@@ -181,7 +181,7 @@ const events = new Map();
 
 function newEvent(id, kind) {
   return {
-    id, kind, phase: 'setup', judgeCount: 3, entrants: [], poomsaePool: DEFAULT_POOL.slice(), poomsaeFrom: POOMSAE_ALL[0], poomsaeTo: POOMSAE_ALL[7], poomsaePerMatch: 2,
+    id, kind, phase: 'setup', judgeCount: 3, entrants: [], poomsaePool: DEFAULT_POOL.slice(), poomsaeFrom: POOMSAE_ALL[0], poomsaeTo: POOMSAE_ALL[7], poomsaePerMatch: 2, drawnPoomsae: null,
     bracket: null, stages: null, stageIdx: 0, current: null, podium: null, seats: {}, lastActive: Date.now(), prelimCount: 0,
   };
 }
@@ -206,7 +206,7 @@ function adminSnapshot(ev) {
   let current = null;
   if (c) {
     current = {
-      type: c.type, status: c.status, poomsae: c.poomsae, poomsaeList: c.poomsaeList || null, pass: c.pass || 0, passCount: c.passCount || 1, passResults: c.passResults || [], matchId: c.matchId || null, entrantId: c.entrantId || null,
+      type: c.type, status: c.status, poomsae: c.poomsae, poomsaeList: c.poomsaeList || null, pass: c.pass || 0, passCount: c.passCount || 1, regularCount: c.regularCount || c.passCount || 1, tiebreak: !!c.tiebreak, passResults: c.passResults || [], matchId: c.matchId || null, entrantId: c.entrantId || null,
       sides: sideInfo(ev, c), deductions: c.deductions, activeSeats: c.activeSeats,
       submitted: c.submitted, result: c.status === 'done' ? c.result : null,
       judgeScores: c.status === 'done' ? Object.fromEntries(Object.entries(c.scores).map(([side, bySeat]) => [side, Object.fromEntries(Object.entries(bySeat).map(([seat, s]) => [seat, { a: s.a, p: s.p, total: s.total }]))])) : null,
@@ -214,7 +214,7 @@ function adminSnapshot(ev) {
   }
   return {
     id: ev.id, kind: ev.kind, phase: ev.phase, judgeCount: ev.judgeCount, entrants: ev.entrants, poomsaePool: ev.poomsaePool,
-    poomsaeAll: POOMSAE_ALL, poomsaeFrom: ev.poomsaeFrom, poomsaeTo: ev.poomsaeTo, poomsaePerMatch: ev.poomsaePerMatch,
+    poomsaeDrawn: ev.drawnPoomsae, poomsaeAll: POOMSAE_ALL, poomsaeFrom: ev.poomsaeFrom, poomsaeTo: ev.poomsaeTo, poomsaePerMatch: ev.poomsaePerMatch,
     seats: seatList(ev), schema: SCHEMAS[ev.kind], deductionValues: DEDUCTION_VALUES, deductionKeys: DEDUCTION_KEYS[ev.kind],
     bracket: ev.bracket ? ev.bracket.map((round, r) => ({ name: roundName(ev.bracket.length, r), matches: round })) : null,
     stages: ev.stages, stageIdx: ev.stageIdx, current, podium: ev.podium,
@@ -225,7 +225,7 @@ function judgeSnapshot(ev, seat) {
   const active = c && c.status === 'scoring' && c.activeSeats.includes(seat);
   return {
     id: ev.id, kind: ev.kind, phase: ev.phase, judgeCount: ev.judgeCount, seat, schema: SCHEMAS[ev.kind],
-    perf: active ? { seq: c.seq, poomsae: c.poomsae, pass: c.pass || 0, passCount: c.passCount || 1, sides: sideInfo(ev, c), mySubmitted: !!c.submitted[seat], myScores: c.submitted[seat] ? Object.fromEntries(Object.entries(c.scores).map(([side, bySeat]) => [side, bySeat[seat] ? { ...bySeat[seat].vals, a: bySeat[seat].a, p: bySeat[seat].p, total: bySeat[seat].total } : null])) : null } : null,
+    perf: active ? { seq: c.seq, poomsae: c.poomsae, pass: c.pass || 0, passCount: c.passCount || 1, tiebreak: !!c.tiebreak, sides: sideInfo(ev, c), mySubmitted: !!c.submitted[seat], myScores: c.submitted[seat] ? Object.fromEntries(Object.entries(c.scores).map(([side, bySeat]) => [side, bySeat[seat] ? { ...bySeat[seat].vals, a: bySeat[seat].a, p: bySeat[seat].p, total: bySeat[seat].total } : null])) : null } : null,
     waitingReview: !!(c && c.status === 'review' && c.activeSeats.includes(seat)),
   };
 }
@@ -240,6 +240,7 @@ function finalizePerf(ev) {
   const c = ev.current;
   const sides = c.type === 'match' ? ['a', 'b'] : ['solo'];
   const one = {};
+  let tbDiff = 0;
   for (const side of sides) {
     const list = Object.values(c.scores[side] || {});
     if (!list.length) return false;
@@ -247,29 +248,46 @@ function finalizePerf(ev) {
   }
   if (c.type === 'match') {
     c.passResults = c.passResults || [];
-    c.passResults.push({ poomsae: c.poomsae, ...one });
-    if (c.pass < c.passCount - 1) {                                          // 다음 품새로: 같은 경기 안에서 채점을 새로 연다
-      c.pass += 1; c.poomsae = c.poomsaeList[c.pass];
+    c.passResults.push({ poomsae: c.poomsae, tb: !!c.tiebreak, ...one });
+    const openPass = () => {                                                  // 같은 경기 안에서 채점을 새로 연다
       const seats = connectedSeats(ev);
       if (seats.length) c.activeSeats = seats;
+      c.poomsae = c.poomsaeList[c.pass];
       c.seq = ++perfSeq; c.status = 'scoring'; c.submitted = {}; c.scores = {};
       c.deductions = Object.fromEntries(sides.map((sd) => [sd, { time: false, line: false, restart: 0 }]));
       c.result = null;
-      return true;
+    };
+    const addTiebreak = () => {                                               // 동점: 아직 하지 않은 다른 품새를 하나 더
+      let cand = ev.poomsaePool.filter((x) => !c.poomsaeList.includes(x));
+      if (!cand.length) cand = ev.poomsaePool.filter((x) => x !== c.poomsae);
+      if (!cand.length) cand = ev.poomsaePool.slice();
+      c.poomsaeList.push(cand[Math.floor(Math.random() * cand.length)]);
+      c.passCount = c.poomsaeList.length; c.pass = c.passCount - 1; c.tiebreak = true;
+      openPass();
+    };
+    if (c.tiebreak) {
+      tbDiff = cmpResult(ev.kind, one.a, one.b);
+      if (tbDiff === 0) { addTiebreak(); return true; }                        // 추가 품새도 동점이면 또 하나
+    } else if (c.pass < c.regularCount - 1) { c.pass += 1; openPass(); return true; }
+    else {
+      const base = { a: mergePasses(c.passResults.map((pr) => pr.a)), b: mergePasses(c.passResults.map((pr) => pr.b)) };
+      if (cmpResult(ev.kind, base.a, base.b) === 0) { addTiebreak(); return true; }
     }
   }
   const result = {};
-  for (const side of sides) result[side] = c.type === 'match' ? mergePasses(c.passResults.map((pr) => pr[side])) : one[side];
+  for (const side of sides) result[side] = c.type === 'match' ? mergePasses(c.passResults.filter((pr) => !pr.tb).map((pr) => pr[side])) : one[side];
   c.result = result;
   c.status = 'done';
   if (c.type === 'match') {
     const m = ev.bracket[c.round][c.index];
-    const diff = cmpResult(ev.kind, result.a, result.b);
-    if (diff === 0) { c.result.tie = true; m.plan = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch); return true; }   // 재경기는 품새를 새로 추첨                    // 완전 동점: 재경기 필요
+    const diff = c.tiebreak ? tbDiff : cmpResult(ev.kind, result.a, result.b);
+    const tbs = c.passResults.filter((pr) => pr.tb).map((pr) => ({ poomsae: pr.poomsae, a: pr.a.total, b: pr.b.total }));
     m.state = 'done';
     m.poomsae = c.poomsaeList.join(' · ');
-    m.result = { winner: diff > 0 ? 'a' : 'b', a: result.a, b: result.b, poomsae: c.poomsaeList.join(' · '), passes: c.passResults.map((pr) => ({ poomsae: pr.poomsae, a: pr.a.total, b: pr.b.total })) };
+    m.result = { winner: diff > 0 ? 'a' : 'b', a: result.a, b: result.b, poomsae: c.poomsaeList.join(' · '), tiebreak: tbs.length > 0,
+      passes: c.passResults.filter((pr) => !pr.tb).map((pr) => ({ poomsae: pr.poomsae, a: pr.a.total, b: pr.b.total })), tb: tbs };
     c.result.winner = m.result.winner;
+    c.result.tb = tbs;
     advanceWinner(ev.bracket, m);
     const last = ev.bracket[ev.bracket.length - 1][0];
     if (last.state === 'done') finishBracket(ev);
@@ -404,7 +422,7 @@ function attach(io, socket, auth) {
     ev.current = null; ev.podium = null; ev.prelimCount = 0;
     if (ev.kind === 'recognized') {
       ev.bracket = buildBracket(ev.entrants); ev.stages = null;
-      for (const m of ev.bracket.flat()) if (!m.bye) m.plan = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);   // 대진 추첨과 함께 경기별 품새도 미리 추첨
+      ev.drawnPoomsae = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);          // 대진 추첨과 함께 품새도 추첨: 모든 경기가 같은 품새
     }
     else { ev.bracket = null; ev.stages = [planStage(ev.entrants.map((e) => e.id), 0)]; ev.stageIdx = 0; }
     ev.phase = 'running';
@@ -412,7 +430,7 @@ function attach(io, socket, auth) {
   }));
 
   socket.on('tkd:reset', admin((ev) => {
-    ev.phase = 'setup'; ev.bracket = null; ev.stages = null; ev.stageIdx = 0; ev.current = null; ev.podium = null;
+    ev.phase = 'setup'; ev.drawnPoomsae = null; ev.bracket = null; ev.stages = null; ev.stageIdx = 0; ev.current = null; ev.podium = null;
     broadcast(ev);
   }));
 
@@ -432,8 +450,8 @@ function attach(io, socket, auth) {
     if (ev.kind !== 'recognized' || ev.phase !== 'running') return;
     const m = ev.bracket.flat().find((x) => x.id === p.matchId);
     if (!m || m.state !== 'pending' || !m.a || !m.b) return err('bad-match');
-    const poomsaeList = m.plan && m.plan.length ? m.plan.slice() : drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);
-    startPerf(ev, { type: 'match', matchId: m.id, round: m.round, index: m.index, poomsae: poomsaeList[0], poomsaeList, pass: 0, passCount: poomsaeList.length, passResults: [] });
+    const poomsaeList = (ev.drawnPoomsae && ev.drawnPoomsae.length ? ev.drawnPoomsae : drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch)).slice();
+    startPerf(ev, { type: 'match', matchId: m.id, round: m.round, index: m.index, poomsae: poomsaeList[0], poomsaeList, pass: 0, passCount: poomsaeList.length, regularCount: poomsaeList.length, tiebreak: false, passResults: [] });
   }));
 
   socket.on('tkd:startSolo', admin((ev, p) => {

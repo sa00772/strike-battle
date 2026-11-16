@@ -312,6 +312,7 @@
       <div class="qr-box" id="qr-blue"></div>
       <div class="join-url" id="url-blue"></div>
       <div class="join-count"><span class="jl">접속 기기</span> <span id="count-blue">0</span>대</div>
+      <button class="small qr-again" id="qrshow-blue" hidden>QR 다시 보기</button>
     </div>
   </section>
 
@@ -378,6 +379,7 @@
       <div class="qr-box" id="qr-red"></div>
       <div class="join-url" id="url-red"></div>
       <div class="join-count"><span class="jl">접속 기기</span> <span id="count-red">0</span>대</div>
+      <button class="small qr-again" id="qrshow-red" hidden>QR 다시 보기</button>
     </div>
   </section>
 </main>
@@ -760,10 +762,21 @@
     cooldownSec = f.cooldownSec;
     renderFlags();
   });
+
+  /* QR은 입장 전에만 표시: 해당 팀에 1대 이상 접속하면 숨김 ('QR 다시 보기'로 임시 표시) */
+  const qrForce = { blue: false, red: false }, lastCount = { blue: -1, red: -1 };
+  function applyJoinView(team, count) {
+    if (lastCount[team] !== count) { lastCount[team] = count; qrForce[team] = false; }
+    const hide = count >= 1 && !qrForce[team];
+    [`jt-${team}`, `qr-${team}`, `url-${team}`].forEach((id) => { $(id).style.display = hide ? 'none' : ''; });
+    $(`qrshow-${team}`).hidden = !(count >= 1 && hide);
+  }
+  ['blue', 'red'].forEach((t) => $(`qrshow-${t}`).addEventListener('click', () => { qrForce[t] = true; applyJoinView(t, lastCount[t]); }));
   socket.on('team:count', (c) => {
     const n = game === 'flag' ? (c.bases || { blue: 0, red: 0 }) : c;
     $('count-blue').textContent = n.blue;
     $('count-red').textContent = n.red;
+    applyJoinView('blue', n.blue); applyJoinView('red', n.red);
   });
   socket.on('timer:end', (e) => beep(e.mode === 'round' ? 3 : 2));
 

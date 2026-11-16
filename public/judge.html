@@ -133,7 +133,7 @@
       const grp = (g) => `<div class="grp"><span>${L[g]}</span><span id="g-${s.side}-${g}">${f2(t[g])}</span></div>` + fields().filter((f) => f.group === g).map((f) => fieldHtml(s.side, f)).join('');
       return `<section class="side ${cls}"><header><div class="who"><b>${s.label ? (s.side === 'a' ? '청 · ' : '홍 · ') : ''}${esc(s.name)}</b><span>${esc(s.team)}</span></div><div class="tot"><b id="t-${s.side}">${f2(t.total)}</b><span>합계</span></div></header>${grp('a')}${grp('p')}</section>`;
     }).join('');
-    const head = `<div style="text-align:center">${p.poomsae ? `<span class="pill">${esc(p.poomsae)}${p.passCount > 1 ? ` · ${p.pass + 1}/${p.passCount}번째 품새` : ''}</span>` : '<span class="pill">채점 중</span>'}</div>`;
+    const head = `<div style="text-align:center">${p.poomsae ? `<span class="pill">${p.tiebreak ? '동점 추가 · ' : ''}${esc(p.poomsae)}${!p.tiebreak && p.passCount > 1 ? ` · ${p.pass + 1}/${p.passCount}번째 품새` : ''}</span>` : '<span class="pill">채점 중</span>'}</div>`;
     const sum = p.sides.length === 2 ? '' : '';
     if (confirming) {
       const rows = p.sides.map((s) => `<div class="side ${s.side === 'solo' ? 'solo' : s.side}"><header><div class="who"><b>${esc(s.name)}</b><span>${s.label ? s.label + '팀' : ''}</span></div><div class="tot"><b>${f2(calc(vals[s.side]).total)}</b><span>합계</span></div></header></div>`).join('');

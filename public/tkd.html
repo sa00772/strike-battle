@@ -60,6 +60,7 @@
   .mrow { display:flex; align-items:center; gap:8px; padding:8px 10px; border-left:5px solid transparent; } .mrow.a { border-left-color:var(--blue); } .mrow.b { border-left-color:var(--red); }
   .mrow + .mrow { border-top:1px solid var(--line); } .mrow .n { flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mrow .s { font-variant-numeric:tabular-nums; font-weight:800; } .mrow.w { background:rgba(255,210,63,.14); } .mrow.l { opacity:.5; } .mrow.empty .n { color:#667; font-weight:500; }
+  .shared { margin:-4px 0 14px; display:flex; flex-wrap:wrap; gap:4px 0; align-items:center; font-weight:700; } .shared .pchip { margin-left:6px; }
   .plan-t { color:var(--gold); font-weight:700; } .mfoot { padding:6px 10px; background:#1a1d27; font-size:.82rem; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
 
   /* 컷오프 표 */
@@ -132,7 +133,7 @@
         </label>
         <div id="pool-wrap">
           <div class="two"><label class="f">품새 범위 (시작)<select id="p-from" aria-label="품새 범위 시작"></select></label><label class="f">품새 범위 (끝)<select id="p-to" aria-label="품새 범위 끝"></select></label></div>
-          <label class="f">경기당 품새 수 (범위 안에서 무작위 추첨)<select id="p-per"><option value="1">1개</option><option value="2" selected>2개 (두 품새 점수 평균)</option></select></label>
+          <label class="f">대회 품새 수 (범위 안에서 무작위 추첨, 모든 경기 동일)<select id="p-per"><option value="1">1개</option><option value="2" selected>2개 (두 품새 점수 평균)</option></select></label>
           <div class="muted" id="pool-note" style="margin:-4px 0 12px;font-size:.85rem"></div>
         </div>
         <div class="plan" id="plan"></div>
@@ -371,6 +372,7 @@
   function startRoll(c) {
     if (c.seq === rollSeq) return;
     rollSeq = c.seq;
+    if (c.tiebreak && c.status === 'scoring') { toast(`동점입니다. 다른 품새를 하나 더 합니다: ${c.poomsae}`); if ($('opt-sfx') && $('opt-sfx').checked) { tone(440, .25, { vol: .25 }); tone(330, .4, { at: .22, vol: .25 }); } return; }
     if (c.type !== 'match' || c.pass !== 0 || c.status !== 'scoring') return;
     rollUntil = Date.now() + 1700; clearInterval(rollTimer);
     rollTimer = setInterval(() => {
@@ -383,7 +385,7 @@
   function poomHtml(c) {
     if (c.type !== 'match' || !c.poomsaeList) return '';
     if (rolling()) return ' · <span class="pchip now" id="cur-poom">품새 추첨 중…</span>';
-    return ' ' + c.poomsaeList.map((n, i) => `<span class="pchip ${c.passCount > 1 && i === c.pass && c.status !== 'done' ? 'now' : ''} ${i < c.pass && c.status !== 'done' ? 'done' : ''}">${c.passCount > 1 ? (i + 1) + '. ' : ''}${esc(n)}</span>`).join('');
+    return ' ' + c.poomsaeList.map((n, i) => `<span class="pchip ${c.passCount > 1 && i === c.pass && c.status !== 'done' ? 'now' : ''} ${i < c.pass && c.status !== 'done' ? 'done' : ''}">${i >= (c.regularCount || c.passCount) ? '동점 ' : c.passCount > 1 ? (i + 1) + '. ' : ''}${esc(n)}</span>`).join('');
   }
 
   /* ------------ 렌더링 ------------ */
@@ -416,7 +418,7 @@
       if (ae !== $('p-to')) $('p-to').value = S.poomsaeTo;
       if (ae !== $('p-per')) $('p-per').value = String(S.poomsaePerMatch);
       const a = S.poomsaeAll.indexOf(S.poomsaeFrom), b = S.poomsaeAll.indexOf(S.poomsaeTo), lo = Math.min(a, b), hi = Math.max(a, b);
-      $('pool-note').textContent = `${S.poomsaeAll[lo]} ~ ${S.poomsaeAll[hi]} (${S.poomsaePool.length}개) 중 경기마다 ${Math.min(S.poomsaePerMatch, S.poomsaePool.length)}개를 무작위로 뽑습니다.`;
+      $('pool-note').textContent = `${S.poomsaeAll[lo]} ~ ${S.poomsaeAll[hi]} (${S.poomsaePool.length}개) 중 ${Math.min(S.poomsaePerMatch, S.poomsaePool.length)}개를 대진 추첨 때 뽑아 모든 경기에 똑같이 적용합니다. 동점이면 다른 품새를 1개 더 합니다.`;
     }
     $('plan').innerHTML = planText(S.entrants.length);
     $('btn-draw').disabled = S.entrants.length < 2;
@@ -439,18 +441,18 @@
     startRoll(c);
     const roundTxt = c.matchId ? (S.bracket.find((r) => r.matches.some((m) => m.id === c.matchId)) || {}).name : (S.stages[S.stageIdx] || {}).name;
     const subm = Object.keys(c.submitted).length, total = c.activeSeats.length;
-    const passTxt = c.passCount > 1 ? ` · 품새 ${c.pass + 1}/${c.passCount}` : '';
-    const statusTxt = c.status === 'scoring' ? `채점 중${passTxt} · 제출 ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : (c.result && c.result.tie ? '동점 — 재경기가 필요합니다' : '확정 완료');
+    const passTxt = c.tiebreak ? ' · 동점 추가 품새' : c.passCount > 1 ? ` · 품새 ${c.pass + 1}/${c.passCount}` : '';
+    const statusTxt = c.status === 'scoring' ? `채점 중${passTxt} · 제출 ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : '확정 완료';
     const sides = c.sides.map((s) => {
       const r = c.result && c.result[s.side];
       const win = c.result && c.result.winner && c.result.winner === s.side;
       const cls = s.side === 'solo' ? '' : s.side;
-      const prevP = (c.passResults || []).map((pr) => `${esc(pr.poomsae)} ${f2(pr[s.side].total)}`).join(' · ');
+      const prevP = (c.passResults || []).map((pr) => `${pr.tb ? '동점 ' : ''}${esc(pr.poomsae)} ${f2(pr[s.side].total)}`).join(' · ');
       const jl = c.judgeScores && c.judgeScores[s.side] ? Object.entries(c.judgeScores[s.side]).map(([k, v]) => `심판${k} ${f2(v.total)}`).join(' · ') : '';
       return `<div class="side ${cls} ${win ? 'win' : ''}">
         <div class="corner">${s.label ? (s.side === 'a' ? '청 (靑)' : '홍 (紅)') : '연기 중'}${win ? ' · 승리' : ''}</div>
         <div class="pname">${esc(s.name)}</div><div class="pteam">${esc(s.team)}</div>
-        ${prevP ? `<div class="jlist">${c.status === 'done' ? '품새별 ' : '확정된 품새 '}${prevP}${c.status === 'done' ? ' → 평균' : ''}</div>` : ''}
+        ${prevP ? `<div class="jlist">${c.status === 'done' ? '품새별 ' : '확정된 품새 '}${prevP}${c.status === 'done' && !(c.result && c.result.tb && c.result.tb.length) ? ' → 평균' : ''}</div>` : ''}
         ${r ? `<div class="bigscore">${f2(r.total)}</div>
           <table class="brk"><tr><td>${LBL().a} 평균</td><td>${f2(r.a)}</td></tr><tr><td>${LBL().p} 평균</td><td>${f2(r.p)}</td></tr><tr><td>감점</td><td>${r.ded ? '−' + f2(r.ded) : '0.00'}</td></tr></table>
           <div class="jlist">${esc(jl)}${r.dropped ? '<br>(최고·최저 점수 제외 평균)' : ''}</div>` : ''}
@@ -459,7 +461,6 @@
     let acts = '';
     if (c.status === 'scoring') acts = `<button class="ctl" id="a-force" ${subm ? '' : 'disabled'}>강제 마감 (제출된 점수만)</button><button class="ctl danger" id="a-cancel">경기 취소</button>`;
     else if (c.status === 'review') acts = `<button class="primary ctl" id="a-final">점수 확정</button><button class="ctl danger" id="a-cancel">경기 취소</button>`;
-    else if (c.result && c.result.tie) acts = `<button class="primary ctl" id="a-rematch" data-m="${esc(c.matchId)}">재경기 시작 (새 품새 추첨)</button>`;
     el.innerHTML = `<div class="cur-head"><div class="cur-title">${esc(roundTxt)}${poomHtml(c)}</div><span class="pill">${statusTxt}</span></div>
       <div class="sides ${c.sides.length === 2 ? 'two' : ''}">${sides}</div><div class="acts">${acts}</div>`;
     el.querySelectorAll('[data-ded]').forEach((b) => b.addEventListener('click', () => {
@@ -483,11 +484,12 @@
         return `<div class="mrow ${side} ${id ? '' : 'empty'} ${w ? 'w' : ''} ${l ? 'l' : ''}"><span class="n">${id ? esc(nameOf(id)) : (m.bye ? '—' : '대기')}</span><span class="s">${res ? f2(res.total) : ''}</span></div>`;
       };
       const ready = m.state === 'pending' && m.a && m.b;
-      const planTxt = m.plan && m.plan.length ? m.plan.join(' · ') : '';
-      const foot = m.bye ? '<span>부전승</span>' : m.state === 'done' ? `<span>${esc(m.result.poomsae || '')}</span>` : `<span class="plan-t" title="이 경기의 품새">${planTxt ? '📋 ' + esc(planTxt) : (m.a && m.b ? '대기' : '상대 미정')}</span>${ready ? `<button class="primary small ctl" data-start="${m.id}" ${busy() || noJudge() ? 'disabled' : ''}>경기 시작</button>` : ''}`;
+      const doneTxt = m.state === 'done' ? (m.result.passes || []).map((x) => x.poomsae).join(' · ') + (m.result.tb && m.result.tb.length ? ' · 동점→ ' + m.result.tb.map((x) => x.poomsae).join(', ') : '') : '';
+      const foot = m.bye ? '<span>부전승</span>' : m.state === 'done' ? `<span>${esc(doneTxt)}</span>` : `<span>${m.a && m.b ? '대기' : '상대 미정'}</span>${ready ? `<button class="primary small ctl" data-start="${m.id}" ${busy() || noJudge() ? 'disabled' : ''}>경기 시작</button>` : ''}`;
       return `<div class="match ${nowId === m.id ? 'now' : ''}">${row('a')}${row('b')}<div class="mfoot">${foot}</div></div>`;
     }).join('')}</div></div>`).join('');
-    $('board').innerHTML = `<h2>토너먼트 대진표</h2><div class="bracket">${cols}</div>`;
+    const shared = (S.poomsaeDrawn || []).map((n, i) => `<span class="pchip now">${S.poomsaeDrawn.length > 1 ? (i + 1) + '. ' : ''}${esc(n)}</span>`).join('');
+    $('board').innerHTML = `<h2>토너먼트 대진표</h2><div class="shared">📋 대회 품새 ${shared}<span class="muted"> · 모든 경기 동일, 동점이면 다른 품새 1개 추가</span></div><div class="bracket">${cols}</div>`;
     $('board').querySelectorAll('[data-start]').forEach((b) => b.addEventListener('click', () => socket.emit('tkd:startMatch', { matchId: b.dataset.start })));
   }
 
