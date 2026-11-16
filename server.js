@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 
@@ -25,6 +26,34 @@ let REST_SEC = Number(process.env.REST_SEC) || 60;     // 휴식 1분 (PC에서 
 const ALLOWED_DURATIONS = [180, 60, 30];               // 선택 가능한 시간: 3분 / 1분 / 30초
 const HIT_MIN_INTERVAL_MS = 250;                        // 서버측 연타 방지(클라이언트 쿨타임 0.3초보다 약간 짧게)
 const TEAMS = ['blue', 'red'];
+
+/* ------------------------- 접근 제어 (코드 방식) -------------------------
+ *  ADMIN_PASSWORD : PC 점수판(타이머/점수 조작)에 들어갈 때 필요한 관리자 비밀번호
+ *  ACCESS_CODE    : 모바일 패드에 들어갈 때 필요한 참가 코드
+ *  둘 다 비워 두면 해당 보호는 꺼집니다(누구나 접속 가능).
+ */
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ACCESS_CODE = process.env.ACCESS_CODE || '';
+
+function safeEqual(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+// 틀린 코드를 5번 입력하면 해당 IP를 60초간 잠금
+const MAX_FAILS = 5;
+const LOCK_MS = 60 * 1000;
+const failures = new Map();
+const ipOf = (socket) =>
+  (socket.handshake.headers['x-forwarded-for'] || '').split(',')[0].trim() || socket.handshake.address;
+const isLocked = (ip) => { const f = failures.get(ip); return !!(f && f.until > Date.now()); };
+function recordFail(ip) {
+  const f = failures.get(ip) || { count: 0, until: 0 };
+  if (f.until && f.until <= Date.now()) { f.count = 0; f.until = 0; }
+  f.count += 1;
+  if (f.count >= MAX_FAILS) { f.until = Date.now() + LOCK_MS; f.count = 0; }
+  failures.set(ip, f);
+}
 
 /* ------------------------- 로컬 IP 자동 감지 ------------------------- */
 function getLanIPs() {
@@ -134,12 +163,14 @@ function connectedCounts() {
   const size = (room) => io.sockets.adapter.rooms.get(room)?.size || 0;
   return { blue: size('team:blue'), red: size('team:red') };
 }
+// 인증을 통과해 방(scoreboard / team:*)에 들어온 소켓에게만 전송
+const toJoined = (event, data) => io.to('scoreboard').to('team:blue').to('team:red').emit(event, data);
 const emitState = () => {
   const s = publicState();
   lastEmittedSec = s.remainingSec;
-  io.emit('game:state', s);
+  toJoined('game:state', s);
 };
-const emitScores = (lastHit = null) => io.emit('score:update', { ...scores, lastHit });
+const emitScores = (lastHit = null) => toJoined('score:update', { ...scores, lastHit });
 const emitCounts = () => io.to('scoreboard').emit('team:count', connectedCounts());
 
 function finishTimer() {
@@ -148,7 +179,7 @@ function finishTimer() {
   game.remainingMs = 0;
   game.finished = true;
   const winner = scores.blue === scores.red ? 'draw' : scores.blue > scores.red ? 'blue' : 'red';
-  io.emit('timer:end', { mode: finishedMode, scores: { ...scores }, winner });
+  toJoined('timer:end', { mode: finishedMode, scores: { ...scores }, winner });
   emitState();
 }
 
@@ -162,19 +193,35 @@ setInterval(() => {
 
 /* ---------------------------- 소켓 처리 ---------------------------- */
 io.on('connection', (socket) => {
-  // 역할 등록: 점수판 또는 팀 패드
+  // 역할 등록 + 인증: 점수판(관리자 비밀번호) 또는 팀 패드(참가 코드)
   socket.on('join', (payload = {}) => {
     for (const r of ['scoreboard', ...TEAMS.map((t) => `team:${t}`)]) socket.leave(r);
     socket.data.role = null;
     socket.data.team = null;
 
+    const ip = ipOf(socket);
+    const reject = (reason) => socket.emit('join:result', { ok: false, reason });
+    if (isLocked(ip)) return reject('rate-limited');
+
     if (payload.role === 'scoreboard') {
+      if (ADMIN_PASSWORD) {
+        if (!payload.password) return reject('password-required');
+        if (!safeEqual(payload.password, ADMIN_PASSWORD)) { recordFail(ip); return reject('bad-password'); }
+        failures.delete(ip);
+      }
       socket.data.role = 'scoreboard';
       socket.join('scoreboard');
+      socket.emit('join:result', { ok: true, role: 'scoreboard', accessCode: ACCESS_CODE || null });
     } else if (TEAMS.includes(payload.team)) {
+      if (ACCESS_CODE) {
+        if (!payload.code) return reject('code-required');
+        if (!safeEqual(payload.code, ACCESS_CODE)) { recordFail(ip); return reject('bad-code'); }
+        failures.delete(ip);
+      }
       socket.data.role = 'pad';
       socket.data.team = payload.team;
       socket.join(`team:${payload.team}`);
+      socket.emit('join:result', { ok: true, role: 'pad', team: payload.team });
     } else {
       return;
     }
@@ -277,6 +324,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`  PC 점수판        : ${proto}://${primary}:${PORT}/`);
   console.log(`  청팀 모바일      : ${proto}://${primary}:${PORT}/mobile.html?team=blue`);
   console.log(`  홍팀 모바일      : ${proto}://${primary}:${PORT}/mobile.html?team=red`);
+  console.log(`\n  관리자 비밀번호(ADMIN_PASSWORD) : ${ADMIN_PASSWORD ? '설정됨' : '⚠ 미설정 - 누구나 점수판 조작 가능'}`);
+  console.log(`  참가 코드(ACCESS_CODE)         : ${ACCESS_CODE ? '설정됨' : '⚠ 미설정 - 누구나 모바일 참가 가능'}`);
   if (!USE_HTTP) {
     console.log('\n  ※ 자체 서명 인증서라서 처음 접속 시 보안 경고가 나옵니다.');
     console.log('    "고급 → 계속 진행(안전하지 않음)"을 눌러주세요.');

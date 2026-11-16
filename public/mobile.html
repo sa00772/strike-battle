@@ -59,7 +59,7 @@
 
   .spacer { flex: 1; }
 
-  .start-btn {
+  .start-btn, .gate-btn {
     width: 100%; max-width: 420px;
     font: inherit; font-size: 1.5rem; font-weight: 900;
     padding: 1.1em 0;
@@ -67,7 +67,7 @@
     background: #fff; color: #11141b;
     box-shadow: 0 6px 0 rgba(0,0,0,.28);
   }
-  .start-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,.28); }
+  .start-btn:active, .gate-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,.28); }
 
   .panel { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 12px; }
   body.running .panel { display: flex; }
@@ -93,6 +93,15 @@
   .chooser a { display: block; text-align: center; text-decoration: none; font-weight: 900; font-size: 1.5rem; padding: 1.1em; border-radius: 16px; color: #fff; }
   .chooser a.b { background: #2f6bff; } .chooser a.r { background: #ff4536; }
 
+  .gate { display: none; width: 100%; max-width: 420px; flex-direction: column; gap: 14px; margin-top: 12vh; align-items: center; }
+  body.need-code .gate { display: flex; }
+  body.need-code .app-main { display: none; }
+  .gate input {
+    width: 100%; font: inherit; font-size: 1.5rem; text-align: center; letter-spacing: .1em;
+    padding: .8em; border-radius: 14px; border: 0; background: rgba(255,255,255,.95); color: #11141b;
+    user-select: text; -webkit-user-select: text;
+  }
+
   .app-main { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; }
 
   /* 타격 피드백 */
@@ -114,6 +123,13 @@
     <p style="text-align:center;font-size:1.1rem">참가할 팀을 선택하세요</p>
     <a class="b" href="?team=blue">청팀으로 참가</a>
     <a class="r" href="?team=red">홍팀으로 참가</a>
+  </div>
+
+  <div class="gate" id="gate">
+    <p style="font-size:1.2rem;font-weight:800">참가 코드를 입력하세요</p>
+    <input id="code-input" type="text" autocomplete="off" autocapitalize="characters" maxlength="30" placeholder="참가 코드" aria-label="참가 코드">
+    <button class="gate-btn" id="code-btn">입장하기</button>
+    <div class="msg" id="gate-msg" role="alert"></div>
   </div>
 
   <div class="app-main">
@@ -212,7 +228,28 @@
     }
   }
 
-  socket.on('connect', () => { if (TEAM_LABEL[team]) socket.emit('join', { team }); });
+  let accessCode = '';
+  try { accessCode = localStorage.getItem('strike-code') || ''; } catch (_) {}
+  const joinNow = () => socket.emit('join', { team, code: accessCode });
+  const GATE_MSG = {
+    'bad-code': '참가 코드가 맞지 않습니다.',
+    'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.',
+    'code-required': '',
+  };
+  socket.on('connect', () => { if (TEAM_LABEL[team]) joinNow(); });
+  socket.on('join:result', (r) => {
+    if (r.ok) {
+      document.body.classList.remove('need-code');
+      try { localStorage.setItem('strike-code', accessCode); } catch (_) {}
+    } else {
+      if (r.reason === 'bad-code') { accessCode = ''; try { localStorage.removeItem('strike-code'); } catch (_) {} }
+      document.body.classList.add('need-code');
+      $('gate-msg').textContent = GATE_MSG[r.reason] || '';
+    }
+  });
+  const submitCode = () => { accessCode = $('code-input').value.trim(); joinNow(); };
+  $('code-btn').addEventListener('click', submitCode);
+  $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
   socket.on('disconnect', () => { $('status').textContent = '연결 끊김 - 재연결 중'; });
   socket.on('game:state', (s) => { game = s; renderStatus(); });
   socket.on('score:update', (s) => {
