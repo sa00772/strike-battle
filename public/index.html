@@ -3,23 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#fbfbfd">
+<meta name="theme-color" content="#000000">
 <title>플레이 라운지</title>
 <meta name="description" content="스마트폰으로 함께 즐기는 도장·체육관 실시간 게임 모음">
+<!-- 배달의민족 주아 (우아한형제들, SIL OFL 1.1) -->
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="stylesheet" href="https://unpkg.com/@kfonts/bm-jua/index.css">
 <style>
   :root {
-    --bg: #fbfbfd; --tile: #f5f5f7; --ink: #1d1d1f; --muted: #6e6e73; --line: #d2d2d7;
+    color-scheme: dark;
+    --bg: #000; --tile: #161617; --ink: #f5f5f7; --muted: #a1a1a6; --line: #333336;
     --blue: #2f6bff; --red: #ff4536; --green: #22c55e; --purple: #a855f7;
-    --nav-bg: rgba(251,251,253,.8);
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #000; --tile: #161617; --ink: #f5f5f7; --muted: #a1a1a6; --line: #333336; --nav-bg: rgba(22,22,23,.8); }
+    --nav-bg: rgba(22,22,23,.8);
+    --font: "배달의민족 주아", "배달의민족주아", "bm-jua", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; animation: none !important; } }
-  body { font-family: var(--font); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.4; }
+  body { font-synthesis: none; font-family: var(--font); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.4; }
   a { color: inherit; text-decoration: none; }
   a:focus-visible, button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; border-radius: 8px; }
 
@@ -36,53 +37,53 @@
   @media (max-width: 700px) { .gnav-in { gap: 14px; padding: 0 14px; } .gnav .cta { display: none; } .gnav ul { justify-content: flex-start; gap: 18px; } }
 
   /* ---------- 히어로 ---------- */
-  .hero { text-align: center; padding: clamp(56px, 11vh, 120px) 20px clamp(40px, 8vh, 80px); }
-  .eyebrow { font-size: clamp(1rem, 1.6vw, 1.3rem); font-weight: 600; color: var(--muted); }
-  .hero h1 { font-size: clamp(2.6rem, 8vw, 5.6rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.05; margin: .25em 0 .35em; }
+  .hero { text-align: center; padding: clamp(28px, 6vh, 56px) 20px clamp(22px, 4vh, 40px); }
+  .eyebrow { font-size: clamp(.85rem, 1.2vw, 1rem); font-weight: 600; color: var(--muted); }
+  .hero h1 { font-size: clamp(1.9rem, 5.2vw, 3.4rem); font-weight: 800; letter-spacing: -.01em; line-height: 1.05; margin: .25em 0 .35em; }
   .grad { background: linear-gradient(90deg, var(--blue), #a855f7 50%, var(--red)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .hero p { font-size: clamp(1.05rem, 2.2vw, 1.55rem); color: var(--muted); max-width: 680px; margin: 0 auto; line-height: 1.5; }
-  .links { margin-top: 1.6em; display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; font-size: clamp(1rem, 1.8vw, 1.3rem); }
+  .hero p { font-size: clamp(.9rem, 1.5vw, 1.1rem); color: var(--muted); max-width: 520px; margin: 0 auto; line-height: 1.5; }
+  .links { margin-top: 1.1em; display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-size: clamp(.9rem, 1.3vw, 1.05rem); }
   .links a { color: var(--blue); } .links a:hover { text-decoration: underline; }
   .links a::after { content: " ›"; }
 
   /* ---------- 타일 ---------- */
-  .tiles { max-width: 1240px; margin: 0 auto; padding: 0 12px 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  @media (max-width: 860px) { .tiles { grid-template-columns: 1fr; } }
-  .tile { position: relative; overflow: hidden; background: var(--tile); border-radius: 28px; text-align: center; padding: clamp(36px, 6vw, 56px) 24px 0;
-    min-height: clamp(480px, 62vw, 620px); display: flex; flex-direction: column; align-items: center; scroll-margin-top: 60px; }
-  .tile .tag { font-size: .85rem; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
-  .tile h2 { font-size: clamp(1.9rem, 4.2vw, 3rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; margin: .2em 0 .25em; }
-  .tile p.sub { font-size: clamp(1rem, 1.6vw, 1.3rem); color: var(--muted); max-width: 420px; line-height: 1.45; }
-  .tile .links { margin-top: 1em; font-size: 1.1rem; }
-  .art { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; margin-top: 18px; min-height: 220px; }
-  .tile.dark { background: #000; color: #f5f5f7; } .tile.dark p.sub { color: #a1a1a6; }
-  .tile.wide { grid-column: 1 / -1; min-height: clamp(460px, 48vw, 560px); }
+  .tiles { max-width: 1040px; margin: 0 auto; padding: 0 12px 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: 1fr; gap: 8px; } .tile, .tile.wide { min-height: 270px; } .art { min-height: 110px; } }
+  .tile { position: relative; overflow: hidden; background: var(--tile); border-radius: 22px; text-align: center; padding: clamp(22px, 3.4vw, 32px) 18px 0;
+    min-height: clamp(300px, 36vw, 380px); display: flex; flex-direction: column; align-items: center; scroll-margin-top: 60px; }
+  .tile .tag { font-size: .75rem; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+  .tile h2 { font-size: clamp(1.35rem, 2.8vw, 1.9rem); font-weight: 800; letter-spacing: 0; line-height: 1.1; margin: .2em 0 .25em; }
+  .tile p.sub { font-size: clamp(.85rem, 1.2vw, 1rem); color: var(--muted); max-width: 360px; line-height: 1.45; }
+  .tile .links { margin-top: .7em; font-size: .95rem; }
+  .art { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; margin-top: 12px; min-height: 130px; }
+  .tile.dark { background: #000; color: #f5f5f7; box-shadow: inset 0 0 0 1px #2a2a2d; } .tile.dark p.sub { color: #a1a1a6; }
+  .tile.wide { grid-column: 1 / -1; min-height: clamp(300px, 30vw, 340px); }
   .tile.strike { --accent: var(--red); } .tile.flag { --accent: var(--blue); } .tile.react { --accent: var(--green); } .tile.flip { --accent: var(--purple); }
   .tile.mission { --accent: #ff453a; }
 
   /* ---------- 일러스트 ---------- */
-  .art svg { width: min(78%, 360px); height: auto; display: block; }
-  .go-orb { width: min(66%, 300px); aspect-ratio: 1; border-radius: 50%; margin-bottom: -10%;
-    background: radial-gradient(circle at 35% 30%, #86efac, #22c55e 55%, #15803d); box-shadow: 0 0 80px 10px rgba(34,197,94,.45);
-    display: grid; place-items: center; color: #06240f; font-weight: 900; font-size: clamp(2.2rem, 6vw, 3.4rem); animation: pulse 2.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { transform: scale(1.04); box-shadow: 0 0 110px 22px rgba(34,197,94,.5); } }
-  .mini-board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; width: min(78%, 330px); aspect-ratio: 1; margin-bottom: -6%; transform: perspective(900px) rotateX(18deg); }
-  .mini-board i { border-radius: 6px; background: #d2d2d7; } @media (prefers-color-scheme: dark) { .mini-board i { background: #3a3a3c; } }
+  .art svg { width: min(62%, 250px); height: auto; display: block; }
+  .go-orb { width: min(46%, 170px); aspect-ratio: 1; border-radius: 50%; margin-bottom: -10%;
+    background: radial-gradient(circle at 35% 30%, #86efac, #22c55e 55%, #15803d); box-shadow: 0 0 50px 6px rgba(34,197,94,.45);
+    display: grid; place-items: center; color: #06240f; font-weight: 900; font-size: clamp(1.5rem, 4vw, 2rem); animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.04); box-shadow: 0 0 70px 12px rgba(34,197,94,.5); } }
+  .mini-board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; width: min(56%, 210px); aspect-ratio: 1; margin-bottom: -6%; transform: perspective(900px) rotateX(18deg); }
+  .mini-board i { border-radius: 4px; background: #3a3a3c; }
   .mini-board i.b { background: var(--blue); } .mini-board i.r { background: var(--red); }
-  .alert { width: min(92%, 640px); margin: 0 auto; border-radius: 22px 22px 0 0; padding: 26px 24px 30px; text-align: center;
+  .alert { width: min(88%, 460px); margin: 0 auto; border-radius: 16px 16px 0 0; padding: 16px 16px 18px; text-align: center;
     background: repeating-linear-gradient(45deg, #14080a 0 22px, #2a0d10 22px 44px); border: 1px solid #3a1417; border-bottom: 0; }
-  .alert b { display: block; color: #ff4d4d; font-size: clamp(1rem, 2.6vw, 1.6rem); letter-spacing: .04em; }
-  .alert span { display: block; font-size: clamp(1.5rem, 4.4vw, 2.8rem); font-weight: 900; margin: .3em 0; }
-  .alert em { font-style: normal; font-size: clamp(2.6rem, 8vw, 4.6rem); font-weight: 900; color: #ffd23f; font-variant-numeric: tabular-nums; }
+  .alert b { display: block; color: #ff4d4d; font-size: clamp(.8rem, 1.8vw, 1rem); letter-spacing: .04em; }
+  .alert span { display: block; font-size: clamp(1.1rem, 2.8vw, 1.6rem); font-weight: 900; margin: .25em 0; }
+  .alert em { font-style: normal; font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 900; color: #ffd23f; font-variant-numeric: tabular-nums; }
 
   /* ---------- 사용 방법 ---------- */
-  .how { max-width: 980px; margin: 0 auto; padding: clamp(64px, 12vh, 120px) 20px; text-align: center; scroll-margin-top: 48px; }
-  .how h2 { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -.02em; }
-  .steps { margin-top: 44px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; text-align: left; }
-  .step .n { font-size: 3.2rem; font-weight: 800; color: var(--blue); line-height: 1; }
-  .step h3 { font-size: 1.25rem; margin: .5em 0 .3em; }
-  .step p { color: var(--muted); font-size: 1rem; line-height: 1.55; }
-  footer { border-top: 1px solid var(--line); padding: 28px 20px 48px; text-align: center; color: var(--muted); font-size: .85rem; }
+  .how { max-width: 880px; margin: 0 auto; padding: clamp(36px, 7vh, 64px) 20px; text-align: center; scroll-margin-top: 48px; }
+  .how h2 { font-size: clamp(1.4rem, 3.4vw, 2.1rem); font-weight: 800; letter-spacing: 0; }
+  .steps { margin-top: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: left; }
+  .step .n { font-size: 1.9rem; font-weight: 800; color: var(--blue); line-height: 1; }
+  .step h3 { font-size: 1.05rem; margin: .35em 0 .2em; }
+  .step p { color: var(--muted); font-size: .9rem; line-height: 1.5; }
+  footer { border-top: 1px solid var(--line); padding: 20px 20px 32px; text-align: center; color: var(--muted); font-size: .85rem; }
 </style>
 </head>
 <body>
@@ -178,7 +179,7 @@
   </div>
 </section>
 
-<footer>플레이 라운지 · 점수판은 관리자 비밀번호로 보호됩니다.</footer>
+<footer>플레이 라운지 · 점수판은 관리자 비밀번호로 보호됩니다.<br>글꼴: 배달의민족 주아 © 우아한형제들 (SIL OFL 1.1)</footer>
 
 <script>
   // 판 뒤집기 미리보기: 청(왼쪽 위) · 홍(오른쪽 아래) 영역이 섞인 9x9 판
