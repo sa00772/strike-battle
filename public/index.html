@@ -67,6 +67,16 @@
   .tile.recog { --accent: var(--blue); } .tile.free { --accent: #f5a524; }
   .bracket-art { width: min(80%, 300px); } .bracket-art svg { width: 100%; }
 
+  .info { margin-top: .5em; max-width: 360px; }
+  .info summary { display: inline-block; cursor: pointer; list-style: none; font-size: .8rem; font-weight: 700; padding: .3em .9em; border-radius: 999px; background: rgba(120,120,128,.18); color: var(--muted); user-select: none; }
+  .info summary::-webkit-details-marker { display: none; }
+  .info summary::after { content: " ▾"; }
+  .info[open] summary::after { content: " ▴"; }
+  .info summary:hover { background: rgba(120,120,128,.3); }
+  .info summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .info p.sub { margin-top: .6em; }
+  .tile.dark .info summary { background: rgba(255,255,255,.12); }
+
   /* ---------- 일러스트 ---------- */
   .art svg { width: min(62%, 250px); height: auto; display: block; }
   .go-orb { width: min(46%, 170px); aspect-ratio: 1; border-radius: 50%; margin-bottom: -10%;
@@ -120,7 +130,7 @@
   <section class="tile strike" id="strike" aria-labelledby="t-strike">
     <span class="tag">모션 센서</span>
     <h2 id="t-strike">타격 대결</h2>
-    <p class="sub">휴대폰을 휘두르면 센서가 타격을 감지해 점수가 올라갑니다.</p>
+    <details class="info"><summary>설명 보기</summary><p class="sub">휴대폰을 휘두르면 센서가 타격을 감지해 점수가 올라갑니다.</p></details>
     <div class="links"><a href="/scoreboard.html?game=strike">점수판 열기</a></div>
     <div class="art" aria-hidden="true">
       <svg viewBox="0 0 360 260">
@@ -136,7 +146,7 @@
   <section class="tile flag" id="flag" aria-labelledby="t-flag">
     <span class="tag">뛰어다니기</span>
     <h2 id="t-flag">사이버 쟁탈전</h2>
-    <p class="sub">체육관 양 끝의 기지 화면을 터치해 상대 깃발을 빼앗으세요.</p>
+    <details class="info"><summary>설명 보기</summary><p class="sub">체육관 양 끝의 기지 화면을 터치해 상대 깃발을 빼앗으세요.</p></details>
     <div class="links"><a href="/scoreboard.html?game=flag">점수판 열기</a></div>
     <div class="art" aria-hidden="true">
       <svg viewBox="0 0 360 260">
@@ -151,7 +161,7 @@
   <section class="tile react dark" id="react" aria-labelledby="t-react">
     <span class="tag">반응속도</span>
     <h2 id="t-react">반응속도 게임</h2>
-    <p class="sub">초록불이 켜지는 순간, 먼저 누르는 팀이 점수를 얻습니다.</p>
+    <details class="info"><summary>설명 보기</summary><p class="sub">초록불이 켜지는 순간, 먼저 누르는 팀이 점수를 얻습니다.</p></details>
     <div class="links"><a href="/scoreboard.html?game=neon" style="color:#6fe39a">점수판 열기</a></div>
     <div class="art" aria-hidden="true"><div class="go-orb">지금!</div></div>
   </section>
@@ -159,7 +169,7 @@
   <section class="tile flip" id="flip" aria-labelledby="t-flip">
     <span class="tag">팀 전략</span>
     <h2 id="t-flip">디지털 판 뒤집기</h2>
-    <p class="sub">9x9 판을 우리 팀 색으로 뒤집으세요. 1분 30초, 실시간 점수 바.</p>
+    <details class="info"><summary>설명 보기</summary><p class="sub">9x9 판을 우리 팀 색으로 뒤집으세요. 1분 30초, 실시간 점수 바.</p></details>
     <div class="links"><a href="/scoreboard.html?game=flip">점수판 열기</a></div>
     <div class="art" aria-hidden="true"><div class="mini-board" id="mini-board"></div></div>
   </section>
@@ -167,7 +177,7 @@
   <section class="tile mission dark wide" id="mission" aria-labelledby="t-mission">
     <span class="tag">모든 게임에서 사용</span>
     <h2 id="t-mission">돌발 미션 덱</h2>
-    <p class="sub">사범님이 문구를 입력하면 경기가 멈추고, 대화면과 모든 휴대폰에 긴급 미션이 나타납니다.</p>
+    <details class="info"><summary>설명 보기</summary><p class="sub">사범님이 문구를 입력하면 경기가 멈추고, 대화면과 모든 휴대폰에 긴급 미션이 나타납니다.</p></details>
     <div class="links"><a href="#how" style="color:#ff6961">사용 방법 보기</a></div>
     <div class="art" aria-hidden="true">
       <div class="alert"><b>🚨 EMERGENCY MISSION! 🚨</b><span>전원 푸시업 5개!</span><em>8초</em></div>

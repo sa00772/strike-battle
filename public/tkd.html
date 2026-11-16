@@ -37,6 +37,8 @@
   .cur { border:2px solid #3a4152; } .cur.live { border-color:var(--gold); }
   .cur-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
   .cur-title { font-size:1.15rem; font-weight:900; } .pill { background:var(--panel2); padding:.25em .8em; border-radius:999px; font-size:.9rem; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .pchip { display:inline-block; margin-left:6px; padding:.1em .7em; border-radius:999px; background:var(--panel2); color:var(--gold); font-size:.95rem; border:1px solid transparent; } .pchip.now { border-color:var(--gold); background:#3a3520; } .pchip.done { color:var(--muted); text-decoration:line-through; }
   .sides { display:grid; gap:14px; } .sides.two { grid-template-columns:1fr 1fr; }
   .side { border-radius:14px; padding:16px; border:2px solid var(--line); background:var(--panel2); text-align:center; }
   .side.a { border-color:var(--blue); background:linear-gradient(180deg, rgba(47,107,255,.25), rgba(47,107,255,.05)); }
@@ -72,6 +74,36 @@
 
   .overlay { position:fixed; inset:0; background:rgba(10,12,18,.94); display:none; align-items:center; justify-content:center; z-index:60; flex-direction:column; gap:14px; }
   .overlay.show { display:flex; } .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#b3261e; color:#fff; padding:.7em 1.2em; border-radius:12px; font-weight:700; z-index:70; display:none; max-width:90vw; }
+
+  /* 진행 큐 + 시간 */
+  .stage-top { display:flex; gap:18px; flex-wrap:wrap; align-items:stretch; }
+  .cues { flex:1 1 420px; display:flex; flex-direction:column; gap:10px; }
+  .cue-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .cue-btn { flex:1 1 90px; font-size:1.25rem; padding:.9em .4em; border-radius:14px; background:#2a2f3b; border:2px solid transparent; }
+  .cue-btn small { display:block; font-size:.65rem; font-weight:600; opacity:.7; letter-spacing:.06em; }
+  .cue-btn.next { border-color:var(--gold); background:#3a3520; } .cue-btn.done { opacity:.5; }
+  .cue-btn.c-start { background:#8c2a1f; } .cue-btn.c-start:hover:not(:disabled) { background:#a8352a; }
+  .opts { display:flex; gap:16px; flex-wrap:wrap; color:var(--muted); font-size:.85rem; align-items:center; } .opts label { display:flex; gap:6px; align-items:center; cursor:pointer; } .opts input { width:auto; margin:0; } .opts label { white-space:nowrap; }
+  .timer { flex:0 1 340px; min-width:260px; background:var(--panel2); border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; text-align:center; }
+  .timer .tl { color:var(--muted); font-size:.85rem; font-weight:700; }
+  .timer .tv { font-size:3.4rem; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; } .timer .tv small { font-size:1.2rem; font-weight:700; margin-left:.15em; }
+  .timer.over .tv { color:#ff6b5e; } .timer.ok .tv { color:#6fe39a; } .timer.low .tv { color:var(--gold); }
+  .tbar { position:relative; height:10px; background:#12141b; border-radius:99px; overflow:visible; } .tbar i { display:block; height:100%; width:0; background:#fff; border-radius:99px; } .tbar b { position:absolute; top:-3px; width:2px; height:16px; background:var(--gold); }
+  .tverdict { min-height:1.4em; font-weight:800; font-size:.95rem; }
+  .tlim { display:flex; gap:8px; justify-content:center; align-items:center; color:var(--muted); font-size:.8rem; } .tlim input { width:58px; padding:.25em .4em; text-align:center; }
+  .trow { display:grid; grid-template-columns:2fr 1fr; gap:8px; }
+
+  /* 큐 오버레이 (먹빛 한지 질감) */
+  .cue-ov { position:fixed; inset:0; z-index:80; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.2em; pointer-events:none; opacity:0; transition:opacity .25s;
+    background: radial-gradient(ellipse at 50% 45%, rgba(40,34,28,.55), rgba(6,6,8,.9) 70%); }
+  .cue-ov.show { opacity:1; }
+  .cue-ov::before { content:""; position:absolute; inset:0; opacity:.5; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .9  0 0 0 0 .85  0 0 0 0 .75  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+  .cue-ov::after { content:""; position:absolute; inset:5vmin; border:2px solid rgba(255,255,255,.18); border-radius:6px; box-shadow: inset 0 0 80px rgba(0,0,0,.55); }
+  .cue-ov .cw { position:relative; z-index:1; font-family:"Noto Serif KR","Nanum Myeongjo","Batang","Malgun Gothic",serif; font-weight:900; font-size:clamp(5rem,22vw,20rem); line-height:1.05; letter-spacing:.04em; color:var(--cc,#f5f0e6);
+    text-shadow:0 0 .12em var(--cc,#fff), 0 .03em 0 rgba(0,0,0,.6), 0 0 .6em rgba(0,0,0,.7); transform:scale(.92); transition:transform .35s cubic-bezier(.2,1.4,.4,1); }
+  .cue-ov.show .cw { transform:scale(1); }
+  .cue-ov .cs { position:relative; z-index:1; font-size:clamp(1rem,3vw,2.2rem); letter-spacing:.35em; color:rgba(245,240,230,.75); text-transform:uppercase; }
   body.present .ctl { display:none !important; }
   @media (max-width:700px) { .sides.two { grid-template-columns:1fr; } }
 </style>
@@ -98,9 +130,11 @@
         <label class="f">심판 수 (1~5명)
           <select id="judges"><option value="1">1명</option><option value="2">2명</option><option value="3" selected>3명</option><option value="4">4명</option><option value="5">5명 (최고·최저 제외 평균)</option></select>
         </label>
-        <label class="f" id="pool-wrap">경기 품새 목록 (쉼표로 구분, 경기마다 무작위 지정)
-          <input id="pool" type="text" value="태극 1장, 태극 2장, 태극 3장, 태극 4장, 태극 5장, 태극 6장, 태극 7장, 태극 8장">
-        </label>
+        <div id="pool-wrap">
+          <div class="two"><label class="f">품새 범위 (시작)<select id="p-from" aria-label="품새 범위 시작"></select></label><label class="f">품새 범위 (끝)<select id="p-to" aria-label="품새 범위 끝"></select></label></div>
+          <label class="f">경기당 품새 수 (범위 안에서 무작위 추첨)<select id="p-per"><option value="1">1개</option><option value="2" selected>2개 (두 품새 점수 평균)</option></select></label>
+          <div class="muted" id="pool-note" style="margin:-4px 0 12px;font-size:.85rem"></div>
+        </div>
         <div class="plan" id="plan"></div>
         <div class="row"><button class="primary" id="btn-draw">대진 추첨 시작</button><span class="muted" id="draw-hint"></span></div>
         <div class="qr" style="margin-top:16px">
@@ -111,6 +145,23 @@
     </div>
   </section>
 
+  <section class="card" id="stage" hidden>
+    <h2>경기 진행</h2>
+    <div class="stage-top">
+      <div class="cues ctl">
+        <div class="cue-row" id="cue-row"></div>
+        <div class="opts"><label><input type="checkbox" id="opt-sfx" checked> 효과음</label><label><input type="checkbox" id="opt-voice" checked> 음성 안내</label><span id="cue-now" class="muted"></span></div>
+      </div>
+      <div class="timer" id="timer">
+        <div class="tl">연기 시간</div>
+        <div class="tv"><span id="t-val">0.0</span><small>초</small></div>
+        <div class="tbar"><i id="t-bar"></i><b id="t-min"></b></div>
+        <div class="tverdict" id="t-verdict"></div>
+        <div class="trow ctl"><button id="t-toggle">⏱ 시작</button><button id="t-reset">초기화</button></div>
+        <div class="tlim ctl">적정 시간 <input id="lim-min" type="number" min="0" max="600" aria-label="최소 시간(초)"> ~ <input id="lim-max" type="number" min="1" max="600" aria-label="최대 시간(초)"> 초</div>
+      </div>
+    </div>
+  </section>
   <section class="card cur" id="cur" hidden></section>
   <section class="card" id="board" hidden></section>
   <section class="card" id="final" hidden></section>
@@ -125,6 +176,7 @@
     <div id="login-err" role="alert" style="color:#ff8a80;min-height:1.3em"></div>
   </form>
 </div>
+<div class="cue-ov" id="cue-ov" aria-hidden="true"><div class="cw" id="cue-w"></div><div class="cs" id="cue-s"></div></div>
 <div class="toast" id="toast" role="alert"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -208,16 +260,131 @@
     return `<b>${n}명 · 컷오프</b><br>예선(${g}개 조, 조별 상위 50% 진출) → 준결승(상위 8명) → 결승<br><span class="muted">진출자가 20명 이상이면 예선을 한 번 더 진행합니다.</span>`;
   }
   function sendConfig() {
-    const payload = { judgeCount: Number($('judges').value), entrants: $('entrants').value, poomsaePool: $('pool').value };
+    const payload = { judgeCount: Number($('judges').value), entrants: $('entrants').value };
+    if (kind === 'recognized' && $('p-from').options.length) Object.assign(payload, { poomsaeFrom: $('p-from').value, poomsaeTo: $('p-to').value, poomsaePerMatch: Number($('p-per').value) });
     const key = JSON.stringify(payload); if (key === lastSent) return; lastSent = key;
     socket.emit('tkd:config', payload);
   }
   const queueConfig = () => { $('plan').innerHTML = planText(parseCount()); clearTimeout(cfgTimer); cfgTimer = setTimeout(sendConfig, 350); };
-  ['entrants', 'judges', 'pool'].forEach((id) => $(id).addEventListener('input', queueConfig));
+  ['entrants', 'judges', 'p-from', 'p-to', 'p-per'].forEach((id) => $(id).addEventListener('input', queueConfig));
   $('btn-draw').addEventListener('click', () => { sendConfig(); setTimeout(() => socket.emit('tkd:draw'), 120); });
   $('btn-reset').addEventListener('click', () => { if (confirm('대진과 지금까지의 점수를 모두 지우고 설정 화면으로 돌아갈까요?')) socket.emit('tkd:reset'); });
   $('btn-present').addEventListener('click', () => { document.body.classList.toggle('present'); $('btn-present').textContent = document.body.classList.contains('present') ? '조작 화면' : '대화면 모드'; });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.body.classList.remove('present'); });
+
+
+  /* ------------ 진행 큐 (사운드 + 화면) ------------ */
+  const CUE_DEF = {
+    '입장': { en: 'Entrance', color: '#ffd23f', say: '입장' }, '경례': { en: 'Kyeongnye', color: '#f5f0e6', say: '경례' },
+    '준비': { en: 'Junbi', color: '#7fb0ff', say: '준비' }, '시작': { en: 'Sijak', color: '#ff6b5e', say: '시작' },
+    '바로': { en: 'Baro', color: '#6fe39a', say: '바로' }, '쉬어': { en: 'Swieo', color: '#b9c4d6', say: '쉬어' }, '퇴장': { en: 'Exit', color: '#c9a7ff', say: '퇴장' },
+  };
+  const CUES = kind === 'recognized' ? ['입장', '경례', '준비', '시작', '바로', '쉬어', '퇴장'] : ['입장', '경례', '준비', '바로', '쉬어', '퇴장'];
+  let cueStep = 0, lastSeq = null, audio = null, cueTimer;
+  const getAudio = () => { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (_) {} return audio; };
+  function tone(f, dur, o = {}) {
+    const a = getAudio(); if (!a) return; const t = a.currentTime + (o.at || 0);
+    const osc = a.createOscillator(), g = a.createGain(); osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(f, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.vol || 0.3, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(a.destination); osc.start(t); osc.stop(t + dur + 0.05);
+  }
+  function noise(dur, o = {}) {
+    const a = getAudio(); if (!a) return; const t = a.currentTime + (o.at || 0);
+    const buf = a.createBuffer(1, Math.max(1, Math.floor(a.sampleRate * dur)), a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = a.createBufferSource(); src.buffer = buf; const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = o.freq || 1800; f.Q.value = 0.8;
+    const g = a.createGain(); g.gain.value = o.vol || 0.4; src.connect(f).connect(g).connect(a.destination); src.start(t);
+  }
+  const drum = (at = 0, vol = 0.6, f = 110) => { tone(f, 0.35, { at, vol, to: f * 0.45, type: 'sine' }); noise(0.12, { at, vol: vol * 0.35, freq: 900 }); };
+  const SFX = {
+    '입장': () => { tone(110, 2.2, { vol: .35 }); tone(220, 1.6, { vol: .15 }); tone(331, 1.2, { vol: .08 }); drum(0, .5, 90); },
+    '경례': () => { tone(880, 1.1, { vol: .25 }); tone(1320, .9, { vol: .08 }); tone(660, 1.4, { at: .35, vol: .25 }); tone(990, 1.0, { at: .35, vol: .07 }); },
+    '준비': () => { [330, 392, 494].forEach((f, i) => tone(f, .28, { at: i * .16, vol: .25, type: 'triangle' })); drum(.5, .35, 130); },
+    '시작': () => { drum(0, .9, 100); noise(.35, { vol: .5, freq: 2400 }); tone(523, .5, { vol: .22, type: 'sawtooth' }); tone(784, .6, { at: .08, vol: .18, type: 'sawtooth' }); },
+    '바로': () => { drum(0, .6, 120); drum(.18, .5, 100); tone(392, .35, { at: .1, vol: .15, to: 262 }); },
+    '쉬어': () => { tone(660, 1.2, { vol: .2, to: 520 }); tone(495, 1.6, { at: .3, vol: .16, to: 330 }); },
+    '퇴장': () => { [0, .3, .6, .9].forEach((t, i) => drum(t, .55 - i * .1, 95)); tone(165, 2.0, { at: 1.1, vol: .2 }); },
+  };
+  function speak(txt) {
+    try { if (!('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(txt); u.lang = 'ko-KR'; u.rate = 0.9; u.pitch = 0.8; u.volume = 1; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (_) {}
+  }
+  function showCue(name) {
+    const d = CUE_DEF[name], ov = $('cue-ov');
+    $('cue-w').textContent = name; $('cue-s').textContent = d.en; ov.style.setProperty('--cc', d.color);
+    ov.classList.add('show'); clearTimeout(cueTimer); cueTimer = setTimeout(() => ov.classList.remove('show'), name === '퇴장' || name === '입장' ? 2600 : 1900);
+  }
+  function fireCue(name) {
+    const i = CUES.indexOf(name); cueStep = Math.min(i + 1, CUES.length);
+    showCue(name); $('cue-now').textContent = `현재: ${name}`;
+    if ($('opt-sfx').checked) SFX[name]();
+    if ($('opt-voice').checked) setTimeout(() => speak(CUE_DEF[name].say), name === '시작' ? 250 : 120);
+    if (name === '준비') timerReset();
+    if (name === '시작' && kind === 'recognized') { timerReset(); timerStart(); }
+    if (name === '바로') timerStop();
+    renderCues();
+  }
+  function renderCues() {
+    $('cue-row').innerHTML = CUES.map((c, i) => `<button class="cue-btn ${c === '시작' ? 'c-start' : ''} ${i === cueStep ? 'next' : ''} ${i < cueStep ? 'done' : ''}" data-cue="${c}">${c}<small>${CUE_DEF[c].en}</small></button>`).join('');
+    $('cue-row').querySelectorAll('[data-cue]').forEach((b) => b.addEventListener('click', () => fireCue(b.dataset.cue)));
+  }
+
+  /* ------------ 연기 시간 (스톱워치) ------------ */
+  const LIM_DEF = kind === 'recognized' ? { min: 0, max: 90 } : { min: 0, max: 100 };
+  let lim = { ...LIM_DEF };
+  try { const sv = JSON.parse(localStorage.getItem('tkd-lim-' + kind) || 'null'); if (sv && sv.max > 0) lim = sv; } catch (_) {}
+  let tAcc = 0, tT0 = 0, tRun = false;
+  const tNow = () => (tAcc + (tRun ? Date.now() - tT0 : 0)) / 1000;
+  const timerStart = () => { if (!tRun) { tT0 = Date.now(); tRun = true; } };
+  const timerStop = () => { if (tRun) { tAcc += Date.now() - tT0; tRun = false; } };
+  const timerReset = () => { tAcc = 0; tRun = false; };
+  function drawTimer() {
+    const sec = tNow(), box = $('timer');
+    $('t-val').textContent = sec.toFixed(1);
+    $('t-bar').style.width = Math.min(100, (sec / lim.max) * 100) + '%';
+    $('t-min').style.left = Math.min(100, (lim.min / lim.max) * 100) + '%'; $('t-min').style.display = lim.min > 0 ? '' : 'none';
+    $('t-toggle').textContent = tRun ? '⏸ 정지' : '⏱ 시작';
+    box.classList.remove('over', 'ok', 'low');
+    let v = '';
+    if (sec > lim.max) { box.classList.add('over'); v = `⚠ 시간 초과 (최대 ${lim.max}초) — 시간 감점 확인`; }
+    else if (sec > 0 && sec >= lim.min) { box.classList.add('ok'); v = tRun ? '적정 시간 구간' : '✔ 적정 시간'; }
+    else if (!tRun && sec > 0) { box.classList.add('low'); v = `⚠ 시간 미달 (최소 ${lim.min}초) — 시간 감점 확인`; }
+    $('t-verdict').textContent = v;
+  }
+  setInterval(drawTimer, 100);
+  $('t-toggle').addEventListener('click', () => (tRun ? timerStop() : timerStart()));
+  $('t-reset').addEventListener('click', timerReset);
+  const syncLim = () => { $('lim-min').value = lim.min; $('lim-max').value = lim.max; };
+  const onLim = () => { const mn = Math.max(0, Number($('lim-min').value) || 0), mx = Math.max(1, Number($('lim-max').value) || 1); lim = { min: Math.min(mn, mx), max: mx }; try { localStorage.setItem('tkd-lim-' + kind, JSON.stringify(lim)); } catch (_) {} };
+  $('lim-min').addEventListener('change', () => { onLim(); syncLim(); }); $('lim-max').addEventListener('change', () => { onLim(); syncLim(); });
+  syncLim(); renderCues(); drawTimer();
+  function syncStage() {
+    $('stage').hidden = S.phase !== 'running';
+    const seq = S.current ? S.current.seq : null;
+    if (seq !== lastSeq) { lastSeq = seq; cueStep = S.current && S.current.pass > 0 ? CUES.indexOf('준비') : 0; timerReset(); $('cue-now').textContent = ''; renderCues(); }
+  }
+
+
+  /* 품새 추첨 연출 */
+  let rollSeq = null, rollUntil = 0, rollTimer = null;
+  const rolling = () => Date.now() < rollUntil;
+  function startRoll(c) {
+    if (c.seq === rollSeq) return;
+    rollSeq = c.seq;
+    if (c.type !== 'match' || c.pass !== 0 || c.status !== 'scoring') return;
+    rollUntil = Date.now() + 1700; clearInterval(rollTimer);
+    rollTimer = setInterval(() => {
+      if (!rolling()) { clearInterval(rollTimer); render(); return; }
+      const el = $('cur-poom'); const all = S.poomsaeAll;
+      if (el) el.textContent = Array.from({ length: S.current ? S.current.passCount : 1 }, () => all[Math.floor(Math.random() * all.length)]).join('  ·  ');
+      if ($('opt-sfx') && $('opt-sfx').checked) tone(500 + Math.random() * 700, .04, { vol: .06 });
+    }, 85);
+  }
+  function poomHtml(c) {
+    if (c.type !== 'match' || !c.poomsaeList) return '';
+    if (rolling()) return ' · <span class="pchip now" id="cur-poom">품새 추첨 중…</span>';
+    return ' ' + c.poomsaeList.map((n, i) => `<span class="pchip ${c.passCount > 1 && i === c.pass && c.status !== 'done' ? 'now' : ''} ${i < c.pass && c.status !== 'done' ? 'done' : ''}">${c.passCount > 1 ? (i + 1) + '. ' : ''}${esc(n)}</span>`).join('');
+  }
 
   /* ------------ 렌더링 ------------ */
   const nameOf = (id) => (S.entrants.find((e) => e.id === id) || {}).name || '';
@@ -234,6 +401,7 @@
     $('board').hidden = setup;
     $('final').hidden = S.phase !== 'finished';
     $('footer-acts').hidden = setup;
+    syncStage();
     $('seats').innerHTML = S.seats.map((s) => `<span class="seat ${s.submitted ? 'sub' : s.connected ? 'on' : ''}">심판 ${s.seat} ${s.submitted ? '제출' : s.connected ? '접속' : '대기'}</span>`).join('');
     if (setup) renderSetup(); else { renderCurrent(); if (S.kind === 'recognized') renderBracket(); else renderStages(); }
     if (S.phase === 'finished') renderFinal();
@@ -242,7 +410,14 @@
     const ae = document.activeElement;
     if (ae !== $('entrants')) $('entrants').value = S.entrants.map((e) => (e.team ? `${e.name} / ${e.team}` : e.name)).join('\n');
     if (ae !== $('judges')) $('judges').value = String(S.judgeCount);
-    if (ae !== $('pool')) $('pool').value = S.poomsaePool.join(', ');
+    if (kind === 'recognized') {
+      if (!$('p-from').options.length) { const o = S.poomsaeAll.map((n) => `<option>${esc(n)}</option>`).join(''); $('p-from').innerHTML = o; $('p-to').innerHTML = o; }
+      if (ae !== $('p-from')) $('p-from').value = S.poomsaeFrom;
+      if (ae !== $('p-to')) $('p-to').value = S.poomsaeTo;
+      if (ae !== $('p-per')) $('p-per').value = String(S.poomsaePerMatch);
+      const a = S.poomsaeAll.indexOf(S.poomsaeFrom), b = S.poomsaeAll.indexOf(S.poomsaeTo), lo = Math.min(a, b), hi = Math.max(a, b);
+      $('pool-note').textContent = `${S.poomsaeAll[lo]} ~ ${S.poomsaeAll[hi]} (${S.poomsaePool.length}개) 중 경기마다 ${Math.min(S.poomsaePerMatch, S.poomsaePool.length)}개를 무작위로 뽑습니다.`;
+    }
     $('plan').innerHTML = planText(S.entrants.length);
     $('btn-draw').disabled = S.entrants.length < 2;
     $('draw-hint').textContent = noJudge() ? '※ 경기를 시작하려면 심판이 1명 이상 접속해야 합니다.' : '';
@@ -261,17 +436,21 @@
     const c = S.current, el = $('cur');
     if (!c) { el.hidden = true; return; }
     el.classList.toggle('live', c.status !== 'done');
+    startRoll(c);
     const roundTxt = c.matchId ? (S.bracket.find((r) => r.matches.some((m) => m.id === c.matchId)) || {}).name : (S.stages[S.stageIdx] || {}).name;
     const subm = Object.keys(c.submitted).length, total = c.activeSeats.length;
-    const statusTxt = c.status === 'scoring' ? `채점 중 · 제출 ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : (c.result && c.result.tie ? '동점 — 재경기가 필요합니다' : '확정 완료');
+    const passTxt = c.passCount > 1 ? ` · 품새 ${c.pass + 1}/${c.passCount}` : '';
+    const statusTxt = c.status === 'scoring' ? `채점 중${passTxt} · 제출 ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : (c.result && c.result.tie ? '동점 — 재경기가 필요합니다' : '확정 완료');
     const sides = c.sides.map((s) => {
       const r = c.result && c.result[s.side];
       const win = c.result && c.result.winner && c.result.winner === s.side;
       const cls = s.side === 'solo' ? '' : s.side;
+      const prevP = (c.passResults || []).map((pr) => `${esc(pr.poomsae)} ${f2(pr[s.side].total)}`).join(' · ');
       const jl = c.judgeScores && c.judgeScores[s.side] ? Object.entries(c.judgeScores[s.side]).map(([k, v]) => `심판${k} ${f2(v.total)}`).join(' · ') : '';
       return `<div class="side ${cls} ${win ? 'win' : ''}">
         <div class="corner">${s.label ? (s.side === 'a' ? '청 (靑)' : '홍 (紅)') : '연기 중'}${win ? ' · 승리' : ''}</div>
         <div class="pname">${esc(s.name)}</div><div class="pteam">${esc(s.team)}</div>
+        ${prevP ? `<div class="jlist">${c.status === 'done' ? '품새별 ' : '확정된 품새 '}${prevP}${c.status === 'done' ? ' → 평균' : ''}</div>` : ''}
         ${r ? `<div class="bigscore">${f2(r.total)}</div>
           <table class="brk"><tr><td>${LBL().a} 평균</td><td>${f2(r.a)}</td></tr><tr><td>${LBL().p} 평균</td><td>${f2(r.p)}</td></tr><tr><td>감점</td><td>${r.ded ? '−' + f2(r.ded) : '0.00'}</td></tr></table>
           <div class="jlist">${esc(jl)}${r.dropped ? '<br>(최고·최저 점수 제외 평균)' : ''}</div>` : ''}
@@ -281,7 +460,7 @@
     if (c.status === 'scoring') acts = `<button class="ctl" id="a-force" ${subm ? '' : 'disabled'}>강제 마감 (제출된 점수만)</button><button class="ctl danger" id="a-cancel">경기 취소</button>`;
     else if (c.status === 'review') acts = `<button class="primary ctl" id="a-final">점수 확정</button><button class="ctl danger" id="a-cancel">경기 취소</button>`;
     else if (c.result && c.result.tie) acts = `<button class="primary ctl" id="a-rematch" data-m="${esc(c.matchId)}">재경기 시작 (새 품새 추첨)</button>`;
-    el.innerHTML = `<div class="cur-head"><div class="cur-title">${esc(roundTxt)} ${c.poomsae && c.type === 'match' ? '· <span style="color:var(--gold)">' + esc(c.poomsae) + '</span>' : ''}</div><span class="pill">${statusTxt}</span></div>
+    el.innerHTML = `<div class="cur-head"><div class="cur-title">${esc(roundTxt)}${poomHtml(c)}</div><span class="pill">${statusTxt}</span></div>
       <div class="sides ${c.sides.length === 2 ? 'two' : ''}">${sides}</div><div class="acts">${acts}</div>`;
     el.querySelectorAll('[data-ded]').forEach((b) => b.addEventListener('click', () => {
       const [side, key, val] = b.dataset.ded.split(':');

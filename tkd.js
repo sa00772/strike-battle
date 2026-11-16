@@ -15,7 +15,22 @@ const EVENT_ID_RE = /^[A-Z0-9]{4,12}$/;
 const KINDS = ['recognized', 'freestyle'];
 const DEDUCTION_VALUES = { time: 0.3, line: 0.3, restart: 0.6 };
 const DEDUCTION_KEYS = { recognized: ['time', 'line', 'restart'], freestyle: ['time', 'line'] };
-const DEFAULT_POOL = Array.from({ length: 8 }, (_, i) => `태극 ${i + 1}장`);
+const POOMSAE_ALL = [...Array.from({ length: 8 }, (_, i) => `태극 ${i + 1}장`), '고려', '금강', '태백', '평원', '십진', '지태', '천권', '한수', '일여'];
+const DEFAULT_POOL = POOMSAE_ALL.slice(0, 8);
+const MAX_PER_MATCH = 3;
+// 품새 범위(시작~끝, 포함) → 후보 목록
+function poolFromRange(from, to) {
+  let a = POOMSAE_ALL.indexOf(from), b = POOMSAE_ALL.indexOf(to);
+  if (a < 0) a = 0; if (b < 0) b = 7;
+  if (a > b) [a, b] = [b, a];
+  return POOMSAE_ALL.slice(a, b + 1);
+}
+// 후보에서 서로 다른 품새를 무작위로 count개 뽑는다
+function drawPoomsae(pool, count) {
+  const arr = pool.slice();
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr.slice(0, Math.max(1, Math.min(count, arr.length)));
+}
 const IDLE_TTL_MS = 12 * 60 * 60 * 1000;
 let perfSeq = 0;                       // 경기(채점) 번호: 심판 화면이 새 경기를 구분하는 용도
 
@@ -33,12 +48,12 @@ const SCHEMAS = {
   freestyle: {
     labels: { a: '기술', p: '표현' },
     fields: [
-      { key: 'basic', group: 'a', type: 'score', label: '기본동작·실용성', min: 0, max: 1.0, def: 0.5 },
-      { key: 'jumpside', group: 'a', type: 'score', label: '뛰어옆차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'multi', group: 'a', type: 'score', label: '한 번 점프 연속차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'spin', group: 'a', type: 'score', label: '회전 각도', min: 0, max: 1.0, def: 0.5 },
-      { key: 'consec', group: 'a', type: 'score', label: '겨루기식 연속차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'acro', group: 'a', type: 'score', label: '곡예 발차기', min: 0, max: 1.0, def: 0.5 },
+      { key: 'jumpside', group: 'a', type: 'score', label: '뛰어 옆차기', min: 0, max: 1.0, def: 0.5 },
+      { key: 'multi', group: 'a', type: 'score', label: '다단계 발차기', min: 0, max: 1.0, def: 0.5 },
+      { key: 'spin', group: 'a', type: 'score', label: '회전 발차기', min: 0, max: 1.0, def: 0.5 },
+      { key: 'consec', group: 'a', type: 'score', label: '연속 발차기', min: 0, max: 1.0, def: 0.5 },
+      { key: 'acro', group: 'a', type: 'score', label: '아크로바틱', min: 0, max: 1.0, def: 0.5 },
+      { key: 'basic', group: 'a', type: 'score', label: '기본동작', min: 0, max: 1.0, def: 0.5 },
       { key: 'creative', group: 'p', type: 'score', label: '창의성', min: 0, max: 1.0, def: 0.5 },
       { key: 'harmony', group: 'p', type: 'score', label: '조화', min: 0, max: 1.0, def: 0.5 },
       { key: 'energy', group: 'p', type: 'score', label: '기의 표현', min: 0, max: 1.0, def: 0.5 },
@@ -166,7 +181,7 @@ const events = new Map();
 
 function newEvent(id, kind) {
   return {
-    id, kind, phase: 'setup', judgeCount: 3, entrants: [], poomsaePool: DEFAULT_POOL.slice(),
+    id, kind, phase: 'setup', judgeCount: 3, entrants: [], poomsaePool: DEFAULT_POOL.slice(), poomsaeFrom: POOMSAE_ALL[0], poomsaeTo: POOMSAE_ALL[7], poomsaePerMatch: 2,
     bracket: null, stages: null, stageIdx: 0, current: null, podium: null, seats: {}, lastActive: Date.now(), prelimCount: 0,
   };
 }
@@ -191,7 +206,7 @@ function adminSnapshot(ev) {
   let current = null;
   if (c) {
     current = {
-      type: c.type, status: c.status, poomsae: c.poomsae, matchId: c.matchId || null, entrantId: c.entrantId || null,
+      type: c.type, status: c.status, poomsae: c.poomsae, poomsaeList: c.poomsaeList || null, pass: c.pass || 0, passCount: c.passCount || 1, passResults: c.passResults || [], matchId: c.matchId || null, entrantId: c.entrantId || null,
       sides: sideInfo(ev, c), deductions: c.deductions, activeSeats: c.activeSeats,
       submitted: c.submitted, result: c.status === 'done' ? c.result : null,
       judgeScores: c.status === 'done' ? Object.fromEntries(Object.entries(c.scores).map(([side, bySeat]) => [side, Object.fromEntries(Object.entries(bySeat).map(([seat, s]) => [seat, { a: s.a, p: s.p, total: s.total }]))])) : null,
@@ -199,6 +214,7 @@ function adminSnapshot(ev) {
   }
   return {
     id: ev.id, kind: ev.kind, phase: ev.phase, judgeCount: ev.judgeCount, entrants: ev.entrants, poomsaePool: ev.poomsaePool,
+    poomsaeAll: POOMSAE_ALL, poomsaeFrom: ev.poomsaeFrom, poomsaeTo: ev.poomsaeTo, poomsaePerMatch: ev.poomsaePerMatch,
     seats: seatList(ev), schema: SCHEMAS[ev.kind], deductionValues: DEDUCTION_VALUES, deductionKeys: DEDUCTION_KEYS[ev.kind],
     bracket: ev.bracket ? ev.bracket.map((round, r) => ({ name: roundName(ev.bracket.length, r), matches: round })) : null,
     stages: ev.stages, stageIdx: ev.stageIdx, current, podium: ev.podium,
@@ -209,21 +225,41 @@ function judgeSnapshot(ev, seat) {
   const active = c && c.status === 'scoring' && c.activeSeats.includes(seat);
   return {
     id: ev.id, kind: ev.kind, phase: ev.phase, judgeCount: ev.judgeCount, seat, schema: SCHEMAS[ev.kind],
-    perf: active ? { seq: c.seq, poomsae: c.poomsae, sides: sideInfo(ev, c), mySubmitted: !!c.submitted[seat], myScores: c.submitted[seat] ? Object.fromEntries(Object.entries(c.scores).map(([side, bySeat]) => [side, bySeat[seat] ? { ...bySeat[seat].vals, a: bySeat[seat].a, p: bySeat[seat].p, total: bySeat[seat].total } : null])) : null } : null,
+    perf: active ? { seq: c.seq, poomsae: c.poomsae, pass: c.pass || 0, passCount: c.passCount || 1, sides: sideInfo(ev, c), mySubmitted: !!c.submitted[seat], myScores: c.submitted[seat] ? Object.fromEntries(Object.entries(c.scores).map(([side, bySeat]) => [side, bySeat[seat] ? { ...bySeat[seat].vals, a: bySeat[seat].a, p: bySeat[seat].p, total: bySeat[seat].total } : null])) : null } : null,
     waitingReview: !!(c && c.status === 'review' && c.activeSeats.includes(seat)),
   };
 }
 
 /* ------------------------------ 진행 로직 ------------------------------ */
+const avg = (arr, k) => r2(arr.reduce((t, x) => t + x[k], 0) / arr.length);
+function mergePasses(list) {
+  if (list.length === 1) return list[0];
+  return { a: avg(list, 'a'), p: avg(list, 'p'), ded: avg(list, 'ded'), total: avg(list, 'total'), sumAll: r2(list.reduce((t, x) => t + x.sumAll, 0)), judges: list[0].judges, dropped: list.some((x) => x.dropped) };
+}
 function finalizePerf(ev) {
   const c = ev.current;
   const sides = c.type === 'match' ? ['a', 'b'] : ['solo'];
-  const result = {};
+  const one = {};
   for (const side of sides) {
     const list = Object.values(c.scores[side] || {});
     if (!list.length) return false;
-    result[side] = combine(list, deductionTotal(c.deductions[side]));
+    one[side] = combine(list, deductionTotal(c.deductions[side]));
   }
+  if (c.type === 'match') {
+    c.passResults = c.passResults || [];
+    c.passResults.push({ poomsae: c.poomsae, ...one });
+    if (c.pass < c.passCount - 1) {                                          // 다음 품새로: 같은 경기 안에서 채점을 새로 연다
+      c.pass += 1; c.poomsae = c.poomsaeList[c.pass];
+      const seats = connectedSeats(ev);
+      if (seats.length) c.activeSeats = seats;
+      c.seq = ++perfSeq; c.status = 'scoring'; c.submitted = {}; c.scores = {};
+      c.deductions = Object.fromEntries(sides.map((sd) => [sd, { time: false, line: false, restart: 0 }]));
+      c.result = null;
+      return true;
+    }
+  }
+  const result = {};
+  for (const side of sides) result[side] = c.type === 'match' ? mergePasses(c.passResults.map((pr) => pr[side])) : one[side];
   c.result = result;
   c.status = 'done';
   if (c.type === 'match') {
@@ -231,8 +267,8 @@ function finalizePerf(ev) {
     const diff = cmpResult(ev.kind, result.a, result.b);
     if (diff === 0) { c.result.tie = true; return true; }                    // 완전 동점: 재경기 필요
     m.state = 'done';
-    m.poomsae = c.poomsae;
-    m.result = { winner: diff > 0 ? 'a' : 'b', a: result.a, b: result.b, poomsae: c.poomsae };
+    m.poomsae = c.poomsaeList.join(' · ');
+    m.result = { winner: diff > 0 ? 'a' : 'b', a: result.a, b: result.b, poomsae: c.poomsaeList.join(' · '), passes: c.passResults.map((pr) => ({ poomsae: pr.poomsae, a: pr.a.total, b: pr.b.total })) };
     c.result.winner = m.result.winner;
     advanceWinner(ev.bracket, m);
     const last = ev.bracket[ev.bracket.length - 1][0];
@@ -350,8 +386,15 @@ function attach(io, socket, auth) {
       const [name, ...rest] = l.split('/');
       return { id: `e${i + 1}`, name: name.trim().slice(0, 30), team: rest.join('/').trim().slice(0, 30) };
     }).filter((e) => e.name);
-    const pool = (Array.isArray(p.poomsaePool) ? p.poomsaePool : String(p.poomsaePool || '').split(/[,\n]/)).map((x) => String(x).trim().slice(0, 20)).filter(Boolean).slice(0, 40);
-    ev.poomsaePool = pool.length ? pool : DEFAULT_POOL.slice();
+    if (p.poomsaeFrom || p.poomsaeTo) {
+      ev.poomsaeFrom = POOMSAE_ALL.includes(p.poomsaeFrom) ? p.poomsaeFrom : ev.poomsaeFrom;
+      ev.poomsaeTo = POOMSAE_ALL.includes(p.poomsaeTo) ? p.poomsaeTo : ev.poomsaeTo;
+      ev.poomsaePool = poolFromRange(ev.poomsaeFrom, ev.poomsaeTo);
+    } else if (p.poomsaePool) {                                              // (이전 방식) 직접 목록 지정
+      const pool = (Array.isArray(p.poomsaePool) ? p.poomsaePool : String(p.poomsaePool).split(/[,\n]/)).map((x) => String(x).trim().slice(0, 20)).filter(Boolean).slice(0, 40);
+      if (pool.length) ev.poomsaePool = pool;
+    }
+    if (p.poomsaePerMatch != null) ev.poomsaePerMatch = Math.min(MAX_PER_MATCH, Math.max(1, Math.round(Number(p.poomsaePerMatch)) || 1));
     broadcast(ev);
   }));
 
@@ -386,8 +429,8 @@ function attach(io, socket, auth) {
     if (ev.kind !== 'recognized' || ev.phase !== 'running') return;
     const m = ev.bracket.flat().find((x) => x.id === p.matchId);
     if (!m || m.state !== 'pending' || !m.a || !m.b) return err('bad-match');
-    const poomsae = ev.poomsaePool[Math.floor(Math.random() * ev.poomsaePool.length)];
-    startPerf(ev, { type: 'match', matchId: m.id, round: m.round, index: m.index, poomsae });
+    const poomsaeList = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);
+    startPerf(ev, { type: 'match', matchId: m.id, round: m.round, index: m.index, poomsae: poomsaeList[0], poomsaeList, pass: 0, passCount: poomsaeList.length, passResults: [] });
   }));
 
   socket.on('tkd:startSolo', admin((ev, p) => {
