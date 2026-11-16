@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2f6bff" id="theme-color">
+<title>사이버 쟁탈전 - 기지</title>
+<style>
+  :root { --bg: #1c1f27; --bg-deep: #101218; --ink: #fff; --font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  body[data-team="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
+  body[data-team="red"]  { --bg: #ff4536; --bg-deep: #8c1409; }
+  /* 깃발을 빼앗기면 화면이 빼앗은 팀(상대 팀) 색으로 바뀜 */
+  body.captured[data-attacker="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
+  body.captured[data-attacker="red"]  { --bg: #ff4536; --bg-deep: #8c1409; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font); color: var(--ink);
+    background: linear-gradient(170deg, var(--bg) 0%, var(--bg-deep) 100%);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select: none; -webkit-user-select: none; touch-action: manipulation; overflow: hidden;
+    transition: background .2s;
+  }
+  .app { height: 100%; display: flex; flex-direction: column; align-items: center; padding: 14px 16px 18px; gap: 10px; }
+  .app-main { width: 100%; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 0; }
+
+  .top { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .team-name { font-size: 1.4rem; font-weight: 900; }
+  .timer { font-size: 1.8rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .status { font-size: 1.05rem; font-weight: 800; padding: .45em 1.1em; border-radius: 999px; background: rgba(0,0,0,.28); text-align: center; }
+  .status.live { background: rgba(255,255,255,.95); color: #11141b; }
+
+  /* 깃발 터치 영역 */
+  .flag-btn {
+    flex: 1; width: 100%; max-width: 520px; min-height: 0;
+    border: 4px dashed rgba(255,255,255,.55); border-radius: 28px;
+    background: rgba(0,0,0,.18); color: inherit; font: inherit;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    touch-action: manipulation;
+  }
+  .flag-btn:active { background: rgba(255,255,255,.18); }
+  .flag-svg { width: min(60%, 34vh); height: auto; }
+  .cloth { fill: #fff; transition: transform .35s ease-in; transform-origin: 50% 0; }
+  body.captured .cloth { transform: translateY(78px); }
+  .pole { fill: rgba(255,255,255,.85); }
+  .flag-caption { font-size: 1.15rem; font-weight: 800; text-align: center; padding: 0 12px; line-height: 1.4; }
+  .big-count { font-size: clamp(3rem, 18vw, 6rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; display: none; }
+  body.captured .big-count { display: block; }
+
+  .scoreline { font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .msg { font-size: .9rem; text-align: center; max-width: 420px; line-height: 1.45; min-height: 1.3em; }
+  .msg.error { background: rgba(0,0,0,.4); padding: .7em 1em; border-radius: 10px; }
+
+  .gate, .noroom, .chooser { display: none; width: 100%; max-width: 420px; flex-direction: column; gap: 14px; margin-top: 12vh; align-items: center; text-align: center; line-height: 1.5; }
+  body.need-code .gate, body.no-room .noroom, body.no-team .chooser { display: flex; }
+  body.need-code .app-main, body.no-room .app-main, body.no-team .app-main { display: none; }
+  body.no-room .gate, body.no-team .gate { display: none; }
+  .gate input { width: 100%; font: inherit; font-size: 1.5rem; text-align: center; letter-spacing: .1em; padding: .8em; border-radius: 14px; border: 0; background: rgba(255,255,255,.95); color: #11141b; user-select: text; -webkit-user-select: text; }
+  .gate-btn, .chooser a { width: 100%; font: inherit; font-size: 1.4rem; font-weight: 900; padding: 1em 0; border: 0; border-radius: 18px; background: #fff; color: #11141b; text-decoration: none; display: block; box-shadow: 0 6px 0 rgba(0,0,0,.28); }
+
+  .flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  .flash.on { animation: flash .25s ease-out; }
+  .flash.dim { background: #000; }
+  .flash.dim.on { animation: flashdim .18s ease-out; }
+  @keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
+  @keyframes flashdim { 0% { opacity: .35; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .flash.on, .flash.dim.on { animation: none; } .cloth { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="chooser">
+    <p style="font-size:1.1rem">이 화면은 점수판의 QR 코드로 열어야 합니다.</p>
+    <a href="/">플레이 라운지 메뉴로</a>
+  </div>
+
+  <div class="noroom">
+    <p style="font-size:1.3rem;font-weight:800">경기방을 찾을 수 없습니다</p>
+    <p>점수판 화면의 QR 코드를 다시 스캔해 주세요.<br>점수판이 열려 있으면 자동으로 다시 연결합니다.</p>
+  </div>
+
+  <div class="gate">
+    <p style="font-size:1.2rem;font-weight:800">참가 코드를 입력하세요</p>
+    <input id="code-input" type="text" autocomplete="off" autocapitalize="characters" maxlength="30" placeholder="참가 코드" aria-label="참가 코드">
+    <button class="gate-btn" id="code-btn">입장하기</button>
+    <div class="msg" id="gate-msg" role="alert"></div>
+  </div>
+
+  <div class="app-main">
+    <div class="top">
+      <div class="team-name" id="team-name"></div>
+      <div class="timer" id="timer">3:00</div>
+    </div>
+    <div class="status" id="status">서버 연결 중</div>
+
+    <button class="flag-btn" id="flag-btn" aria-label="깃발 터치">
+      <svg class="flag-svg" viewBox="0 0 120 170" aria-hidden="true">
+        <rect class="pole" x="14" y="6" width="8" height="158" rx="4"/>
+        <g class="cloth"><path d="M22 12 H108 L88 40 L108 68 H22 Z"/></g>
+      </svg>
+      <div class="big-count" id="big-count">5</div>
+      <div class="flag-caption" id="flag-caption"></div>
+    </button>
+
+    <div class="scoreline" id="scoreline">청 0 : 0 홍</div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+<div class="flash" id="flash"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/mission.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const team = params.get('team');
+  const room = (params.get('room') || '').toUpperCase();
+  const TEAM_LABEL = { blue: '청팀', red: '홍팀' };
+  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536' };
+  const OTHER = { blue: 'red', red: 'blue' };
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  if (!TEAM_LABEL[team]) {
+    document.body.classList.add('no-team');
+  } else {
+    document.body.dataset.team = team;
+    document.body.dataset.attacker = OTHER[team];
+    $('team-name').textContent = `${TEAM_LABEL[team]} 기지`;
+    $('theme-color').setAttribute('content', TEAM_COLOR[team]);
+    document.title = `${TEAM_LABEL[team]} 기지`;
+    if (!room) document.body.classList.add('no-room');
+  }
+
+  /* ---------------------- 상태 ---------------------- */
+  let game = null;
+  let scores = { blue: 0, red: 0 };
+  let lockUntil = 0;
+  const lockedRemain = () => Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+  const isLive = () => game && game.running && game.mode === 'round';
+
+  function render() {
+    const remain = lockedRemain();
+    document.body.classList.toggle('captured', remain > 0);
+    const st = $('status');
+    st.classList.remove('live');
+    if (game) $('timer').textContent = fmt(game.remainingSec);
+
+    if (remain > 0) {
+      st.textContent = `${TEAM_LABEL[OTHER[team]]}이 깃발을 빼앗았어요! +1`;
+      $('big-count').textContent = remain;
+      $('flag-caption').textContent = '초 뒤 깃발이 돌아옵니다';
+    } else if (!game) {
+      st.textContent = '서버 연결 중';
+      $('flag-caption').textContent = '';
+    } else if (game.mode === 'rest') {
+      st.textContent = game.running ? '휴식 시간' : '휴식 대기';
+      $('flag-caption').textContent = '지금은 터치해도 점수가 오르지 않아요';
+    } else if (game.running) {
+      st.textContent = '진행 중 - 상대 팀 터치!';
+      st.classList.add('live');
+      $('flag-caption').textContent = `${TEAM_LABEL[team]} 깃발입니다. ${TEAM_LABEL[OTHER[team]]}만 터치하세요!`;
+    } else if (game.finished) {
+      st.textContent = '라운드 종료';
+      $('flag-caption').textContent = '';
+    } else {
+      st.textContent = '대기 중';
+      $('flag-caption').textContent = '경기 시작을 기다려 주세요';
+    }
+  }
+  setInterval(render, 250);
+
+  /* ---------------------- 소켓 ---------------------- */
+  const socket = io();
+  if (window.Mission) Mission.attach(socket, 'phone');
+  let accessCode = '';
+  try { accessCode = localStorage.getItem('strike-code') || ''; } catch (_) {}
+  const joinNow = () => socket.emit('join', { role: 'base', team, code: accessCode, room });
+  const GATE_MSG = { 'bad-code': '참가 코드가 맞지 않습니다.', 'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.', 'code-required': '' };
+
+  socket.on('connect', () => { if (TEAM_LABEL[team] && room) joinNow(); });
+  socket.on('disconnect', () => { $('status').textContent = '연결 끊김 - 재연결 중'; });
+  socket.on('join:result', (r) => {
+    if (r.ok) {
+      document.body.classList.remove('need-code', 'no-room');
+      try { localStorage.setItem('strike-code', accessCode); } catch (_) {}
+    } else if (r.reason === 'no-room' || r.reason === 'bad-room') {
+      document.body.classList.remove('need-code');
+      document.body.classList.add('no-room');
+      if (r.reason === 'no-room') setTimeout(joinNow, 3000);
+    } else {
+      if (r.reason === 'bad-code') { accessCode = ''; try { localStorage.removeItem('strike-code'); } catch (_) {} }
+      document.body.classList.add('need-code');
+      $('gate-msg').textContent = GATE_MSG[r.reason] || '';
+    }
+  });
+  const submitCode = () => { accessCode = $('code-input').value.trim(); joinNow(); };
+  $('code-btn').addEventListener('click', submitCode);
+  $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
+
+  socket.on('game:state', (s) => { game = s; render(); });
+  socket.on('score:update', (s) => { scores = { blue: s.blue, red: s.red }; $('scoreline').textContent = `청 ${s.blue} : ${s.red} 홍`; });
+  socket.on('flag:update', (f) => { lockUntil = Date.now() + f[team]; render(); });
+
+  /* ---------------------- 깃발 터치 ---------------------- */
+  const flashEl = $('flash');
+  function feedback(ok) {
+    flashEl.classList.toggle('dim', !ok);
+    flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on');
+    if (ok && navigator.vibrate) navigator.vibrate([80, 40, 80]);
+  }
+  $('flag-btn').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (lockedRemain() > 0) return;                  // 이미 빼앗긴 상태
+    if (!isLive()) { feedback(false); return; }      // 경기 중이 아님
+    socket.emit('capture', { t: Date.now() }, (res) => {
+      if (res && res.accepted) { lockUntil = Date.now() + res.lockMs; feedback(true); render(); }
+      else if (res && res.reason === 'inactive') feedback(false);
+    });
+  });
+
+  // 화면 꺼짐 방지 (기지 기기는 계속 켜 두어야 함)
+  const keepAwake = async () => { try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (_) {} };
+  keepAwake();
+  document.addEventListener('pointerdown', keepAwake, { once: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+  if (!window.isSecureContext) $('msg').textContent = '보안 연결(HTTPS)이 아니어도 터치 점수는 정상 동작합니다.';
+})();
+</script>
+</body>
+</html>

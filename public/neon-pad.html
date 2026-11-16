@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2f6bff" id="theme-color">
+<title>네온 터치 - 플레이 라운지</title>
+<style>
+  :root { --bg: #1c1f27; --bg-deep: #101218; --ink: #fff; --font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  body[data-team="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
+  body[data-team="red"]  { --bg: #ff4536; --bg-deep: #8c1409; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font); color: var(--ink);
+    background: linear-gradient(170deg, var(--bg) 0%, var(--bg-deep) 100%);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select: none; -webkit-user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  /* 신호 단계별 화면 */
+  body.waiting { background: #0d0f15; }
+  body.locked  { background: #3a3d46; }
+  body.go { color: #0b0d12; }              /* 배경색은 JS가 신호 색으로 지정 */
+
+  .app { height: 100%; display: flex; flex-direction: column; align-items: center; padding: 14px 16px 18px; gap: 10px; }
+  .app-main { width: 100%; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 0; }
+  .top { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .team-name { font-size: 1.4rem; font-weight: 900; }
+  .timer { font-size: 1.8rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .scoreline { font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  .tap {
+    flex: 1; width: 100%; min-height: 0; border: 4px solid rgba(255,255,255,.5); border-radius: 28px;
+    background: rgba(0,0,0,.16); color: inherit; font: inherit;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 0 14px;
+  }
+  body.go .tap { border-color: rgba(0,0,0,.45); background: rgba(255,255,255,.18); }
+  .tap-main { font-size: clamp(2.4rem, 13vw, 5rem); font-weight: 900; line-height: 1.1; }
+  .tap-sub { font-size: 1.15rem; font-weight: 700; line-height: 1.4; opacity: .92; }
+  .msg { font-size: .9rem; text-align: center; max-width: 420px; line-height: 1.45; min-height: 1.3em; }
+
+  .gate, .noroom, .chooser { display: none; width: 100%; max-width: 420px; flex-direction: column; gap: 14px; margin-top: 12vh; align-items: center; text-align: center; line-height: 1.5; }
+  body.need-code .gate, body.no-room .noroom, body.no-team .chooser { display: flex; }
+  body.need-code .app-main, body.no-room .app-main, body.no-team .app-main { display: none; }
+  body.no-room .gate, body.no-team .gate { display: none; }
+  .gate input { width: 100%; font: inherit; font-size: 1.5rem; text-align: center; letter-spacing: .1em; padding: .8em; border-radius: 14px; border: 0; background: rgba(255,255,255,.95); color: #11141b; user-select: text; -webkit-user-select: text; }
+  .gate-btn, .chooser a { width: 100%; font: inherit; font-size: 1.4rem; font-weight: 900; padding: 1em 0; border: 0; border-radius: 18px; background: #fff; color: #11141b; text-decoration: none; display: block; box-shadow: 0 6px 0 rgba(0,0,0,.28); }
+  .flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  .flash.on { animation: flash .22s ease-out; }
+  .flash.dim { background: #000; }
+  .flash.dim.on { animation: flashdim .18s ease-out; }
+  @keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
+  @keyframes flashdim { 0% { opacity: .4; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .flash.on, .flash.dim.on { animation: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="chooser">
+    <p style="font-size:1.1rem">이 화면은 점수판의 QR 코드로 열어야 합니다.</p>
+    <a href="/">플레이 라운지 메뉴로</a>
+  </div>
+  <div class="noroom">
+    <p style="font-size:1.3rem;font-weight:800">경기방을 찾을 수 없습니다</p>
+    <p>점수판 화면의 QR 코드를 다시 스캔해 주세요.<br>점수판이 열려 있으면 자동으로 다시 연결합니다.</p>
+  </div>
+  <div class="gate">
+    <p style="font-size:1.2rem;font-weight:800">참가 코드를 입력하세요</p>
+    <input id="code-input" type="text" autocomplete="off" autocapitalize="characters" maxlength="30" placeholder="참가 코드" aria-label="참가 코드">
+    <button class="gate-btn" id="code-btn">입장하기</button>
+    <div class="msg" id="gate-msg" role="alert"></div>
+  </div>
+
+  <div class="app-main">
+    <div class="top">
+      <div class="team-name" id="team-name"></div>
+      <div class="timer" id="timer">3:00</div>
+    </div>
+    <button class="tap" id="tap" aria-live="polite">
+      <div class="tap-main" id="tap-main">연결 중</div>
+      <div class="tap-sub" id="tap-sub"></div>
+    </button>
+    <div class="scoreline" id="scoreline">청 0 : 0 홍</div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+<div class="flash" id="flash"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/mission.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const team = params.get('team');
+  const room = (params.get('room') || '').toUpperCase();
+  const TEAM_LABEL = { blue: '청팀', red: '홍팀' };
+  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536' };
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const fmtMs = (ms) => `${(ms / 1000).toFixed(3)}초`;
+
+  if (!TEAM_LABEL[team]) {
+    document.body.classList.add('no-team');
+  } else {
+    document.body.dataset.team = team;
+    $('team-name').textContent = TEAM_LABEL[team];
+    $('theme-color').setAttribute('content', TEAM_COLOR[team]);
+    document.title = `${TEAM_LABEL[team]} 네온 터치`;
+    if (!room) document.body.classList.add('no-room');
+  }
+
+  let game = null, neon = null, lockedRound = -1;
+  const isLive = () => game && game.running && game.mode === 'round';
+
+  function render() {
+    const b = document.body;
+    b.classList.remove('waiting', 'go', 'locked');
+    b.style.background = '';
+    const main = $('tap-main'), sub = $('tap-sub');
+    if (game) $('timer').textContent = fmt(game.remainingSec);
+    if (!game) { main.textContent = '연결 중'; sub.textContent = ''; return; }
+    if (!isLive()) {
+      main.textContent = game.mode === 'rest' ? '휴식 시간' : game.finished ? '라운드 종료' : '대기 중';
+      sub.textContent = '경기가 시작되면 신호가 나옵니다';
+      return;
+    }
+    const n = neon || { phase: 'idle' };
+    const lockedNow = n.roundNo === lockedRound && (n.phase === 'waiting' || n.phase === 'go');
+    if (lockedNow) {
+      b.classList.add('locked');
+      main.textContent = '부정 출발!';
+      sub.textContent = '이번 라운드는 쉬어요. 다음 신호를 기다리세요';
+    } else if (n.phase === 'waiting') {
+      b.classList.add('waiting');
+      main.textContent = '준비…';
+      sub.textContent = '아직 누르면 안 돼요!';
+    } else if (n.phase === 'go') {
+      b.classList.add('go');
+      b.style.background = n.color ? n.color.hex : '#fff';
+      main.textContent = '터치!';
+      sub.textContent = '';
+    } else if (n.phase === 'result') {
+      if (n.last && n.last.team === team) { main.textContent = '우리 팀 +1!'; sub.textContent = fmtMs(n.last.ms); }
+      else if (n.last && n.last.team) { main.textContent = '아쉬워요'; sub.textContent = '상대 팀이 먼저 눌렀어요'; }
+      else { main.textContent = '시간 초과'; sub.textContent = '아무도 누르지 않았어요'; }
+    } else {
+      main.textContent = '잠시 후 신호';
+      sub.textContent = '화면을 보고 준비하세요';
+    }
+  }
+
+  /* ---------------------- 소켓 ---------------------- */
+  const socket = io();
+  if (window.Mission) Mission.attach(socket, 'phone');
+  let accessCode = '';
+  try { accessCode = localStorage.getItem('strike-code') || ''; } catch (_) {}
+  const joinNow = () => socket.emit('join', { team, code: accessCode, room });
+  const GATE_MSG = { 'bad-code': '참가 코드가 맞지 않습니다.', 'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.', 'code-required': '' };
+
+  socket.on('connect', () => { if (TEAM_LABEL[team] && room) joinNow(); });
+  socket.on('disconnect', () => { $('tap-main').textContent = '재연결 중'; $('tap-sub').textContent = ''; });
+  socket.on('join:result', (r) => {
+    if (r.ok) {
+      document.body.classList.remove('need-code', 'no-room');
+      try { localStorage.setItem('strike-code', accessCode); } catch (_) {}
+    } else if (r.reason === 'no-room' || r.reason === 'bad-room') {
+      document.body.classList.remove('need-code');
+      document.body.classList.add('no-room');
+      if (r.reason === 'no-room') setTimeout(joinNow, 3000);
+    } else {
+      if (r.reason === 'bad-code') { accessCode = ''; try { localStorage.removeItem('strike-code'); } catch (_) {} }
+      document.body.classList.add('need-code');
+      $('gate-msg').textContent = GATE_MSG[r.reason] || '';
+    }
+  });
+  const submitCode = () => { accessCode = $('code-input').value.trim(); joinNow(); };
+  $('code-btn').addEventListener('click', submitCode);
+  $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
+
+  let lastPhase = null;
+  socket.on('room:game', (g) => {
+    $('msg').textContent = g === 'neon' ? '' : '이 경기방은 네온 터치 대전이 아닙니다. 점수판에서 네온 터치를 선택하세요.';
+  });
+  socket.on('game:state', (s) => { game = s; render(); });
+  socket.on('neon:state', (n) => {
+    neon = n;
+    if (n.phase === 'go' && lastPhase !== 'go' && navigator.vibrate && n.roundNo !== lockedRound) navigator.vibrate(40);
+    lastPhase = n.phase;
+    render();
+  });
+  socket.on('score:update', (s) => { $('scoreline').textContent = `청 ${s.blue} : ${s.red} 홍`; });
+  setInterval(() => { if (game && game.running) render(); }, 500);
+
+  /* ---------------------- 터치 ---------------------- */
+  const flashEl = $('flash');
+  function feedback(ok) {
+    flashEl.classList.toggle('dim', !ok);
+    flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on');
+    if (navigator.vibrate) navigator.vibrate(ok ? [60, 30, 60] : 120);
+  }
+  $('tap').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (!isLive()) return;
+    socket.emit('tap', { t: Date.now() }, (res) => {
+      if (!res) return;
+      if (res.accepted) feedback(true);
+      else if (res.reason === 'early') { lockedRound = neon ? neon.roundNo : lockedRound; feedback(false); render(); }
+    });
+  });
+
+  // 화면 꺼짐 방지
+  const keepAwake = async () => { try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (_) {} };
+  document.addEventListener('pointerdown', keepAwake, { once: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+})();
+</script>
+</body>
+</html>

@@ -172,6 +172,7 @@
 <div class="flash" id="flash"></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/mission.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -215,6 +216,7 @@
 
   /* ---------------------- 소켓 / 게임 상태 ---------------------- */
   const socket = io();
+  if (window.Mission) Mission.attach(socket, 'phone');
   let game = null;
   let myHits = 0;
 

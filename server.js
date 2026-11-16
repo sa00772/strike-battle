@@ -22,7 +22,9 @@ const PORT = Number(process.env.PORT) || 3000;
 const USE_HTTP = process.argv.includes('--http') || process.env.USE_HTTP === '1';
 const DEFAULT_ROUND_SEC = Number(process.env.ROUND_SEC) || 180; // 라운드 기본 3분
 const DEFAULT_REST_SEC = Number(process.env.REST_SEC) || 60;    // 휴식 기본 1분
-const ALLOWED_DURATIONS = [180, 60, 30];                        // 선택 가능한 시간: 3분 / 1분 / 30초
+const ALLOWED_DURATIONS = [180, 90, 60, 30];                        // 선택 가능한 시간: 3분 / 1분 / 30초
+const ALLOWED_COOLDOWNS = [3, 5, 10];                          // 깃발 탈취 후 쿨타임(초) 선택지
+const DEFAULT_FLAG_COOLDOWN_SEC = 5;
 const HIT_MIN_INTERVAL_MS = 250;                                // 서버측 연타 방지
 const TEAMS = ['blue', 'red'];
 const ROOM_ID_RE = /^[A-Z0-9]{4,12}$/;
@@ -137,6 +139,21 @@ const io = new Server(server);
 /* --------------------------- 경기방 상태 --------------------------- */
 const rooms = new Map(); // roomId -> room
 
+const GAME_TYPES = ['strike', 'flag', 'neon', 'flip'];
+const FLIP_TILES = 81;                                   // 9 x 9 판
+const FLIP_DEFAULT_ROUND_SEC = 90;                       // 판 뒤집기 기본 1분 30초
+const MISSION_SOUNDS = ['alarm', 'cheer', 'wrong', 'none'];
+const newFlip = () => ({ tiles: Array(FLIP_TILES).fill('0') });   // '0' 비어 있음, 'b' 청, 'r' 홍
+const newMission = () => ({ active: false, text: '', sec: 10, sound: 'alarm', phoneSound: false, endsAt: 0, wasRunning: false });
+const NEON_COLORS = [
+  { name: '초록', hex: '#22c55e' }, { name: '노랑', hex: '#facc15' }, { name: '보라', hex: '#a855f7' },
+  { name: '하늘', hex: '#22d3ee' }, { name: '주황', hex: '#fb923c' },
+];
+const NEON_WAIT_MIN_MS = 2000, NEON_WAIT_MAX_MS = 5000;  // 신호가 뜨기까지 무작위 대기
+const NEON_GO_TIMEOUT_MS = 3000;                         // 신호 후 아무도 안 누르면 무효
+const NEON_RESULT_MS = 1800;                             // 결과 표시 시간
+const newNeon = () => ({ phase: 'idle', roundNo: 0, nextAt: 0, goAt: 0, resultUntil: 0, color: null, last: null, best: { blue: null, red: null } });
+
 function getOrCreateRoom(id) {
   let room = rooms.get(id);
   if (!room) {
@@ -152,6 +169,12 @@ function getOrCreateRoom(id) {
         remainingMs: DEFAULT_ROUND_SEC * 1000,
         endAt: 0,
       },
+      gameType: 'strike',                           // 'strike' | 'flag' | 'neon' (점수판이 정함)
+      neon: newNeon(),
+      flip: newFlip(),
+      mission: newMission(),
+      flags: { blue: 0, red: 0 },                   // 깃발이 빼앗겨 있는 동안의 종료 시각(ms)
+      flagCooldownSec: DEFAULT_FLAG_COOLDOWN_SEC,
       lastEmittedSec: null,
       emptySince: null,
     };
@@ -180,15 +203,75 @@ function publicState(room) {
 }
 function connectedCounts(room) {
   const size = (name) => io.sockets.adapter.rooms.get(rn(room, name))?.size || 0;
-  return { blue: size('team:blue'), red: size('team:red') };
+  return {
+    blue: size('team:blue'),
+    red: size('team:red'),
+    bases: { blue: size('base:blue'), red: size('base:red') },
+  };
 }
 const roomSocketCount = (room) =>
-  ['scoreboard', 'team:blue', 'team:red']
+  ['scoreboard', 'team:blue', 'team:red', 'base:blue', 'base:red']
     .reduce((n, name) => n + (io.sockets.adapter.rooms.get(rn(room, name))?.size || 0), 0);
 
 // 인증을 통과해 해당 경기방에 들어온 소켓에게만 전송
 const toJoined = (room, event, data) =>
-  io.to(rn(room, 'scoreboard')).to(rn(room, 'team:blue')).to(rn(room, 'team:red')).emit(event, data);
+  io.to(rn(room, 'scoreboard')).to(rn(room, 'team:blue')).to(rn(room, 'team:red'))
+    .to(rn(room, 'base:blue')).to(rn(room, 'base:red')).emit(event, data);
+
+// 깃발 상태: 팀별 남은 잠금 시간(ms)을 보내면 각 화면이 자기 시계로 카운트다운
+const flagSnapshot = (room) => {
+  const now = Date.now();
+  return {
+    blue: Math.max(0, room.flags.blue - now),
+    red: Math.max(0, room.flags.red - now),
+    cooldownSec: room.flagCooldownSec,
+  };
+};
+const emitFlags = (room) => toJoined(room, 'flag:update', flagSnapshot(room));
+
+// 네온 터치 대전 상태 (다음 신호까지 남은 시간 같은 정답 힌트는 보내지 않음)
+const neonSnapshot = (room) => {
+  const n = room.neon;
+  return {
+    phase: n.phase, roundNo: n.roundNo, color: n.color, last: n.last, best: n.best,
+  };
+};
+const emitNeon = (room) => toJoined(room, 'neon:state', neonSnapshot(room));
+
+// 디지털 판 뒤집기: 타일 상태와 점유 수(= 점수)
+const flipCounts = (room) => ({
+  blue: room.flip.tiles.filter((t) => t === 'b').length,
+  red: room.flip.tiles.filter((t) => t === 'r').length,
+});
+const flipSnapshot = (room) => ({ tiles: room.flip.tiles.join(''), ...flipCounts(room), total: FLIP_TILES });
+const emitFlip = (room) => toJoined(room, 'flip:state', flipSnapshot(room));
+function resetFlip(room) {
+  room.flip = newFlip();
+  room.scores.blue = 0;
+  room.scores.red = 0;
+  emitFlip(room);
+}
+
+// 돌발 미션: 게임 타이머를 멈추고 미션 카운트다운 → 끝나면(또는 사범님이 누르면) 자동 재개
+const missionSnapshot = (room) => {
+  const m = room.mission;
+  return { text: m.text, sec: m.sec, sound: m.sound, phoneSound: m.phoneSound, remainingMs: Math.max(0, m.endsAt - Date.now()) };
+};
+function endMission(room, reason) {
+  const m = room.mission;
+  if (!m.active) return;
+  const g = room.game;
+  let resumed = false;
+  m.active = false;
+  if (m.wasRunning && !g.running && !g.finished && g.remainingMs > 0) {
+    g.endAt = Date.now() + g.remainingMs;
+    g.running = true;
+    resumed = true;
+  }
+  m.wasRunning = false;
+  emitState(room);
+  toJoined(room, 'mission:end', { resumed, reason, phoneSound: m.phoneSound });
+}
 
 function emitState(room) {
   const s = publicState(room);
@@ -213,12 +296,47 @@ function finishTimer(room) {
 // 0.2초마다 모든 방의 타이머 확인 → 초가 바뀔 때만 해당 방에 브로드캐스트
 setInterval(() => {
   for (const room of rooms.values()) {
+    if (room.mission.active && Date.now() >= room.mission.endsAt) endMission(room, 'timeout');
     if (!room.game.running) continue;
     const rem = room.game.endAt - Date.now();
     if (rem <= 0) { finishTimer(room); continue; }
     if (Math.ceil(rem / 1000) !== room.lastEmittedSec) emitState(room);
   }
 }, 200);
+
+// 네온 터치 대전 진행: 라운드(타이머)가 진행 중일 때만 신호를 반복해서 보냄
+setInterval(() => {
+  const now = Date.now();
+  for (const room of rooms.values()) {
+    if (room.gameType !== 'neon') continue;
+    const n = room.neon;
+    const live = room.game.running && room.game.mode === 'round';
+    if (!live) {
+      if (n.phase !== 'idle') { n.phase = 'idle'; n.color = null; emitNeon(room); }
+      continue;
+    }
+    if (n.phase === 'idle') {
+      n.phase = 'waiting';
+      n.roundNo += 1;
+      n.color = null;
+      n.nextAt = now + NEON_WAIT_MIN_MS + Math.random() * (NEON_WAIT_MAX_MS - NEON_WAIT_MIN_MS);
+      emitNeon(room);
+    } else if (n.phase === 'waiting' && now >= n.nextAt) {
+      n.phase = 'go';
+      n.goAt = now;
+      n.color = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
+      emitNeon(room);
+    } else if (n.phase === 'go' && now - n.goAt > NEON_GO_TIMEOUT_MS) {
+      n.phase = 'result';
+      n.resultUntil = now + NEON_RESULT_MS;
+      n.last = { team: null, ms: null, roundNo: n.roundNo };
+      emitNeon(room);
+    } else if (n.phase === 'result' && now >= n.resultUntil) {
+      n.phase = 'idle';
+      emitNeon(room);
+    }
+  }
+}, 50);
 
 // 접속자가 없는 방 정리
 setInterval(() => {
@@ -254,6 +372,13 @@ io.on('connection', (socket) => {
         failures.delete(ip);
       }
       room = getOrCreateRoom(roomId);                 // 점수판만 방을 만들 수 있음
+      if (GAME_TYPES.includes(payload.game) && room.gameType !== payload.game) {
+        room.gameType = payload.game;                 // 점수판이 연 게임 종류로 방을 설정
+        room.neon = newNeon();
+        room.flip = newFlip();
+        room.roundSec = payload.game === 'flip' ? FLIP_DEFAULT_ROUND_SEC : DEFAULT_ROUND_SEC;
+        if (!room.game.running && room.game.mode === 'round') room.game.remainingMs = room.roundSec * 1000;
+      }
       socket.data.role = 'scoreboard';
       socket.join(rn(room, 'scoreboard'));
       socket.emit('join:result', { ok: true, role: 'scoreboard', room: roomId, accessCode: ACCESS_CODE || null });
@@ -265,10 +390,11 @@ io.on('connection', (socket) => {
       }
       room = rooms.get(roomId);
       if (!room) return reject('no-room');
-      socket.data.role = 'pad';
+      const isBase = payload.role === 'base';   // 사이버 쟁탈전의 기지(거점) 기기
+      socket.data.role = isBase ? 'base' : 'pad';
       socket.data.team = payload.team;
-      socket.join(rn(room, `team:${payload.team}`));
-      socket.emit('join:result', { ok: true, role: 'pad', team: payload.team, room: roomId });
+      socket.join(rn(room, `${isBase ? 'base' : 'team'}:${payload.team}`));
+      socket.emit('join:result', { ok: true, role: socket.data.role, team: payload.team, room: roomId });
     } else {
       return;
     }
@@ -276,6 +402,11 @@ io.on('connection', (socket) => {
     room.emptySince = null;
     socket.emit('game:state', publicState(room));
     socket.emit('score:update', { ...room.scores, lastHit: null });
+    socket.emit('flag:update', flagSnapshot(room));
+    socket.emit('neon:state', neonSnapshot(room));
+    socket.emit('room:game', room.gameType);
+    socket.emit('flip:state', flipSnapshot(room));
+    if (room.mission.active) socket.emit('mission:start', missionSnapshot(room));
     emitCounts(room);
   });
 
@@ -284,7 +415,8 @@ io.on('connection', (socket) => {
     const reply = typeof ack === 'function' ? ack : () => {};
     const room = roomOf(socket);
     const team = socket.data.team;
-    if (!room || !team) return reply({ accepted: false, reason: 'no-team' });
+    if (!room || socket.data.role !== 'pad' || !team) return reply({ accepted: false, reason: 'no-team' });
+    if (room.gameType !== 'strike') return reply({ accepted: false, reason: 'wrong-game' });
 
     const now = Date.now();
     if (now - (socket.data.lastHit || 0) < HIT_MIN_INTERVAL_MS) {
@@ -299,15 +431,118 @@ io.on('connection', (socket) => {
     reply({ accepted: true, score: room.scores[team] });
   });
 
-  // PC 점수판 → 서버: 타이머/점수 제어 (자기 방의 scoreboard 역할만 허용)
+  // 점수판 역할 소켓만 허용하는 래퍼 (자기 방 기준)
   const onlyScoreboard = (fn) => (...args) => {
     if (socket.data.role !== 'scoreboard') return;
     const room = roomOf(socket);
     if (room) fn(room, ...args);
   };
 
+  // 모바일 → 서버: 판 뒤집기. 눌린 칸을 내 팀 색으로 뒤집고, 점유한 칸 수가 곧 점수
+  socket.on('flip', (payload = {}, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const room = roomOf(socket);
+    const team = socket.data.team;
+    if (!room || socket.data.role !== 'pad' || !team) return reply({ accepted: false, reason: 'no-team' });
+    if (room.gameType !== 'flip') return reply({ accepted: false, reason: 'wrong-game' });
+    if (!(room.game.running && room.game.mode === 'round')) return reply({ accepted: false, reason: 'inactive' });
+    const i = Number(payload.i);
+    if (!Number.isInteger(i) || i < 0 || i >= FLIP_TILES) return reply({ accepted: false, reason: 'bad-tile' });
+    const now = Date.now();
+    if (now - (socket.data.lastFlip || 0) < 80) return reply({ accepted: false, reason: 'cooldown' });
+    const mark = team === 'blue' ? 'b' : 'r';
+    if (room.flip.tiles[i] === mark) return reply({ accepted: false, reason: 'same' });
+    socket.data.lastFlip = now;
+    room.flip.tiles[i] = mark;
+    const c = flipCounts(room);
+    room.scores.blue = c.blue;
+    room.scores.red = c.red;
+    emitScores(room, team);
+    emitFlip(room);
+    reply({ accepted: true });
+  });
+
+  // 점수판/리모컨 → 서버: 돌발 미션 송출 (게임 일시정지 + 카운트다운)
+  socket.on('mission:send', onlyScoreboard((room, p = {}) => {
+    const text = String(p.text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!text) return;
+    const sec = Math.min(60, Math.max(3, Math.round(Number(p.sec) || 10)));
+    const sound = MISSION_SOUNDS.includes(p.sound) ? p.sound : 'alarm';
+    const m = room.mission;
+    const g = room.game;
+    if (!m.active) m.wasRunning = g.running;          // 이미 미션 중이면 원래 진행 여부 유지
+    if (g.running) { g.remainingMs = Math.max(0, g.endAt - Date.now()); g.running = false; }
+    m.active = true;
+    m.text = text;
+    m.sec = sec;
+    m.sound = sound;
+    m.phoneSound = !!p.phoneSound;
+    m.endsAt = Date.now() + sec * 1000;
+    emitState(room);
+    toJoined(room, 'mission:start', missionSnapshot(room));
+  }));
+  socket.on('mission:resume', onlyScoreboard((room) => endMission(room, 'manual')));
+
+  // 모바일 → 서버: 네온 터치 대전 터치.
+  //  - 신호 전(waiting)에 누르면 '부정 출발' → 이번 라운드 실격
+  //  - 신호 후(go) 가장 먼저 누른 기기의 팀이 +1점
+  socket.on('tap', (_payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const room = roomOf(socket);
+    const team = socket.data.team;
+    if (!room || socket.data.role !== 'pad' || !team) return reply({ accepted: false, reason: 'no-team' });
+    if (room.gameType !== 'neon') return reply({ accepted: false, reason: 'wrong-game' });
+    if (!(room.game.running && room.game.mode === 'round')) return reply({ accepted: false, reason: 'inactive' });
+
+    const n = room.neon;
+    const now = Date.now();
+    if (socket.data.neonLock === n.roundNo) return reply({ accepted: false, reason: 'locked' });
+
+    if (n.phase === 'waiting') {
+      socket.data.neonLock = n.roundNo;
+      return reply({ accepted: false, reason: 'early' });
+    }
+    if (n.phase !== 'go') return reply({ accepted: false, reason: 'no-signal' });
+
+    const ms = now - n.goAt;
+    n.phase = 'result';
+    n.resultUntil = now + NEON_RESULT_MS;
+    n.last = { team, ms, roundNo: n.roundNo };
+    if (n.best[team] === null || ms < n.best[team]) n.best[team] = ms;
+    room.scores[team] += 1;
+    emitScores(room, team);
+    emitNeon(room);
+    reply({ accepted: true, ms });
+  });
+
+  // 기지 기기 → 서버: 깃발 터치. 이 기기의 팀이 '수비', 반대 팀이 '탈취'한 것으로 처리
+  socket.on('capture', (_payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const room = roomOf(socket);
+    if (!room || socket.data.role !== 'base') return reply({ accepted: false, reason: 'no-base' });
+    if (room.gameType !== 'flag') return reply({ accepted: false, reason: 'wrong-game' });
+
+    const now = Date.now();
+    if (now - (socket.data.lastCapture || 0) < 300) return reply({ accepted: false, reason: 'cooldown' });
+    if (!(room.game.running && room.game.mode === 'round')) return reply({ accepted: false, reason: 'inactive' });
+
+    const defender = socket.data.team;
+    const attacker = defender === 'blue' ? 'red' : 'blue';
+    if (room.flags[defender] > now) return reply({ accepted: false, reason: 'locked' });
+
+    socket.data.lastCapture = now;
+    room.flags[defender] = now + room.flagCooldownSec * 1000;
+    room.scores[attacker] += 1;
+    emitScores(room, attacker);
+    emitFlags(room);
+    reply({ accepted: true, attacker, lockMs: room.flagCooldownSec * 1000 });
+  });
+
+  // PC 점수판 → 서버: 타이머/점수 제어 (자기 방의 scoreboard 역할만 허용)
+
   socket.on('timer:start', onlyScoreboard((room) => {
     const g = room.game;
+    if (room.mission.active) { endMission(room, 'manual'); if (g.running) return; }
     if (g.running) return;
     if (g.finished || g.remainingMs <= 0) {
       // 끝난 상태에서 시작 → 다음 모드(라운드↔휴식)로 넘어가서 시작
@@ -336,8 +571,15 @@ io.on('connection', (socket) => {
     g.remainingMs = durationMs(room, g.mode);
     room.scores.blue = 0;
     room.scores.red = 0;
+    room.flags.blue = 0;
+    room.flags.red = 0;
+    room.neon = newNeon();
+    emitNeon(room);
+    resetFlip(room);
+    if (room.mission.active) { room.mission.active = false; room.mission.wasRunning = false; toJoined(room, 'mission:end', { resumed: false, reason: 'reset', phoneSound: false }); }
     emitState(room);
     emitScores(room, null);
+    emitFlags(room);
   }));
 
   socket.on('timer:setMode', onlyScoreboard((room, mode) => {
@@ -363,7 +605,15 @@ io.on('connection', (socket) => {
     emitState(room);
   }));
 
+  // 깃발 탈취 후 쿨타임(3 / 5 / 10초)
+  socket.on('flag:setCooldown', onlyScoreboard((room, sec) => {
+    if (!ALLOWED_COOLDOWNS.includes(sec)) return;
+    room.flagCooldownSec = sec;
+    emitFlags(room);
+  }));
+
   socket.on('score:reset', onlyScoreboard((room) => {
+    if (room.gameType === 'flip') resetFlip(room);
     room.scores.blue = 0;
     room.scores.red = 0;
     emitScores(room, null);
@@ -381,11 +631,12 @@ server.listen(PORT, '0.0.0.0', () => {
   const primary = LAN_IPS[0] || 'localhost';
   const line = '='.repeat(62);
   console.log(`\n${line}`);
-  console.log('  🥊 청팀 vs 홍팀 타격 대결 서버가 실행 중입니다');
+  console.log('  🎮 플레이 라운지 서버가 실행 중입니다');
   console.log(line);
   console.log(`  감지된 로컬 IPv4 : ${LAN_IPS.length ? LAN_IPS.join(', ') : '(없음 - 네트워크 연결 확인)'}`);
-  console.log(`  PC 점수판        : ${proto}://${primary}:${PORT}/   (열 때마다 새 경기방이 만들어집니다)`);
-  console.log('  모바일 주소      : 점수판 화면의 QR 코드를 스캔 (경기방 ID 포함)');
+  console.log(`  PC 점수판        : ${proto}://${primary}:${PORT}/   (메뉴에서 게임을 고르면 새 경기방이 만들어집니다)`);
+  console.log('  플레이 라운지    : 메인 주소(/)의 메뉴에서 게임을 선택');
+  console.log('  모바일/기지 주소 : 점수판 화면의 QR 코드를 스캔 (경기방 ID 포함)');
   console.log(`\n  관리자 비밀번호(ADMIN_PASSWORD) : ${ADMIN_PASSWORD ? '설정됨' : '⚠ 미설정 - 누구나 점수판 조작 가능'}`);
   console.log(`  참가 코드(ACCESS_CODE)         : ${ACCESS_CODE ? '설정됨' : '⚠ 미설정 - 누구나 모바일 참가 가능'}`);
   if (!USE_HTTP) {

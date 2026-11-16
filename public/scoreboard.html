@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>청팀 vs 홍팀 타격 대결 - 점수판</title>
+<style>
+  :root {
+    --blue: #2f6bff;
+    --blue-deep: #0b2a86;
+    --red: #ff4536;
+    --red-deep: #8c1409;
+    --base: #14161d;
+    --panel: #1d2029;
+    --ink: #f5f7fb;
+    --muted: #9aa3b5;
+    --font: "Arial Narrow", "Roboto Condensed", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--base);
+    color: var(--ink);
+    overflow: hidden;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: 1fr minmax(300px, 25vw) 1fr;
+    height: 100vh;
+  }
+
+  /* ---------- 팀 패널 ---------- */
+  .team {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.4vh 2vw;
+    overflow: hidden;
+  }
+  .team.blue { background: linear-gradient(165deg, var(--blue) 0%, var(--blue-deep) 100%); }
+  .team.red  { background: linear-gradient(195deg, var(--red) 0%, var(--red-deep) 100%); }
+
+  .team-name {
+    font-size: clamp(1.6rem, 3.2vw, 3.6rem);
+    font-weight: 900;
+    letter-spacing: 0.04em;
+  }
+  .team-sub { font-size: clamp(.9rem, 1.1vw, 1.3rem); opacity: .8; margin-top: .3vh; }
+
+  .score {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: min(17vw, 36vh);
+    font-weight: 900;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 .04em 0 rgba(0,0,0,.28);
+  }
+  .score.pop { animation: pop .22s ease-out; }
+  @keyframes pop {
+    0%   { transform: scale(1.14); }
+    100% { transform: scale(1); }
+  }
+  .team.hit::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,.22);
+    animation: fade .25s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes fade { to { opacity: 0; } }
+
+  .join {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .8vh;
+    padding-bottom: .5vh;
+  }
+  .qr-box {
+    background: #fff;
+    padding: 10px;
+    border-radius: 6px;
+    width: 180px; height: 180px;
+    display: grid; place-items: center;
+  }
+  .qr-box img, .qr-box canvas { display: block; max-width: 100%; }
+  .qr-fallback { color: #333; font-size: .8rem; text-align: center; }
+  .join-url { font-size: .85rem; opacity: .85; word-break: break-all; text-align: center; max-width: 28vw; }
+  .join-count { font-size: 1rem; font-weight: 700; }
+
+  /* ---------- 가운데 타이머 ---------- */
+  .center {
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.4vh;
+    padding: 3vh 1.6vw;
+  }
+  .mode-label {
+    font-size: clamp(1.3rem, 2vw, 2.4rem);
+    font-weight: 800;
+    padding: .2em .9em;
+    border-radius: 999px;
+    background: #2a2f3b;
+  }
+  .mode-label.round.running { background: #1f8f4e; }
+  .mode-label.rest { background: #b27a10; }
+
+  .time {
+    font-size: clamp(3.6rem, 7vw, 9rem);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .time.warn { color: #ffd23f; animation: blink 1s steps(2, start) infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  .bar { width: 100%; height: 10px; background: #2a2f3b; border-radius: 99px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 100%; background: var(--ink); transition: width .25s linear; }
+
+  .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; width: 100%; }
+  .controls.sub { grid-template-columns: 1fr 1fr; }
+  button {
+    font: inherit;
+    font-weight: 800;
+    font-size: clamp(.95rem, 1.2vw, 1.4rem);
+    padding: .75em .4em;
+    border: 0;
+    border-radius: 10px;
+    background: #323847;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #3f4659; }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.primary { background: #1f9d57; }
+  button.primary:hover:not(:disabled) { background: #25b566; }
+  button.preset.active { background: #fff; color: #11141b; }
+  button.small { font-size: clamp(.8rem, .95vw, 1.1rem); font-weight: 600; background: transparent; border: 1px solid #3a4152; color: var(--muted); }
+
+  .meta { font-size: .85rem; color: var(--muted); text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .dot { display: inline-block; width: .6em; height: .6em; border-radius: 50%; background: #d33; margin-right: .4em; }
+  .dot.on { background: #2ecc71; }
+  select { font: inherit; background: #2a2f3b; color: var(--ink); border: 1px solid #3a4152; border-radius: 6px; padding: 3px 6px; max-width: 100%; }
+
+  /* ---------- 종료 오버레이 ---------- */
+  .overlay {
+    position: fixed; inset: 0;
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 2vh;
+    background: rgba(10,12,18,.9);
+    text-align: center;
+    z-index: 10;
+    cursor: pointer;
+  }
+  .overlay.show { display: flex; }
+  .overlay .o-title { font-size: clamp(2rem, 5vw, 6rem); font-weight: 900; }
+  .overlay .o-result { font-size: clamp(3rem, 10vw, 12rem); font-weight: 900; line-height: 1.05; }
+  .overlay .o-result.blue { color: #6f9bff; }
+  .overlay .o-result.red { color: #ff7a6e; }
+  .overlay .o-score { font-size: clamp(2rem, 5vw, 6rem); font-variant-numeric: tabular-nums; font-weight: 800; }
+  .overlay .o-hint { font-size: clamp(1rem, 1.5vw, 1.6rem); color: var(--muted); }
+
+  /* 관리자 로그인 */
+  .login-form { display: flex; flex-direction: column; gap: 12px; width: min(360px, 86vw); }
+  .login-form input {
+    font: inherit; font-size: 1.2rem; padding: .8em 1em; border-radius: 10px;
+    border: 2px solid #3a4152; background: #1d2029; color: var(--ink);
+  }
+  .login-form .err { color: #ff8a80; min-height: 1.3em; font-size: .95rem; }
+  .game-links { font-size: .85rem; display: flex; gap: 10px; justify-content: center; }
+  .game-links a { color: var(--muted); text-decoration: none; padding: 2px 8px; border-radius: 6px; border: 1px solid #3a4152; }
+  .game-links a.on { color: #11141b; background: #fff; border-color: #fff; font-weight: 700; }
+  .flag-chip { font-size: clamp(.9rem, 1.2vw, 1.4rem); font-weight: 800; padding: .3em .9em; border-radius: 999px; background: rgba(0,0,0,.3); margin-bottom: 1vh; }
+  .flag-chip.captured { background: #fff; color: #11141b; animation: blink 1s steps(2, start) infinite; }
+  .join-title { font-size: .95rem; font-weight: 700; opacity: .9; }
+  button.preset.active, button.cdbtn.active { background: #fff; color: #11141b; }
+  .cap { font-size: .8rem; color: var(--muted); margin-bottom: -1.4vh; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .overlay > div { position: relative; z-index: 1; }
+  body.neon .board { grid-template-columns: 1fr minmax(360px, 32vw) 1fr; }
+  .signal {
+    display: none; width: 100%; aspect-ratio: 1.25 / 1; border-radius: 18px;
+    flex-direction: column; align-items: center; justify-content: center; gap: .35em;
+    background: #0d0f15; border: 3px solid #2a2f3b; text-align: center; padding: 1vh 1vw;
+  }
+  body.neon .signal { display: flex; }
+  .signal .s-main { font-size: clamp(1.8rem, 3.2vw, 4rem); font-weight: 900; line-height: 1.1; }
+  .signal .s-sub { font-size: clamp(.95rem, 1.3vw, 1.5rem); opacity: .9; }
+  .signal .s-best { font-size: clamp(.8rem, 1vw, 1.1rem); opacity: .75; }
+  .signal.go { color: #0b0d12; border-color: #fff; }
+  .signal.result.blue { background: #2f6bff; border-color: #fff; }
+  .signal.result.red { background: #ff4536; border-color: #fff; }
+  #presets { grid-template-columns: repeat(4, 1fr); }
+  .scorebar { display: none; height: 9vh; background: #2a2f3b; align-items: stretch; font-weight: 900; font-size: clamp(1.1rem, 2.4vw, 2.6rem); font-variant-numeric: tabular-nums; }
+  body.flip .scorebar { display: flex; }
+  body.flip .board { height: 91vh; }
+  .sb-blue, .sb-red { display: flex; align-items: center; min-width: 4.5em; padding: 0 1.2vw; transition: width .25s ease; white-space: nowrap; }
+  .sb-blue { background: var(--blue); justify-content: flex-start; width: 0; }
+  .sb-red { background: var(--red); justify-content: flex-end; width: 0; }
+  .sb-mid { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: .55em; font-weight: 700; }
+  .deck-toggle { position: fixed; top: 10px; right: 10px; z-index: 30; font: inherit; font-weight: 800; padding: .55em 1em; border-radius: 999px; border: 2px solid #fff; background: #e5352b; color: #fff; cursor: pointer; }
+  .deck-toggle:focus-visible { outline: 3px solid #ffd23f; outline-offset: 2px; }
+  .deck-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 94vw); z-index: 40; background: #1b1e28; border-left: 1px solid #2a2f3d; padding: 16px; overflow-y: auto; box-shadow: -8px 0 30px rgba(0,0,0,.5); }
+  .deck-close { position: sticky; top: 0; float: right; z-index: 1; font: inherit; font-weight: 800; background: #323847; color: #fff; border: 0; border-radius: 8px; padding: .4em .8em; cursor: pointer; }
+  .deck-remote { margin-top: 16px; color: var(--muted); font-size: .9rem; }
+  .deck-remote .qr-box { margin: 10px 0 6px; width: 160px; height: 160px; }
+  .back-menu { color: var(--muted); font-size: .85rem; text-decoration: none; }
+  .new-room { color: var(--muted); font-size: .85rem; }
+  .code-box { font-size: .95rem; color: var(--muted); }
+  .code-box b { font-size: 1.6rem; letter-spacing: .12em; color: var(--ink); margin-left: .3em; }
+
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    .board { grid-template-columns: 1fr; height: auto; }
+    .score { font-size: 28vw; padding: 3vh 0; }
+    .join-url { max-width: 90vw; }
+    body.neon .board { grid-template-columns: 1fr; }
+    body.flip .board { height: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .score.pop, .time.warn, .team.hit::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="scorebar" id="scorebar" aria-label="타일 점유 현황">
+  <div class="sb-blue" id="sb-blue">청 0</div>
+  <div class="sb-mid" id="sb-mid">남은 칸 81</div>
+  <div class="sb-red" id="sb-red">홍 0</div>
+</div>
+<main class="board">
+
+  <!-- 청팀 -->
+  <section class="team blue" id="panel-blue">
+    <div class="team-name">청팀</div>
+    <div class="team-sub">Blue Score</div>
+    <div class="score" id="score-blue">0</div>
+    <div class="flag-chip" id="flag-blue" hidden></div>
+    <div class="join">
+      <div class="join-title" id="jt-blue"></div>
+      <div class="qr-box" id="qr-blue"></div>
+      <div class="join-url" id="url-blue"></div>
+      <div class="join-count"><span class="jl">접속 기기</span> <span id="count-blue">0</span>대</div>
+    </div>
+  </section>
+
+  <!-- 타이머 -->
+  <section class="center">
+    <div class="signal" id="signal" aria-live="polite">
+      <div class="s-main" id="s-main"></div>
+      <div class="s-sub" id="s-sub"></div>
+      <div class="s-best" id="s-best"></div>
+    </div>
+    <div class="mode-label round" id="mode-label">라운드 대기</div>
+    <div class="time" id="time">3:00</div>
+    <div class="bar"><i id="bar"></i></div>
+
+    <div class="controls">
+      <button class="primary" id="btn-start">시작</button>
+      <button id="btn-pause" disabled>일시정지</button>
+      <button id="btn-reset">초기화</button>
+    </div>
+    <div class="controls sub">
+      <button class="small" id="btn-mode-round">라운드</button>
+      <button class="small" id="btn-mode-rest">휴식</button>
+    </div>
+    <div class="controls" id="presets" role="group" aria-label="타이머 시간 선택">
+      <button class="preset" data-sec="180">3분</button>
+      <button class="preset" data-sec="90">1분30초</button>
+      <button class="preset" data-sec="60">1분</button>
+      <button class="preset" data-sec="30">30초</button>
+    </div>
+    <div class="cap" id="cd-cap" hidden>깃발 탈취 후 쿨타임</div>
+    <div class="controls" id="cooldowns" hidden role="group" aria-label="깃발 탈취 쿨타임">
+      <button class="cdbtn" data-sec="3">3초</button>
+      <button class="cdbtn" data-sec="5">5초</button>
+      <button class="cdbtn" data-sec="10">10초</button>
+    </div>
+    <button class="small" id="btn-score-reset" style="width:100%">점수 0점으로 초기화</button>
+
+    <div class="meta">
+      <div><span class="dot" id="conn-dot"></span><span id="conn-text">서버 연결 중</span></div>
+      <div class="game-links" aria-label="게임 선택">
+        <a href="/scoreboard.html?game=strike" id="gl-strike" target="_blank" rel="noopener">타격 대결</a>
+        <a href="/scoreboard.html?game=flag" id="gl-flag" target="_blank" rel="noopener">사이버 쟁탈전</a>
+        <a href="/scoreboard.html?game=neon" id="gl-neon" target="_blank" rel="noopener">네온 터치</a>
+        <a href="/scoreboard.html?game=flip" id="gl-flip" target="_blank" rel="noopener">판 뒤집기</a>
+      </div>
+      <div class="code-box">경기방<b id="room-val"></b></div>
+      <a class="new-room" id="new-room" href="/scoreboard.html" target="_blank" rel="noopener">새 경기방 만들기</a>
+      <a class="back-menu" href="/">← 플레이 라운지 메뉴</a>
+      <div class="code-box" id="code-box" hidden>참가 코드<b id="code-val"></b></div>
+      <label id="ip-picker" hidden>QR 주소
+        <select id="ip-select" aria-label="QR 코드에 사용할 네트워크 주소"></select>
+      </label>
+    </div>
+  </section>
+
+  <!-- 홍팀 -->
+  <section class="team red" id="panel-red">
+    <div class="team-name">홍팀</div>
+    <div class="team-sub">Red Score</div>
+    <div class="score" id="score-red">0</div>
+    <div class="flag-chip" id="flag-red" hidden></div>
+    <div class="join">
+      <div class="join-title" id="jt-red"></div>
+      <div class="qr-box" id="qr-red"></div>
+      <div class="join-url" id="url-red"></div>
+      <div class="join-count"><span class="jl">접속 기기</span> <span id="count-red">0</span>대</div>
+    </div>
+  </section>
+</main>
+
+<button class="deck-toggle" id="deck-toggle" hidden aria-expanded="false" aria-controls="deck-panel">🚨 미션 덱</button>
+<aside class="deck-panel" id="deck-panel" hidden aria-label="미션 송출 덱">
+  <button class="deck-close" id="deck-close" type="button">닫기</button>
+  <div id="deck-body"></div>
+  <details class="deck-remote">
+    <summary>사범님 휴대폰을 리모컨으로 쓰기</summary>
+    <div class="qr-box" id="qr-deck"></div>
+    <div class="join-url" id="url-deck"></div>
+    <p>QR을 스캔하고 관리자 비밀번호를 입력하면 휴대폰에서 미션 발송과 타이머를 조작할 수 있습니다.</p>
+  </details>
+</aside>
+
+<div class="overlay" id="login" role="dialog" aria-label="관리자 로그인" style="cursor:default;z-index:20">
+  <div class="o-title">관리자 로그인</div>
+  <form class="login-form" id="login-form">
+    <input id="login-pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" aria-label="관리자 비밀번호">
+    <button class="primary" type="submit">입장</button>
+    <div class="err" id="login-err" role="alert"></div>
+  </form>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-live="polite">
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="o-title" id="o-title"></div>
+  <div class="o-result" id="o-result"></div>
+  <div class="o-score" id="o-score"></div>
+  <div class="o-hint" id="o-hint"></div>
+</div>
+
+<!-- qrcode.js (CDN). 오프라인 환경이면 README의 안내를 참고하세요. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/mission.js"></script>
+<script src="/deck.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  // 경기방 ID: 주소의 ?room= 값을 사용하고, 없으면 새로 만들어 주소에 기록(새로고침해도 같은 방 유지)
+  const urlParams = new URLSearchParams(location.search);
+  const newRoomId = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+  };
+  let roomId = (urlParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  if (roomId.length < 4) {
+    roomId = newRoomId();
+    urlParams.set('room', roomId);
+    history.replaceState(null, '', `?${urlParams.toString()}`);
+  }
+  $('room-val').textContent = roomId;
+
+  // 게임 종류: ?game=flag 이면 사이버 쟁탈전, 그 외에는 타격 대결
+  const game = ['flag', 'neon', 'flip'].includes(urlParams.get('game')) ? urlParams.get('game') : 'strike';
+  const TEAM_KO = { blue: '청팀', red: '홍팀' };
+  (function applyGameUI() {
+    $('gl-' + game).classList.add('on');
+    document.title = { flag: '사이버 쟁탈전', neon: '네온 터치 대전', flip: '디지털 판 뒤집기', strike: '타격 대결' }[game] + ' - 플레이 라운지';
+    if (game === 'neon') document.body.classList.add('neon');
+    if (game === 'flip') {
+      document.body.classList.add('flip');
+      document.querySelector('#panel-blue .team-sub').textContent = 'Blue Tiles';
+      document.querySelector('#panel-red .team-sub').textContent = 'Red Tiles';
+    }
+    $('new-room').href = `/scoreboard.html?game=${game}`;
+    ['blue', 'red'].forEach((t) => {
+      $('jt-' + t).textContent = game === 'flag' ? `${TEAM_KO[t]} 기지 기기 연결 (QR)` : `${TEAM_KO[t]} 선수 입장 (QR)`;
+      if (game === 'flag') {
+        $('flag-' + t).hidden = false;
+        document.querySelector(`#panel-${t} .team-sub`).textContent = t === 'blue' ? 'Blue Base' : 'Red Base';
+        document.querySelector(`#panel-${t} .jl`).textContent = '기지 연결';
+      }
+    });
+    if (game === 'flag') { $('cooldowns').hidden = false; $('cd-cap').hidden = false; }
+  })();
+
+  const socket = io();
+  Mission.attach(socket, 'screen');
+  Deck.mount($('deck-body'), socket);
+  const deckToggle = (open) => {
+    $('deck-panel').hidden = !open;
+    $('deck-toggle').setAttribute('aria-expanded', String(open));
+    if (open) SFX.unlock();
+  };
+  $('deck-toggle').addEventListener('click', () => deckToggle($('deck-panel').hidden));
+  $('deck-close').addEventListener('click', () => deckToggle(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deckToggle(false); });
+
+  let cfg = null;
+  let state = null;
+  let scores = { blue: 0, red: 0 };
+  let dismissedFor = null; // 사용자가 닫은 종료 오버레이
+  let authed = false;
+  let adminPw = '';
+  try { adminPw = sessionStorage.getItem('strike-admin') || ''; } catch (_) {}
+
+  /* ---------------------------- QR 코드 ---------------------------- */
+  function pickHost() {
+    const sel = $('ip-select');
+    if (cfg && cfg.ips.length) return sel.value || cfg.ips[0];
+    return location.hostname;
+  }
+  // 내부망(localhost/사설 IP)이 아닌 외부 주소(터널·클라우드)로 열었다면 그 주소를 그대로 사용
+  const isLocalHost = (h) =>
+    h === 'localhost' || h === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
+  function renderQR() {
+    if (!cfg || !authed) return;   // 로그인 전에는 QR을 보여주지 않음
+    const origin = isLocalHost(location.hostname)
+      ? `${cfg.protocol}://${pickHost()}:${cfg.port}`
+      : location.origin;
+    const deckUrl = `${origin}/deck.html?room=${roomId}`;
+    $('url-deck').textContent = deckUrl;
+    const dq = $('qr-deck'); dq.innerHTML = '';
+    if (typeof QRCode !== 'undefined') new QRCode(dq, { text: deckUrl, width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M });
+    [['blue', '#1747c9'], ['red', '#c4281b']].forEach(([team, color]) => {
+      const url = `${origin}/${{ flag: 'base', neon: 'neon-pad', flip: 'flip-pad', strike: 'mobile' }[game]}.html?team=${team}&room=${roomId}`;
+      const box = $(`qr-${team}`);
+      box.innerHTML = '';
+      $(`url-${team}`).textContent = url;
+      if (typeof QRCode === 'undefined') {
+        box.innerHTML = '<div class="qr-fallback">QR 라이브러리를 불러오지 못했습니다.<br>아래 주소를 직접 입력하세요.</div>';
+        return;
+      }
+      new QRCode(box, {
+        text: url, width: 160, height: 160,
+        colorDark: color, colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    });
+  }
+  fetch('/api/config').then((r) => r.json()).then((c) => {
+    cfg = c;
+    if (c.ips.length > 1 && isLocalHost(location.hostname)) {
+      const sel = $('ip-select');
+      sel.innerHTML = c.ips.map((ip) => `<option value="${ip}">${ip}</option>`).join('');
+      sel.addEventListener('change', renderQR);
+      $('ip-picker').hidden = false;
+    }
+    renderQR();
+  });
+
+  /* ---------------------------- 소리 ---------------------------- */
+  let audio;
+  function beep(times) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      for (let i = 0; i < times; i++) {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+        const t = audio.currentTime + i * 0.28;
+        g.gain.setValueAtTime(0.25, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        o.start(t); o.stop(t + 0.24);
+      }
+    } catch (_) { /* 소리 실패는 무시 */ }
+  }
+
+  /* ---------------------------- 폭죽 효과 ---------------------------- */
+  const fx = $('fx'), fctx = fx.getContext('2d');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let particles = [], fxRaf = null, fxTimer = null;
+  const FX_COLORS = { blue: ['#6f9bff', '#9ec0ff', '#ffffff'], red: ['#ff7a6e', '#ffb0a8', '#ffffff'] };
+  function burst(x, y, palette) {
+    for (let i = 0; i < 80; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 6;
+      particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, c: palette[i % palette.length] });
+    }
+  }
+  function fxFrame() {
+    fctx.fillStyle = 'rgba(10,12,18,0.22)';
+    fctx.fillRect(0, 0, fx.width, fx.height);
+    particles = particles.filter((p) => p.life > 0);
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.07; p.vx *= 0.99; p.life -= 0.012;
+      fctx.globalAlpha = Math.max(p.life, 0);
+      fctx.fillStyle = p.c;
+      fctx.beginPath(); fctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); fctx.fill();
+    }
+    fctx.globalAlpha = 1;
+    fxRaf = requestAnimationFrame(fxFrame);
+  }
+  function startFx() {
+    if (reduceMotion || fxRaf) return;
+    fx.width = innerWidth; fx.height = innerHeight;
+    const { blue, red } = scores;
+    const palette = blue === red ? [...FX_COLORS.blue, ...FX_COLORS.red] : FX_COLORS[blue > red ? 'blue' : 'red'];
+    const shoot = () => burst(innerWidth * (0.15 + Math.random() * 0.7), innerHeight * (0.12 + Math.random() * 0.5), palette);
+    shoot(); shoot();
+    fxTimer = setInterval(shoot, 500);
+    fxRaf = requestAnimationFrame(fxFrame);
+  }
+  function stopFx() {
+    clearInterval(fxTimer); fxTimer = null;
+    if (fxRaf) cancelAnimationFrame(fxRaf);
+    fxRaf = null; particles = [];
+    fctx.clearRect(0, 0, fx.width, fx.height);
+  }
+
+  /* ---------------------------- 깃발 상태 (쟁탈전) ---------------------------- */
+  const flagLock = { blue: 0, red: 0 };
+  let cooldownSec = 5;
+  function renderFlags() {
+    if (game !== 'flag') return;
+    ['blue', 'red'].forEach((t) => {
+      const remain = Math.max(0, Math.ceil((flagLock[t] - Date.now()) / 1000));
+      const chip = $('flag-' + t);
+      chip.classList.toggle('captured', remain > 0);
+      chip.textContent = remain > 0 ? `🚩 깃발 탈취당함 · ${remain}초` : '🚩 깃발 사수 중';
+    });
+    document.querySelectorAll('#cooldowns .cdbtn').forEach((b) => b.classList.toggle('active', Number(b.dataset.sec) === cooldownSec));
+  }
+  setInterval(renderFlags, 250);
+
+  /* ---------------------------- 렌더링 ---------------------------- */
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  function renderTimer() {
+    if (!state) return;
+    const { mode, running, finished, remainingSec, totalSec } = state;
+    $('time').textContent = fmt(remainingSec);
+    $('time').classList.toggle('warn', running && remainingSec <= 10 && remainingSec > 0);
+    $('bar').style.width = `${totalSec ? (remainingSec / totalSec) * 100 : 0}%`;
+
+    const label = $('mode-label');
+    label.className = `mode-label ${mode}${running ? ' running' : ''}`;
+    label.textContent =
+      mode === 'round'
+        ? (running ? '라운드 진행 중' : finished ? '라운드 종료' : remainingSec < totalSec ? '라운드 일시정지' : '라운드 대기')
+        : (running ? '휴식 시간' : finished ? '휴식 종료' : remainingSec < totalSec ? '휴식 일시정지' : '휴식 대기');
+
+    const start = $('btn-start');
+    start.disabled = running;
+    start.textContent = finished
+      ? (mode === 'round' ? '휴식 시작' : '라운드 시작')
+      : (remainingSec < totalSec ? '재개' : '시작');
+    $('btn-pause').disabled = !running;
+    document.querySelectorAll('#presets .preset').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.sec) === totalSec);
+      b.disabled = running;   // 진행 중에는 시간 변경 잠금
+    });
+    $('btn-mode-round').textContent = `라운드 ${fmt(state.roundSec)}`;
+    $('btn-mode-rest').textContent = `휴식 ${fmt(state.restSec)}`;
+  }
+
+  function renderOverlay() {
+    const ov = $('overlay');
+    const key = state && state.finished ? `${state.mode}` : null;
+    if (!key) { dismissedFor = null; ov.classList.remove('show'); stopFx(); return; }
+    if (dismissedFor === key) return;
+
+    const res = $('o-result');
+    res.className = 'o-result';
+    if (state.mode === 'round') {
+      const { blue, red } = scores;
+      $('o-title').textContent = '라운드 종료';
+      if (blue === red) { res.textContent = '무승부'; }
+      else { const w = blue > red ? 'blue' : 'red'; res.textContent = w === 'blue' ? '청팀 승리' : '홍팀 승리'; res.classList.add(w); }
+      $('o-score').textContent = `청 ${blue}  :  ${red} 홍`;
+      $('o-hint').textContent = '시작 버튼을 누르면 휴식 시간이 시작됩니다 (화면을 누르면 닫힘)';
+    } else {
+      $('o-title').textContent = '휴식 종료';
+      res.textContent = '다음 라운드 준비';
+      $('o-score').textContent = `청 ${scores.blue}  :  ${scores.red} 홍`;
+      $('o-hint').textContent = '시작 버튼을 누르면 다음 라운드가 시작됩니다 (화면을 누르면 닫힘)';
+    }
+    ov.classList.add('show');
+    if (state.mode === 'round') startFx(); else stopFx();
+  }
+  $('overlay').addEventListener('click', () => {
+    dismissedFor = state && state.finished ? state.mode : null;
+    $('overlay').classList.remove('show');
+    stopFx();
+  });
+
+  function setScore(team, value, hit) {
+    const el = $(`score-${team}`);
+    el.textContent = value;
+    if (hit) {
+      el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+      const panel = $(`panel-${team}`);
+      panel.classList.remove('hit'); void panel.offsetWidth; panel.classList.add('hit');
+    }
+  }
+
+  /* ---------------------------- 소켓 이벤트 ---------------------------- */
+  socket.on('connect', () => {
+    socket.emit('join', { role: 'scoreboard', password: adminPw, room: roomId, game });
+    $('conn-dot').classList.add('on');
+    $('conn-text').textContent = '서버 연결됨';
+  });
+  socket.on('disconnect', () => {
+    $('conn-dot').classList.remove('on');
+    $('conn-text').textContent = '연결 끊김 - 재연결 중';
+  });
+  const LOGIN_ERR = {
+    'password-required': '',
+    'bad-password': '비밀번호가 맞지 않습니다.',
+    'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.',
+  };
+  socket.on('join:result', (r) => {
+    if (r.ok) {
+      authed = true;
+      $('login').classList.remove('show');
+      $('deck-toggle').hidden = false;
+      try { sessionStorage.setItem('strike-admin', adminPw); } catch (_) {}
+      if (r.accessCode) { $('code-val').textContent = r.accessCode; $('code-box').hidden = false; }
+      renderQR();
+    } else {
+      authed = false;
+      if (r.reason === 'bad-password') { adminPw = ''; try { sessionStorage.removeItem('strike-admin'); } catch (_) {} }
+      $('login-err').textContent = LOGIN_ERR[r.reason] || '';
+      $('login').classList.add('show');
+      $('login-pw').focus();
+    }
+  });
+  $('login-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    adminPw = $('login-pw').value;
+    socket.emit('join', { role: 'scoreboard', password: adminPw, room: roomId, game });
+  });
+  socket.on('game:state', (s) => { state = s; renderTimer(); renderOverlay(); });
+  socket.on('score:update', (s) => {
+    scores = { blue: s.blue, red: s.red };
+    setScore('blue', s.blue, s.lastHit === 'blue');
+    setScore('red', s.red, s.lastHit === 'red');
+    renderOverlay();
+  });
+  /* ---------------------------- 네온 터치 대전 ---------------------------- */
+  let lastNeonPhase = null;
+  function renderNeon(n) {
+    if (game !== 'neon') return;
+    const el = $('signal');
+    el.className = 'signal ' + n.phase;
+    el.style.background = '';
+    const main = $('s-main'), sub = $('s-sub'), best = $('s-best');
+    const fmtMs = (ms) => `${(ms / 1000).toFixed(3)}초`;
+    if (n.phase === 'idle') {
+      main.textContent = state && state.running && state.mode === 'round' ? '잠시 후 신호' : '대기 중';
+      sub.textContent = state && state.running ? '' : '시작 버튼을 누르면 신호가 나옵니다';
+    } else if (n.phase === 'waiting') {
+      main.textContent = '준비…';
+      sub.textContent = '신호가 뜨면 가장 먼저 터치!';
+    } else if (n.phase === 'go') {
+      el.style.background = n.color ? n.color.hex : '#fff';
+      main.textContent = '터치!';
+      sub.textContent = n.color ? n.color.name : '';
+    } else if (n.phase === 'result') {
+      if (n.last && n.last.team) {
+        el.classList.add(n.last.team);
+        main.textContent = `${TEAM_KO[n.last.team]} +1`;
+        sub.textContent = fmtMs(n.last.ms);
+      } else {
+        main.textContent = '시간 초과';
+        sub.textContent = '아무도 누르지 않았어요';
+      }
+    }
+    const b = n.best || {};
+    best.textContent = (b.blue != null || b.red != null)
+      ? `최고 기록  청 ${b.blue != null ? fmtMs(b.blue) : '-'} · 홍 ${b.red != null ? fmtMs(b.red) : '-'}` : '';
+    if (n.phase === 'go' && lastNeonPhase !== 'go') beep(1);
+    lastNeonPhase = n.phase;
+  }
+  socket.on('neon:state', renderNeon);
+  socket.on('flip:state', (f) => {
+    if (game !== 'flip') return;
+    const pct = (n) => `${(n / f.total) * 100}%`;
+    $('sb-blue').style.width = pct(f.blue); $('sb-blue').textContent = `청 ${f.blue}`;
+    $('sb-red').style.width = pct(f.red); $('sb-red').textContent = `홍 ${f.red}`;
+    $('sb-mid').textContent = `남은 칸 ${f.total - f.blue - f.red}`;
+  });
+  socket.on('flag:update', (f) => {
+    flagLock.blue = Date.now() + f.blue;
+    flagLock.red = Date.now() + f.red;
+    cooldownSec = f.cooldownSec;
+    renderFlags();
+  });
+  socket.on('team:count', (c) => {
+    const n = game === 'flag' ? (c.bases || { blue: 0, red: 0 }) : c;
+    $('count-blue').textContent = n.blue;
+    $('count-red').textContent = n.red;
+  });
+  socket.on('timer:end', (e) => beep(e.mode === 'round' ? 3 : 2));
+
+  /* ---------------------------- 버튼 ---------------------------- */
+  $('btn-start').addEventListener('click', () => { beep(0); socket.emit('timer:start'); });
+  $('btn-pause').addEventListener('click', () => socket.emit('timer:pause'));
+  $('btn-reset').addEventListener('click', () => {
+    if ((scores.blue || scores.red) && !confirm('타이머와 점수를 모두 초기화할까요?')) return;
+    socket.emit('timer:reset');
+  });
+  $('btn-mode-round').addEventListener('click', () => socket.emit('timer:setMode', 'round'));
+  $('btn-mode-rest').addEventListener('click', () => socket.emit('timer:setMode', 'rest'));
+  document.querySelectorAll('#presets .preset').forEach((b) => {
+    b.addEventListener('click', () => {
+      if (state) socket.emit('timer:setDuration', { mode: state.mode, sec: Number(b.dataset.sec) });
+    });
+  });
+  document.querySelectorAll('#cooldowns .cdbtn').forEach((b) => {
+    b.addEventListener('click', () => socket.emit('flag:setCooldown', Number(b.dataset.sec)));
+  });
+  $('btn-score-reset').addEventListener('click', () => {
+    if (confirm('양 팀 점수를 0점으로 초기화할까요?')) socket.emit('score:reset');
+  });
+})();
+</script>
+</body>
+</html>
