@@ -291,6 +291,24 @@
   .overlay { background: rgba(22,24,40,.74); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
   .overlay .o-result.blue { color: #b7cdff; } .overlay .o-result.red { color: #ffc2c9; }
   @media (max-width: 900px) { .board { padding: 10px; gap: 10px; } }
+
+  /* ===== 화면 높이에 맞춰 줄이기 (QR이 잘리지 않도록) ===== */
+  .team { padding: 1.6vh 1.4vw; overflow-y: auto; scrollbar-width: none; } .team::-webkit-scrollbar { display: none; }
+  .team-name { font-size: clamp(1.3rem, min(2.6vw, 5vh), 2.8rem); }
+  .team-sub { font-size: clamp(.75rem, 1.6vh, 1rem); }
+  .score { font-size: min(13vw, 24vh); min-height: 0; }
+  .join { gap: .5vh; padding-bottom: 0; flex-shrink: 0; }
+  .qr-box { width: clamp(96px, 19vh, 170px); height: clamp(96px, 19vh, 170px); padding: 6px; }
+  .qr-box img, .qr-box canvas { width: 100% !important; height: auto !important; }
+  .join-url { font-size: clamp(.62rem, 1.4vh, .8rem); }
+  .join-title, .join-count { font-size: clamp(.8rem, 1.9vh, 1rem); }
+  .center { gap: 1.6vh; padding: 2vh 1.2vw; overflow-y: auto; scrollbar-width: none; } .center::-webkit-scrollbar { display: none; }
+  .mode-label { font-size: clamp(1rem, min(1.6vw, 3.4vh), 2rem); }
+  .time { font-size: clamp(2.6rem, min(6vw, 12vh), 7.5rem); }
+  button { padding: .55em .4em; font-size: clamp(.85rem, min(1.05vw, 2.2vh), 1.2rem); }
+  .meta { font-size: clamp(.72rem, 1.6vh, .85rem); gap: 4px; }
+  .code-box b { font-size: clamp(1.1rem, 2.8vh, 1.5rem); }
+  @media (max-width: 900px) { .score { font-size: 22vw; } .qr-box { width: 150px; height: 150px; } }
 </style>
 </head>
 <body>
