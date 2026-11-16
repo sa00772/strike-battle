@@ -293,7 +293,7 @@
       <div class="game-links" aria-label="게임 선택">
         <a href="/scoreboard.html?game=strike" id="gl-strike" target="_blank" rel="noopener">타격 대결</a>
         <a href="/scoreboard.html?game=flag" id="gl-flag" target="_blank" rel="noopener">사이버 쟁탈전</a>
-        <a href="/scoreboard.html?game=neon" id="gl-neon" target="_blank" rel="noopener">네온 터치</a>
+        <a href="/scoreboard.html?game=neon" id="gl-neon" target="_blank" rel="noopener">반응속도</a>
         <a href="/scoreboard.html?game=flip" id="gl-flip" target="_blank" rel="noopener">판 뒤집기</a>
       </div>
       <div class="code-box">경기방<b id="room-val"></b></div>
@@ -379,7 +379,7 @@
   const TEAM_KO = { blue: '청팀', red: '홍팀' };
   (function applyGameUI() {
     $('gl-' + game).classList.add('on');
-    document.title = { flag: '사이버 쟁탈전', neon: '네온 터치 대전', flip: '디지털 판 뒤집기', strike: '타격 대결' }[game] + ' - 플레이 라운지';
+    document.title = { flag: '사이버 쟁탈전', neon: '반응속도 게임', flip: '디지털 판 뒤집기', strike: '타격 대결' }[game] + ' - 플레이 라운지';
     if (game === 'neon') document.body.classList.add('neon');
     if (game === 'flip') {
       document.body.classList.add('flip');
@@ -650,7 +650,7 @@
     setScore('red', s.red, s.lastHit === 'red');
     renderOverlay();
   });
-  /* ---------------------------- 네온 터치 대전 ---------------------------- */
+  /* ---------------------------- 반응속도 게임 ---------------------------- */
   let lastNeonPhase = null;
   function renderNeon(n) {
     if (game !== 'neon') return;
@@ -664,11 +664,11 @@
       sub.textContent = state && state.running ? '' : '시작 버튼을 누르면 신호가 나옵니다';
     } else if (n.phase === 'waiting') {
       main.textContent = '준비…';
-      sub.textContent = '신호가 뜨면 가장 먼저 터치!';
+      sub.textContent = '초록불이 켜지면 가장 먼저 터치!';
     } else if (n.phase === 'go') {
       el.style.background = n.color ? n.color.hex : '#fff';
-      main.textContent = '터치!';
-      sub.textContent = n.color ? n.color.name : '';
+      main.textContent = '지금!';
+      sub.textContent = '먼저 누르세요!';
     } else if (n.phase === 'result') {
       if (n.last && n.last.team) {
         el.classList.add(n.last.team);

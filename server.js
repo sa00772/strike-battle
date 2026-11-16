@@ -145,10 +145,7 @@ const FLIP_DEFAULT_ROUND_SEC = 90;                       // 판 뒤집기 기본
 const MISSION_SOUNDS = ['alarm', 'cheer', 'wrong', 'none'];
 const newFlip = () => ({ tiles: Array(FLIP_TILES).fill('0') });   // '0' 비어 있음, 'b' 청, 'r' 홍
 const newMission = () => ({ active: false, text: '', sec: 10, sound: 'alarm', phoneSound: false, endsAt: 0, wasRunning: false });
-const NEON_COLORS = [
-  { name: '초록', hex: '#22c55e' }, { name: '노랑', hex: '#facc15' }, { name: '보라', hex: '#a855f7' },
-  { name: '하늘', hex: '#22d3ee' }, { name: '주황', hex: '#fb923c' },
-];
+const NEON_COLORS = [{ name: '초록', hex: '#22c55e' }];   // 신호는 항상 초록불
 const NEON_WAIT_MIN_MS = 2000, NEON_WAIT_MAX_MS = 5000;  // 신호가 뜨기까지 무작위 대기
 const NEON_GO_TIMEOUT_MS = 3000;                         // 신호 후 아무도 안 누르면 무효
 const NEON_RESULT_MS = 1800;                             // 결과 표시 시간
@@ -229,7 +226,7 @@ const flagSnapshot = (room) => {
 };
 const emitFlags = (room) => toJoined(room, 'flag:update', flagSnapshot(room));
 
-// 네온 터치 대전 상태 (다음 신호까지 남은 시간 같은 정답 힌트는 보내지 않음)
+// 반응속도 게임 상태 (다음 신호까지 남은 시간 같은 정답 힌트는 보내지 않음)
 const neonSnapshot = (room) => {
   const n = room.neon;
   return {
@@ -304,7 +301,7 @@ setInterval(() => {
   }
 }, 200);
 
-// 네온 터치 대전 진행: 라운드(타이머)가 진행 중일 때만 신호를 반복해서 보냄
+// 반응속도 게임 진행: 라운드(타이머)가 진행 중일 때만 신호를 반복해서 보냄
 setInterval(() => {
   const now = Date.now();
   for (const room of rooms.values()) {
@@ -483,7 +480,7 @@ io.on('connection', (socket) => {
   }));
   socket.on('mission:resume', onlyScoreboard((room) => endMission(room, 'manual')));
 
-  // 모바일 → 서버: 네온 터치 대전 터치.
+  // 모바일 → 서버: 반응속도 게임 터치.
   //  - 신호 전(waiting)에 누르면 '부정 출발' → 이번 라운드 실격
   //  - 신호 후(go) 가장 먼저 누른 기기의 팀이 +1점
   socket.on('tap', (_payload, ack) => {

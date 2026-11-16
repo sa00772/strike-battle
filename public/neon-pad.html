@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#2f6bff" id="theme-color">
-<title>네온 터치 - 플레이 라운지</title>
+<title>반응속도 게임 - 플레이 라운지</title>
 <style>
   :root { --bg: #1c1f27; --bg-deep: #101218; --ink: #fff; --font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
   body[data-team="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
@@ -105,7 +105,7 @@
     document.body.dataset.team = team;
     $('team-name').textContent = TEAM_LABEL[team];
     $('theme-color').setAttribute('content', TEAM_COLOR[team]);
-    document.title = `${TEAM_LABEL[team]} 네온 터치`;
+    document.title = `${TEAM_LABEL[team]} 반응속도`;
     if (!room) document.body.classList.add('no-room');
   }
 
@@ -133,12 +133,12 @@
     } else if (n.phase === 'waiting') {
       b.classList.add('waiting');
       main.textContent = '준비…';
-      sub.textContent = '아직 누르면 안 돼요!';
+      sub.textContent = '초록불이 켜질 때까지 누르면 안 돼요!';
     } else if (n.phase === 'go') {
       b.classList.add('go');
       b.style.background = n.color ? n.color.hex : '#fff';
-      main.textContent = '터치!';
-      sub.textContent = '';
+      main.textContent = '지금!';
+      sub.textContent = '먼저 누르세요!';
     } else if (n.phase === 'result') {
       if (n.last && n.last.team === team) { main.textContent = '우리 팀 +1!'; sub.textContent = fmtMs(n.last.ms); }
       else if (n.last && n.last.team) { main.textContent = '아쉬워요'; sub.textContent = '상대 팀이 먼저 눌렀어요'; }
@@ -179,7 +179,7 @@
 
   let lastPhase = null;
   socket.on('room:game', (g) => {
-    $('msg').textContent = g === 'neon' ? '' : '이 경기방은 네온 터치 대전이 아닙니다. 점수판에서 네온 터치를 선택하세요.';
+    $('msg').textContent = g === 'neon' ? '' : '이 경기방은 반응속도 게임이 아닙니다. 점수판에서 반응속도 게임을 선택하세요.';
   });
   socket.on('game:state', (s) => { game = s; render(); });
   socket.on('neon:state', (n) => {
