@@ -102,6 +102,10 @@
     user-select: text; -webkit-user-select: text;
   }
 
+  .noroom { display: none; width: 100%; max-width: 420px; flex-direction: column; gap: 10px; margin-top: 12vh; text-align: center; line-height: 1.5; }
+  body.no-room .noroom { display: flex; }
+  body.no-room .app-main, body.no-room .gate { display: none; }
+
   .app-main { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; }
 
   /* 타격 피드백 */
@@ -123,6 +127,11 @@
     <p style="text-align:center;font-size:1.1rem">참가할 팀을 선택하세요</p>
     <a class="b" href="?team=blue">청팀으로 참가</a>
     <a class="r" href="?team=red">홍팀으로 참가</a>
+  </div>
+
+  <div class="noroom" id="noroom">
+    <p style="font-size:1.3rem;font-weight:800">경기방을 찾을 수 없습니다</p>
+    <p>점수판 화면의 QR 코드를 다시 스캔해 주세요.<br>점수판이 열려 있으면 자동으로 다시 연결합니다.</p>
   </div>
 
   <div class="gate" id="gate">
@@ -168,6 +177,7 @@
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const team = params.get('team');
+  const room = (params.get('room') || '').toUpperCase();
   const TEAM_LABEL = { blue: '청팀', red: '홍팀' };
   const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536' };
   const COOLDOWN_MS = 300;     // 중복 카운트 방지 쿨타임 (0.3초)
@@ -230,17 +240,22 @@
 
   let accessCode = '';
   try { accessCode = localStorage.getItem('strike-code') || ''; } catch (_) {}
-  const joinNow = () => socket.emit('join', { team, code: accessCode });
+  const joinNow = () => socket.emit('join', { team, code: accessCode, room });
   const GATE_MSG = {
     'bad-code': '참가 코드가 맞지 않습니다.',
     'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.',
     'code-required': '',
   };
-  socket.on('connect', () => { if (TEAM_LABEL[team]) joinNow(); });
+  if (TEAM_LABEL[team] && !room) document.body.classList.add('no-room');
+  socket.on('connect', () => { if (TEAM_LABEL[team] && room) joinNow(); });
   socket.on('join:result', (r) => {
     if (r.ok) {
-      document.body.classList.remove('need-code');
+      document.body.classList.remove('need-code', 'no-room');
       try { localStorage.setItem('strike-code', accessCode); } catch (_) {}
+    } else if (r.reason === 'no-room' || r.reason === 'bad-room') {
+      document.body.classList.remove('need-code');
+      document.body.classList.add('no-room');
+      if (r.reason === 'no-room') setTimeout(joinNow, 3000);   // 점수판이 다시 열리면 자동 재연결
     } else {
       if (r.reason === 'bad-code') { accessCode = ''; try { localStorage.removeItem('strike-code'); } catch (_) {} }
       document.body.classList.add('need-code');

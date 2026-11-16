@@ -177,6 +177,7 @@
     border: 2px solid #3a4152; background: #1d2029; color: var(--ink);
   }
   .login-form .err { color: #ff8a80; min-height: 1.3em; font-size: .95rem; }
+  .new-room { color: var(--muted); font-size: .85rem; }
   .code-box { font-size: .95rem; color: var(--muted); }
   .code-box b { font-size: 1.6rem; letter-spacing: .12em; color: var(--ink); margin-left: .3em; }
 
@@ -230,6 +231,8 @@
 
     <div class="meta">
       <div><span class="dot" id="conn-dot"></span><span id="conn-text">서버 연결 중</span></div>
+      <div class="code-box">경기방<b id="room-val"></b></div>
+      <a class="new-room" href="/" target="_blank" rel="noopener">새 경기방 만들기</a>
       <div class="code-box" id="code-box" hidden>참가 코드<b id="code-val"></b></div>
       <label id="ip-picker" hidden>QR 주소
         <select id="ip-select" aria-label="QR 코드에 사용할 네트워크 주소"></select>
@@ -272,6 +275,22 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
+  // 경기방 ID: 주소의 ?room= 값을 사용하고, 없으면 새로 만들어 주소에 기록(새로고침해도 같은 방 유지)
+  const urlParams = new URLSearchParams(location.search);
+  const newRoomId = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+  };
+  let roomId = (urlParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  if (roomId.length < 4) {
+    roomId = newRoomId();
+    urlParams.set('room', roomId);
+    history.replaceState(null, '', `?${urlParams.toString()}`);
+  }
+  $('room-val').textContent = roomId;
+
   const socket = io();
 
   let cfg = null;
@@ -297,7 +316,7 @@
       ? `${cfg.protocol}://${pickHost()}:${cfg.port}`
       : location.origin;
     [['blue', '#1747c9'], ['red', '#c4281b']].forEach(([team, color]) => {
-      const url = `${origin}/mobile.html?team=${team}`;
+      const url = `${origin}/mobile.html?team=${team}&room=${roomId}`;
       const box = $(`qr-${team}`);
       box.innerHTML = '';
       $(`url-${team}`).textContent = url;
@@ -411,7 +430,7 @@
 
   /* ---------------------------- 소켓 이벤트 ---------------------------- */
   socket.on('connect', () => {
-    socket.emit('join', { role: 'scoreboard', password: adminPw });
+    socket.emit('join', { role: 'scoreboard', password: adminPw, room: roomId });
     $('conn-dot').classList.add('on');
     $('conn-text').textContent = '서버 연결됨';
   });
@@ -442,7 +461,7 @@
   $('login-form').addEventListener('submit', (e) => {
     e.preventDefault();
     adminPw = $('login-pw').value;
-    socket.emit('join', { role: 'scoreboard', password: adminPw });
+    socket.emit('join', { role: 'scoreboard', password: adminPw, room: roomId });
   });
   socket.on('game:state', (s) => { state = s; renderTimer(); renderOverlay(); });
   socket.on('score:update', (s) => {
@@ -460,7 +479,10 @@
   /* ---------------------------- 버튼 ---------------------------- */
   $('btn-start').addEventListener('click', () => { beep(0); socket.emit('timer:start'); });
   $('btn-pause').addEventListener('click', () => socket.emit('timer:pause'));
-  $('btn-reset').addEventListener('click', () => socket.emit('timer:reset'));
+  $('btn-reset').addEventListener('click', () => {
+    if ((scores.blue || scores.red) && !confirm('타이머와 점수를 모두 초기화할까요?')) return;
+    socket.emit('timer:reset');
+  });
   $('btn-mode-round').addEventListener('click', () => socket.emit('timer:setMode', 'round'));
   $('btn-mode-rest').addEventListener('click', () => socket.emit('timer:setMode', 'rest'));
   document.querySelectorAll('#presets .preset').forEach((b) => {
