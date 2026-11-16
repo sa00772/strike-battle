@@ -1,0 +1,19 @@
+{
+  "name": "strike-battle",
+  "version": "1.0.0",
+  "description": "청팀 vs 홍팀 실시간 모션 센서 타격 대결",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:http": "node server.js --http",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "selfsigned": "~2.4.1",
+    "socket.io": "^4.7.5"
+  }
+}

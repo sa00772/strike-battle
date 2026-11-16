@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2f6bff" id="theme-color">
+<title>타격 패드</title>
+<style>
+  :root {
+    --bg: #1c1f27;
+    --bg-deep: #101218;
+    --accent: #ffffff;
+    --ink: #ffffff;
+    --font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  }
+  body[data-team="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
+  body[data-team="red"]  { --bg: #ff4536; --bg-deep: #8c1409; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: linear-gradient(170deg, var(--bg) 0%, var(--bg-deep) 100%);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select: none; -webkit-user-select: none;
+    touch-action: manipulation;
+    overflow: hidden;
+  }
+
+  .app {
+    height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 18px 20px 22px;
+    gap: 14px;
+  }
+  .team-name { font-size: 1.7rem; font-weight: 900; letter-spacing: .05em; }
+
+  .status {
+    font-size: 1rem; font-weight: 800;
+    padding: .45em 1.1em; border-radius: 999px;
+    background: rgba(0,0,0,.28);
+    text-align: center;
+  }
+  .status.live { background: rgba(255,255,255,.95); color: #11141b; }
+
+  .scoreline { display: flex; align-items: baseline; gap: 14px; }
+  .my-score {
+    font-size: clamp(6rem, 34vw, 11rem);
+    font-weight: 900; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 .04em 0 rgba(0,0,0,.25);
+  }
+  .my-score.pop { animation: pop .18s ease-out; }
+  @keyframes pop { 0% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  .vs { font-size: 1rem; opacity: .85; }
+  .timer { font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums; opacity: .95; }
+
+  .spacer { flex: 1; }
+
+  .start-btn {
+    width: 100%; max-width: 420px;
+    font: inherit; font-size: 1.5rem; font-weight: 900;
+    padding: 1.1em 0;
+    border: 0; border-radius: 18px;
+    background: #fff; color: #11141b;
+    box-shadow: 0 6px 0 rgba(0,0,0,.28);
+  }
+  .start-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,.28); }
+
+  .panel { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 12px; }
+  body.running .panel { display: flex; }
+  body.running .start-btn { display: none; }
+
+  .meter-wrap { background: rgba(0,0,0,.3); border-radius: 10px; height: 22px; position: relative; overflow: hidden; }
+  .meter { height: 100%; width: 0; background: #fff; transition: width .05s linear; }
+  .meter-mark { position: absolute; top: 0; bottom: 0; width: 3px; background: #ffd23f; }
+  .row { display: flex; justify-content: space-between; font-size: .95rem; }
+  .row b { font-variant-numeric: tabular-nums; }
+
+  input[type=range] { width: 100%; accent-color: #ffd23f; height: 34px; }
+
+  .msg { font-size: .92rem; text-align: center; max-width: 420px; line-height: 1.45; min-height: 1.4em; }
+  .msg.error { background: rgba(0,0,0,.4); padding: .7em 1em; border-radius: 10px; }
+
+  .debug-btn { display: none; font: inherit; padding: .8em; border: 2px dashed rgba(255,255,255,.7); background: transparent; color: #fff; border-radius: 12px; }
+  body.debug .debug-btn { display: block; }
+
+  .chooser { display: none; width: 100%; max-width: 420px; flex-direction: column; gap: 12px; margin-top: 12vh; }
+  body.no-team .chooser { display: flex; }
+  body.no-team .app-main { display: none; }
+  .chooser a { display: block; text-align: center; text-decoration: none; font-weight: 900; font-size: 1.5rem; padding: 1.1em; border-radius: 16px; color: #fff; }
+  .chooser a.b { background: #2f6bff; } .chooser a.r { background: #ff4536; }
+
+  .app-main { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; }
+
+  /* 타격 피드백 */
+  .flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  .flash.on { animation: flash .22s ease-out; }
+  .flash.dim { background: #000; }
+  .flash.dim.on { animation: flashdim .18s ease-out; }
+  @keyframes flash { 0% { opacity: .9; } 100% { opacity: 0; } }
+  @keyframes flashdim { 0% { opacity: .35; } 100% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .my-score.pop { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="chooser">
+    <p style="text-align:center;font-size:1.1rem">참가할 팀을 선택하세요</p>
+    <a class="b" href="?team=blue">청팀으로 참가</a>
+    <a class="r" href="?team=red">홍팀으로 참가</a>
+  </div>
+
+  <div class="app-main">
+    <div class="team-name" id="team-name"></div>
+    <div class="status" id="status">서버 연결 중</div>
+
+    <div class="scoreline">
+      <div class="my-score" id="my-score">0</div>
+    </div>
+    <div class="vs" id="vs">상대 0점</div>
+    <div class="timer" id="timer">3:00</div>
+
+    <div class="spacer"></div>
+
+    <button class="start-btn" id="start-btn">센서 시작</button>
+
+    <div class="panel" id="panel">
+      <div class="meter-wrap" aria-label="현재 가속도">
+        <div class="meter" id="meter"></div>
+        <div class="meter-mark" id="meter-mark"></div>
+      </div>
+      <div class="row"><span>현재 세기 <b id="mag">0.0</b></span><span>내 타격 <b id="my-hits">0</b>회</span></div>
+      <div class="row"><span>타격 임계값 <b id="th-val">20</b></span><span>값이 낮을수록 민감</span></div>
+      <input type="range" id="threshold" min="5" max="50" step="1" value="20" aria-label="타격 임계값">
+    </div>
+
+    <button class="debug-btn" id="debug-btn">수동 타격 테스트 (debug)</button>
+    <div class="msg" id="msg">휴대폰을 손에 쥐고 [센서 시작]을 누르세요.</div>
+  </div>
+</div>
+<div class="flash" id="flash"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const team = params.get('team');
+  const TEAM_LABEL = { blue: '청팀', red: '홍팀' };
+  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536' };
+  const COOLDOWN_MS = 300;     // 중복 카운트 방지 쿨타임 (0.3초)
+  const METER_MAX = 60;        // 미터 표시 최대값 (m/s²)
+
+  /* ---------------------- 팀 테마 ---------------------- */
+  if (!TEAM_LABEL[team]) {
+    document.body.classList.add('no-team');
+  } else {
+    document.body.dataset.team = team;
+    $('team-name').textContent = TEAM_LABEL[team];
+    $('theme-color').setAttribute('content', TEAM_COLOR[team]);
+    document.title = `${TEAM_LABEL[team]} 타격 패드`;
+  }
+  if (params.get('debug') === '1') document.body.classList.add('debug');
+
+  /* ---------------------- 임계값 ---------------------- */
+  let threshold = 20;
+  try {
+    const saved = Number(localStorage.getItem('strike-threshold'));
+    if (saved >= 5 && saved <= 50) threshold = saved;
+  } catch (_) {}
+  const slider = $('threshold');
+  const applyThreshold = () => {
+    $('th-val').textContent = threshold;
+    $('meter-mark').style.left = `${Math.min(100, (threshold / METER_MAX) * 100)}%`;
+  };
+  slider.value = threshold;
+  applyThreshold();
+  slider.addEventListener('input', () => {
+    threshold = Number(slider.value);
+    applyThreshold();
+    try { localStorage.setItem('strike-threshold', String(threshold)); } catch (_) {}
+  });
+
+  /* ---------------------- 소켓 / 게임 상태 ---------------------- */
+  const socket = io();
+  let game = null;
+  let myHits = 0;
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const isLive = () => game && game.running && game.mode === 'round';
+
+  function renderStatus() {
+    const el = $('status');
+    el.classList.remove('live');
+    if (!game) { el.textContent = '서버 연결 중'; return; }
+    $('timer').textContent = fmt(game.remainingSec);
+    if (game.mode === 'rest') {
+      el.textContent = game.running ? '휴식 시간' : '휴식 대기';
+    } else if (game.running) {
+      el.textContent = '진행 중 - 타격하세요!';
+      el.classList.add('live');
+    } else if (game.finished) {
+      el.textContent = '라운드 종료';
+    } else {
+      el.textContent = '대기 중 - 타격은 집계되지 않아요';
+    }
+  }
+
+  socket.on('connect', () => { if (TEAM_LABEL[team]) socket.emit('join', { team }); });
+  socket.on('disconnect', () => { $('status').textContent = '연결 끊김 - 재연결 중'; });
+  socket.on('game:state', (s) => { game = s; renderStatus(); });
+  socket.on('score:update', (s) => {
+    if (!TEAM_LABEL[team]) return;
+    const other = team === 'blue' ? 'red' : 'blue';
+    const el = $('my-score');
+    const changed = el.textContent !== String(s[team]);
+    el.textContent = s[team];
+    $('vs').textContent = `상대(${TEAM_LABEL[other]}) ${s[other]}점`;
+    if (changed && s[team] > 0) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+  });
+
+  /* ---------------------- 타격 처리 ---------------------- */
+  let lastHitAt = 0;
+  const flashEl = $('flash');
+
+  function feedback(accepted) {
+    flashEl.classList.toggle('dim', !accepted);
+    flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on');
+    if (accepted && navigator.vibrate) navigator.vibrate(60);
+  }
+
+  function sendHit() {
+    const live = isLive();
+    feedback(live);                         // 즉각 피드백 (라운드 중이 아니면 어둡게 깜빡)
+    if (!live) return;
+    socket.emit('hit', { t: Date.now() }, (res) => {
+      if (res && res.accepted) { myHits += 1; $('my-hits').textContent = myHits; }
+    });
+  }
+
+  function onMotion(e) {
+    gotMotion = true;
+    let mag;
+    const a = e.acceleration;
+    if (a && a.x != null && a.y != null && a.z != null) {
+      mag = Math.hypot(a.x, a.y, a.z);                       // 중력 제외 가속도
+    } else {
+      const g = e.accelerationIncludingGravity;              // 일부 기기용 대체 계산
+      if (!g || g.x == null) return;
+      mag = Math.abs(Math.hypot(g.x, g.y, g.z) - 9.81);
+    }
+
+    meterPeak = Math.max(mag, meterPeak * 0.9);
+    $('meter').style.width = `${Math.min(100, (meterPeak / METER_MAX) * 100)}%`;
+    $('mag').textContent = mag.toFixed(1);
+
+    const now = performance.now();
+    if (mag >= threshold && now - lastHitAt >= COOLDOWN_MS) {
+      lastHitAt = now;
+      sendHit();
+    }
+  }
+  let meterPeak = 0;
+  let gotMotion = false;
+
+  /* ---------------------- 센서 시작 (iOS 권한 대응) ---------------------- */
+  const msg = (text, isError) => { const m = $('msg'); m.textContent = text; m.classList.toggle('error', !!isError); };
+
+  async function startSensor() {
+    try {
+      // iOS 13+ : 사용자 제스처(클릭) 안에서 권한 요청 필수
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        const result = await DeviceMotionEvent.requestPermission();
+        if (result !== 'granted') {
+          msg('모션 센서 권한이 거부되었습니다. 설정 > Safari > 모션 및 방향 접근을 켜고 페이지를 새로고침하세요.', true);
+          return;
+        }
+      }
+      if (typeof DeviceMotionEvent === 'undefined') {
+        msg('이 브라우저는 모션 센서를 지원하지 않습니다.', true);
+        return;
+      }
+      window.addEventListener('devicemotion', onMotion);
+      document.body.classList.add('running');
+      msg('휴대폰을 힘차게 휘둘러 타격하세요! 반응이 약하면 임계값을 낮추세요.');
+      if (navigator.vibrate) navigator.vibrate(30);   // 진동 권한 활성화
+
+      // 화면 꺼짐 방지
+      try {
+        if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+      } catch (_) {}
+
+      // 센서 데이터가 실제로 들어오는지 확인
+      setTimeout(() => {
+        if (!gotMotion) {
+          msg(window.isSecureContext
+            ? '센서 데이터가 들어오지 않습니다. 기기 센서/브라우저 설정을 확인하세요.'
+            : '보안 연결(HTTPS)이 아니라 센서가 차단되었습니다. https:// 주소로 접속해 주세요.', true);
+        }
+      }, 2000);
+    } catch (err) {
+      msg(`센서를 시작하지 못했습니다: ${err && err.message ? err.message : err}`, true);
+    }
+  }
+  $('start-btn').addEventListener('click', startSensor);
+  $('debug-btn').addEventListener('click', () => { lastHitAt = performance.now(); sendHit(); });
+
+  // 화면이 다시 보이면 재연결/상태 갱신
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && document.body.classList.contains('running') && 'wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').catch(() => {});
+    }
+  });
+})();
+</script>
+</body>
+</html>
