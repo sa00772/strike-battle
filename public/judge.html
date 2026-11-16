@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>심판 채점 - 플레이 라운지</title>
+<style>
+  :root { --bg:#12141b; --panel:#1b1e28; --panel2:#232736; --ink:#f5f7fb; --muted:#9aa3b5; --line:#2e3342; --blue:#2f6bff; --red:#ff4536; --gold:#ffd23f; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; padding-bottom:env(safe-area-inset-bottom); }
+  button { font:inherit; font-weight:800; border:0; border-radius:12px; padding:.8em 1em; background:#323847; color:var(--ink); }
+  button.primary { background:#1f9d57; } button:disabled { opacity:.4; }
+  button:focus-visible, input:focus-visible { outline:3px solid #fff; outline-offset:2px; }
+  input { font:inherit; background:#12141b; color:var(--ink); border:2px solid #3a4152; border-radius:12px; padding:.7em .8em; width:100%; }
+  .top { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:10; }
+  .top b { font-size:1.05rem; } .top span { color:var(--muted); font-size:.9rem; }
+  .page { max-width:560px; margin:0 auto; padding:16px 14px 40px; display:flex; flex-direction:column; gap:14px; }
+  .center { text-align:center; padding:50px 10px; line-height:1.7; } .center .big { font-size:1.6rem; font-weight:900; margin-bottom:8px; }
+  .muted { color:var(--muted); }
+  .seatgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+  .seatgrid button { padding:1.1em .5em; font-size:1.1rem; } .seatgrid button:disabled { background:#2a2f3b; }
+  .side { border-radius:16px; border:2px solid var(--line); background:var(--panel); overflow:hidden; }
+  .side.a { border-color:var(--blue); } .side.b { border-color:var(--red); }
+  .side > header { padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .side.a > header { background:rgba(47,107,255,.3); } .side.b > header { background:rgba(255,69,54,.3); } .side.solo > header { background:var(--panel2); }
+  .who b { font-size:1.25rem; display:block; } .who span { color:var(--muted); font-size:.85rem; }
+  .tot { text-align:right; } .tot b { font-size:2rem; font-variant-numeric:tabular-nums; display:block; line-height:1; } .tot span { font-size:.75rem; color:var(--muted); }
+  .grp { padding:10px 14px 4px; color:var(--muted); font-size:.85rem; font-weight:800; display:flex; justify-content:space-between; }
+  .fld { padding:8px 14px 12px; border-top:1px solid var(--line); }
+  .fld .l { display:flex; justify-content:space-between; font-weight:700; margin-bottom:6px; } .fld .l output { font-variant-numeric:tabular-nums; color:var(--gold); }
+  .stepper { display:grid; grid-template-columns:64px 1fr 64px; gap:8px; align-items:center; } .stepper button { font-size:1.5rem; padding:.4em; } .stepper .n { text-align:center; font-size:1.8rem; font-weight:900; font-variant-numeric:tabular-nums; }
+  input[type=range] { padding:0; height:44px; accent-color:var(--gold); border:0; background:none; }
+  .scale { display:flex; justify-content:space-between; font-size:.75rem; color:var(--muted); }
+  .submit { position:sticky; bottom:0; padding:10px 0 calc(10px + env(safe-area-inset-bottom)); background:linear-gradient(transparent, var(--bg) 30%); }
+  .submit button { width:100%; font-size:1.2rem; padding:1em; }
+  .err { color:#ff8a80; min-height:1.3em; font-weight:700; }
+  .pill { display:inline-block; background:var(--gold); color:#11141b; padding:.2em .8em; border-radius:999px; font-weight:900; }
+  .conn { position:fixed; top:0; left:0; right:0; background:#b3261e; text-align:center; padding:6px; font-weight:800; z-index:50; display:none; }
+</style>
+</head>
+<body>
+<div class="conn" id="conn" role="alert">연결이 끊겼습니다. 다시 연결하는 중…</div>
+<div class="top"><b id="ttl">심판 채점</b><span id="seatLabel"></span></div>
+<main class="page" id="app"></main>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const f2 = (x) => Number(x).toFixed(2);
+  const eventId = (new URLSearchParams(location.search).get('event') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const app = $('#app');
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (_) {} },
+  };
+  let token = store.get('tkd-token');
+  if (!token) { const b = new Uint8Array(12); crypto.getRandomValues(b); token = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join(''); store.set('tkd-token', token); }
+  let code = (() => { try { return sessionStorage.getItem('lounge-code') || ''; } catch (_) { return ''; } })();
+  let mySeat = Number(store.get('tkd-seat-' + eventId)) || 0;
+  let J = null, formSeq = null, vals = {}, confirming = false, view = 'login', lobby = null, lastErr = '';
+
+  if (!eventId) { app.innerHTML = '<div class="center"><div class="big">대회 코드가 없습니다</div>관리자 화면의 QR을 다시 스캔해 주세요.</div>'; return; }
+  const socket = io();
+  const enter = () => socket.emit('tkd:join', { role: 'judge', event: eventId, code, seat: mySeat || undefined, token });
+  socket.on('connect', () => { $('#conn').style.display = 'none'; enter(); });
+  socket.on('disconnect', () => { $('#conn').style.display = 'block'; });
+
+  socket.on('tkd:join:result', (r) => {
+    if (!r.ok) {
+      const msg = { 'code-required': '참가 코드를 입력하세요.', 'bad-code': '참가 코드가 맞지 않습니다.', 'rate-limited': '시도가 너무 많습니다. 1분 뒤 다시 시도하세요.', 'no-event': '아직 열리지 않은 대회입니다. 관리자가 먼저 화면을 열어야 합니다.', 'seat-taken': '이미 다른 기기에서 사용 중인 심판 번호입니다. 다른 번호를 선택하세요.', 'bad-seat': '심판 번호가 올바르지 않습니다.' }[r.reason] || '입장할 수 없습니다.';
+      if (r.reason === 'seat-taken' || r.reason === 'bad-seat') { store.del('tkd-seat-' + eventId); mySeat = 0; lastErr = msg; return enter(); }
+      lastErr = msg; if (r.reason === 'bad-code') { code = ''; try { sessionStorage.removeItem('lounge-code'); } catch (_) {} }
+      view = r.reason === 'no-event' ? 'noevent' : 'login'; return draw();
+    }
+    try { sessionStorage.setItem('lounge-code', code); } catch (_) {}
+    $('#ttl').textContent = r.kind === 'freestyle' ? '자유품새 심판' : '공인품새 심판';
+    if (r.role === 'lobby') { lobby = r; view = 'lobby'; lastErr = ''; draw(); }
+    else { mySeat = r.seat; store.set('tkd-seat-' + eventId, String(mySeat)); $('#seatLabel').textContent = `심판 ${mySeat}`; view = 'judge'; lastErr = ''; draw(); }
+  });
+  socket.on('tkd:seats', (s) => { if (view === 'lobby') { lobby = { ...lobby, ...s }; draw(); } });
+  socket.on('tkd:judge', (s) => { J = s; draw(); });
+  socket.on('tkd:error', (e) => { lastErr = e.code === 'bad-scores' ? '점수 값이 올바르지 않습니다.' : e.code === 'not-open' ? '지금은 제출할 수 없습니다.' : ''; confirming = false; draw(); });
+
+  const fields = () => J.schema.fields;
+  const initVals = () => {
+    vals = {};
+    for (const s of J.perf.sides) { vals[s.side] = {}; for (const f of fields()) vals[s.side][f.key] = f.def; }
+  };
+  const calc = (v) => {
+    if (J.kind === 'recognized') { const a = Math.max(0, r2(4 - 0.1 * v.minor - 0.3 * v.major)); const p = r2(v.power + v.rhythm + v.energy); return { a, p, total: r2(a + p) }; }
+    let a = 0, p = 0; for (const f of fields()) { if (f.group === 'a') a += v[f.key]; else p += v[f.key]; }
+    a = r2(a); p = r2(p); return { a, p, total: r2(a + p) };
+  };
+
+  function draw() {
+    if (view === 'login') {
+      app.innerHTML = `<div class="center"><div class="big">참가 코드 입력</div><p class="muted" style="margin-bottom:14px">관리자에게 받은 코드를 입력하세요.</p>
+        <form id="f" style="display:flex;flex-direction:column;gap:10px"><input id="code" inputmode="text" autocomplete="off" aria-label="참가 코드" placeholder="참가 코드" value="${esc(code)}"><button class="primary" type="submit">입장</button></form><div class="err">${esc(lastErr)}</div></div>`;
+      $('#f').addEventListener('submit', (e) => { e.preventDefault(); code = $('#code').value.trim(); enter(); });
+      return;
+    }
+    if (view === 'noevent') { app.innerHTML = `<div class="center"><div class="big">대회 대기 중</div><p class="muted">${esc(lastErr)}</p><button id="retry" style="margin-top:16px">다시 시도</button></div>`; $('#retry').onclick = enter; return; }
+    if (view === 'lobby') {
+      app.innerHTML = `<div class="center" style="padding-bottom:10px"><div class="big">심판 번호 선택</div><p class="muted">본인 번호를 눌러 입장하세요. (총 ${lobby.judgeCount}명)</p></div>
+        <div class="seatgrid">${lobby.seats.map((s) => `<button data-s="${s.seat}" ${s.connected ? 'disabled' : ''}>심판 ${s.seat}${s.connected ? '<br><small>사용 중</small>' : ''}</button>`).join('')}</div><div class="err" style="text-align:center">${esc(lastErr)}</div>`;
+      app.querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => { mySeat = Number(b.dataset.s); enter(); }));
+      return;
+    }
+    if (!J) { app.innerHTML = '<div class="center"><div class="big">연결 중…</div></div>'; return; }
+    if (!J.perf) {
+      if (J.waitingReview) app.innerHTML = '<div class="center"><div class="big">채점 완료 ✔</div><p class="muted">관리자가 점수를 확정하는 중입니다.<br>다음 경기를 기다려 주세요.</p></div>';
+      else app.innerHTML = `<div class="center"><div class="big">대기 중</div><p class="muted">${J.phase === 'setup' ? '관리자가 대진을 준비하고 있습니다.' : '다음 선수의 경기가 시작되면<br>채점 화면이 자동으로 열립니다.'}</p></div>`;
+      formSeq = null; confirming = false; return;
+    }
+    if (J.perf.mySubmitted) { app.innerHTML = '<div class="center"><div class="big">제출 완료 ✔</div><p class="muted">다른 심판의 제출을 기다리고 있습니다.</p></div>'; return; }
+    if (formSeq !== J.perf.seq) { formSeq = J.perf.seq; initVals(); confirming = false; lastErr = ''; }
+    drawForm();
+  }
+
+  function fieldHtml(side, f) {
+    const v = vals[side][f.key];
+    if (f.type === 'count') return `<div class="fld"><div class="l"><span>${esc(f.label)}</span></div><div class="stepper"><button data-c="${side}:${f.key}:-1" aria-label="${esc(f.label)} 줄이기">−</button><div class="n" id="v-${side}-${f.key}">${v}</div><button data-c="${side}:${f.key}:1" aria-label="${esc(f.label)} 늘리기">+</button></div></div>`;
+    return `<div class="fld"><div class="l"><span>${esc(f.label)}</span><output id="v-${side}-${f.key}">${v.toFixed(1)}</output></div><input type="range" min="${f.min}" max="${f.max}" step="0.1" value="${v}" data-r="${side}:${f.key}" aria-label="${esc(f.label)}"><div class="scale"><span>${f.min.toFixed(1)}</span><span>${f.max.toFixed(1)}</span></div></div>`;
+  }
+  function drawForm() {
+    const L = J.schema.labels, p = J.perf;
+    const sides = p.sides.map((s) => {
+      const t = calc(vals[s.side]); const cls = s.side === 'solo' ? 'solo' : s.side;
+      const grp = (g) => `<div class="grp"><span>${L[g]}</span><span id="g-${s.side}-${g}">${f2(t[g])}</span></div>` + fields().filter((f) => f.group === g).map((f) => fieldHtml(s.side, f)).join('');
+      return `<section class="side ${cls}"><header><div class="who"><b>${s.label ? (s.side === 'a' ? '청 · ' : '홍 · ') : ''}${esc(s.name)}</b><span>${esc(s.team)}</span></div><div class="tot"><b id="t-${s.side}">${f2(t.total)}</b><span>합계</span></div></header>${grp('a')}${grp('p')}</section>`;
+    }).join('');
+    const head = `<div style="text-align:center">${p.poomsae ? `<span class="pill">${esc(p.poomsae)}</span>` : '<span class="pill">채점 중</span>'}</div>`;
+    const sum = p.sides.length === 2 ? '' : '';
+    if (confirming) {
+      const rows = p.sides.map((s) => `<div class="side ${s.side === 'solo' ? 'solo' : s.side}"><header><div class="who"><b>${esc(s.name)}</b><span>${s.label ? s.label + '팀' : ''}</span></div><div class="tot"><b>${f2(calc(vals[s.side]).total)}</b><span>합계</span></div></header></div>`).join('');
+      app.innerHTML = `${head}<div class="center" style="padding:20px 0 4px"><div class="big">이대로 제출할까요?</div><p class="muted">제출 후에는 수정할 수 없습니다.</p></div>${rows}<div class="err" style="text-align:center">${esc(lastErr)}</div>
+        <div class="submit"><div style="display:grid;grid-template-columns:1fr 2fr;gap:10px"><button id="back">돌아가기</button><button class="primary" id="go">제출</button></div></div>`;
+      $('#back').onclick = () => { confirming = false; drawForm(); };
+      $('#go').onclick = () => { $('#go').disabled = true; socket.emit('tkd:submit', { scores: vals }); };
+      return;
+    }
+    app.innerHTML = `${head}${sides}${sum}<div class="err" style="text-align:center">${esc(lastErr)}</div><div class="submit"><button class="primary" id="ok">제출하기</button></div>`;
+    $('#ok').onclick = () => { confirming = true; window.scrollTo(0, 0); drawForm(); };
+    app.querySelectorAll('[data-c]').forEach((b) => b.addEventListener('click', () => {
+      const [side, key, d] = b.dataset.c.split(':'); const f = fields().find((x) => x.key === key);
+      vals[side][key] = Math.min(f.max, Math.max(0, vals[side][key] + Number(d)));
+      $(`#v-${side}-${key}`).textContent = vals[side][key]; refresh(side);
+    }));
+    app.querySelectorAll('[data-r]').forEach((i) => i.addEventListener('input', () => {
+      const [side, key] = i.dataset.r.split(':'); vals[side][key] = Math.round(Number(i.value) * 10) / 10;
+      $(`#v-${side}-${key}`).textContent = vals[side][key].toFixed(1); refresh(side);
+    }));
+  }
+  function refresh(side) {
+    const t = calc(vals[side]);
+    $(`#t-${side}`).textContent = f2(t.total); $(`#g-${side}-a`).textContent = f2(t.a); $(`#g-${side}-p`).textContent = f2(t.p);
+  }
+})();
+</script>
+</body>
+</html>

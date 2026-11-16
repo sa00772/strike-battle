@@ -61,6 +61,12 @@
   .tile.strike { --accent: var(--red); } .tile.flag { --accent: var(--blue); } .tile.react { --accent: var(--green); } .tile.flip { --accent: var(--purple); }
   .tile.mission { --accent: #ff453a; }
 
+  .cat { max-width: 1040px; margin: 0 auto; padding: clamp(22px, 4vh, 36px) 20px 12px; scroll-margin-top: 48px; }
+  .cat h2 { font-size: clamp(1.25rem, 2.6vw, 1.7rem); font-weight: 800; }
+  .cat p { color: var(--muted); font-size: .9rem; margin-top: .25em; }
+  .tile.recog { --accent: var(--blue); } .tile.free { --accent: #f5a524; }
+  .bracket-art { width: min(80%, 300px); } .bracket-art svg { width: 100%; }
+
   /* ---------- 일러스트 ---------- */
   .art svg { width: min(62%, 250px); height: auto; display: block; }
   .go-orb { width: min(46%, 170px); aspect-ratio: 1; border-radius: 50%; margin-bottom: -10%;
@@ -92,10 +98,8 @@
   <div class="gnav-in">
     <a class="logo" href="#top">플레이 라운지</a>
     <ul>
-      <li><a href="#strike">타격 대결</a></li>
-      <li><a href="#flag">사이버 쟁탈전</a></li>
-      <li><a href="#react">반응속도</a></li>
-      <li><a href="#flip">판 뒤집기</a></li>
+      <li><a href="#games">종합놀이</a></li>
+      <li><a href="#tkd">태권도 경기</a></li>
       <li><a href="#mission">미션 덱</a></li>
       <li><a href="#how">사용 방법</a></li>
     </ul>
@@ -110,6 +114,7 @@
   <div class="links"><a href="#games">게임 둘러보기</a><a href="#how">사용 방법 보기</a></div>
 </header>
 
+<div class="cat" id="games-head"><h2>종합놀이</h2><p>스마트폰으로 함께 즐기는 실시간 게임</p></div>
 <main class="tiles" id="games">
 
   <section class="tile strike" id="strike" aria-labelledby="t-strike">
@@ -170,12 +175,48 @@
   </section>
 </main>
 
+<div class="cat" id="tkd-head"><h2 id="tkd">태권도 경기</h2><p>심판 1~5명 · 무작위 대진표 · 자동 점수 집계</p></div>
+<main class="tiles" id="tkd-tiles">
+
+  <section class="tile recog" id="recog" aria-labelledby="t-recog">
+    <span class="tag">토너먼트</span>
+    <h2 id="t-recog">공인품새 대전</h2>
+    <p class="sub">청·홍 두 선수가 같은 품새를 겨룹니다. 참가 인원에 맞춰 무작위 토너먼트 대진표를 만듭니다.</p>
+    <div class="links"><a href="/tkd.html?kind=recognized">경기 열기</a></div>
+    <div class="art" aria-hidden="true">
+      <svg viewBox="0 0 360 200" class="bracket-art">
+        <g fill="none" stroke="#8e8e93" stroke-width="3"><path d="M110 40 H150 V80 H190"/><path d="M110 120 H150 V80"/><path d="M110 170 H150 V150 H190"/><path d="M190 80 H230 V115 H270"/><path d="M190 150 H230 V115"/></g>
+        <g><rect x="40" y="26" width="70" height="28" rx="6" fill="#2f6bff"/><rect x="40" y="106" width="70" height="28" rx="6" fill="#ff4536"/><rect x="40" y="156" width="70" height="28" rx="6" fill="#2f6bff"/><rect x="270" y="100" width="64" height="30" rx="6" fill="#ffd23f"/></g>
+        <text x="302" y="121" text-anchor="middle" font-size="16" font-weight="900" fill="#11141b" font-family="sans-serif">우승</text>
+      </svg>
+    </div>
+  </section>
+
+  <section class="tile free dark" id="free" aria-labelledby="t-free">
+    <span class="tag">컷오프</span>
+    <h2 id="t-free">자유품새 대전</h2>
+    <p class="sub">선수가 차례로 연기하고 점수로 순위를 정합니다. 인원에 따라 예선 · 준결승 · 결승으로 걸러냅니다.</p>
+    <div class="links"><a href="/tkd.html?kind=freestyle" style="color:#f5a524">경기 열기</a></div>
+    <div class="art" aria-hidden="true">
+      <svg viewBox="0 0 360 200" class="bracket-art">
+        <g font-family="sans-serif" font-weight="800" font-size="15" text-anchor="middle">
+          <rect x="20" y="30" width="90" height="140" rx="10" fill="#2a2a2d"/><text x="65" y="55" fill="#a1a1a6">예선</text>
+          <rect x="135" y="55" width="90" height="90" rx="10" fill="#3a2d12"/><text x="180" y="80" fill="#f5a524">준결승</text>
+          <rect x="250" y="75" width="90" height="50" rx="10" fill="#f5a524"/><text x="295" y="106" fill="#11141b">결승</text>
+        </g>
+        <g fill="#8e8e93"><path d="M112 100 l16 -8 v16z"/><path d="M227 100 l16 -8 v16z"/></g>
+      </svg>
+    </div>
+  </section>
+
+</main>
+
 <section class="how" id="how" aria-labelledby="t-how">
   <h2 id="t-how">세 단계로 시작하세요.</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><h3>게임 선택</h3><p>위에서 게임을 고르면 점수판이 열립니다. 점수판을 열 때마다 독립된 경기방이 만들어집니다.</p></div>
+    <div class="step"><div class="n">1</div><h3>게임 선택</h3><p>종합놀이 또는 태권도 경기에서 종목을 고르면 화면이 열립니다. 점수판을 열 때마다 독립된 경기방이 만들어집니다.</p></div>
     <div class="step"><div class="n">2</div><h3>QR로 입장</h3><p>청팀·홍팀 QR을 선수의 스마트폰으로 스캔하고 참가 코드를 입력합니다.</p></div>
-    <div class="step"><div class="n">3</div><h3>경기 시작</h3><p>점수판의 시작 버튼을 누르면 경기가 시작됩니다. 🚨 미션 덱으로 돌발 미션도 보낼 수 있어요.</p></div>
+    <div class="step"><div class="n">3</div><h3>경기 시작</h3><p>점수판의 시작 버튼을 누르면 경기가 시작됩니다. 품새 경기는 심판이 QR로 입장해 휴대폰으로 채점합니다.</p></div>
   </div>
 </section>
 

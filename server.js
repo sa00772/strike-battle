@@ -16,6 +16,7 @@ const https = require('https');
 const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
+const tkd = require('./tkd');
 
 /* ------------------------------ 설정 ------------------------------ */
 const PORT = Number(process.env.PORT) || 3000;
@@ -347,6 +348,12 @@ setInterval(() => {
 
 /* ---------------------------- 소켓 처리 ---------------------------- */
 io.on('connection', (socket) => {
+  // 태권도 경기(공인품새 / 자유품새) 이벤트 처리
+  tkd.attach(io, socket, {
+    ADMIN_PASSWORD, ACCESS_CODE, safeEqual, ipOf, isLocked, recordFail,
+    clearFail: (ip) => failures.delete(ip),
+  });
+
   // 역할 등록 + 인증: 점수판(관리자 비밀번호) 또는 팀 패드(참가 코드)
   socket.on('join', (payload = {}) => {
     for (const r of socket.rooms) if (r !== socket.id) socket.leave(r);

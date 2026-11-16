@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>태권도 경기 - 플레이 라운지</title>
+<style>
+  :root { --bg:#12141b; --panel:#1b1e28; --panel2:#232736; --ink:#f5f7fb; --muted:#9aa3b5; --line:#2e3342; --blue:#2f6bff; --red:#ff4536; --gold:#ffd23f; --green:#2ecc71;
+    --font:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:var(--font); background:var(--bg); color:var(--ink); min-height:100vh; }
+  button { font:inherit; font-weight:800; border:0; border-radius:10px; padding:.65em 1.1em; background:#323847; color:var(--ink); cursor:pointer; }
+  button:hover:not(:disabled) { background:#3f4659; } button:disabled { opacity:.35; cursor:not-allowed; }
+  button.primary { background:#1f9d57; } button.primary:hover:not(:disabled) { background:#25b566; }
+  button.danger { background:#b3261e; } button.small { padding:.35em .8em; font-size:.85rem; font-weight:700; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:3px solid #fff; outline-offset:2px; }
+  input, textarea, select { font:inherit; background:#12141b; color:var(--ink); border:2px solid #3a4152; border-radius:10px; padding:.55em .7em; width:100%; }
+  textarea { min-height:220px; resize:vertical; line-height:1.5; }
+  a { color:inherit; }
+
+  .bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:12px 20px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; }
+  .bar h1 { font-size:1.3rem; font-weight:900; } .bar .back { color:var(--muted); text-decoration:none; font-size:.9rem; }
+  .eid { color:var(--muted); font-size:.9rem; } .eid b { color:var(--ink); letter-spacing:.1em; }
+  .seats { display:flex; gap:6px; margin-left:auto; align-items:center; flex-wrap:wrap; }
+  .seat { padding:.25em .7em; border-radius:999px; font-size:.85rem; font-weight:800; background:#2a2f3b; color:#7d8599; }
+  .seat.on { background:#1d5a3a; color:#b6f5d0; } .seat.sub { background:var(--gold); color:#11141b; }
+  .wrap { max-width:1280px; margin:0 auto; padding:18px 20px 60px; display:flex; flex-direction:column; gap:18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
+  .card h2 { font-size:1.15rem; margin-bottom:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; } @media (max-width:900px) { .grid2 { grid-template-columns:1fr; } }
+  label.f { display:flex; flex-direction:column; gap:6px; color:var(--muted); font-size:.9rem; margin-bottom:12px; }
+  .plan { background:var(--panel2); border-radius:10px; padding:.8em 1em; line-height:1.6; margin-bottom:12px; }
+  .qr { display:flex; gap:16px; align-items:center; flex-wrap:wrap; } .qrbox { background:#fff; padding:8px; border-radius:8px; width:150px; height:150px; }
+  .muted { color:var(--muted); } .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  /* 현재 채점 패널 */
+  .cur { border:2px solid #3a4152; } .cur.live { border-color:var(--gold); }
+  .cur-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .cur-title { font-size:1.15rem; font-weight:900; } .pill { background:var(--panel2); padding:.25em .8em; border-radius:999px; font-size:.9rem; }
+  .sides { display:grid; gap:14px; } .sides.two { grid-template-columns:1fr 1fr; }
+  .side { border-radius:14px; padding:16px; border:2px solid var(--line); background:var(--panel2); text-align:center; }
+  .side.a { border-color:var(--blue); background:linear-gradient(180deg, rgba(47,107,255,.25), rgba(47,107,255,.05)); }
+  .side.b { border-color:var(--red); background:linear-gradient(180deg, rgba(255,69,54,.25), rgba(255,69,54,.05)); }
+  .side.win { box-shadow:0 0 0 4px var(--gold); }
+  .corner { font-size:.95rem; font-weight:900; opacity:.9; } .pname { font-size:clamp(1.4rem,3vw,2.4rem); font-weight:900; line-height:1.2; } .pteam { color:var(--muted); min-height:1.3em; }
+  .bigscore { font-size:clamp(2.4rem,6vw,4.6rem); font-weight:900; font-variant-numeric:tabular-nums; line-height:1.1; margin-top:6px; }
+  .brk { width:100%; margin-top:8px; border-collapse:collapse; font-size:.95rem; } .brk td { padding:3px 6px; } .brk td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+  .jlist { margin-top:8px; font-size:.82rem; color:var(--muted); line-height:1.6; }
+  .ded { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
+  .ded button { background:#2a2f3b; font-size:.8rem; padding:.4em .8em; } .ded button.on { background:#b3261e; }
+  .acts { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .msg { margin-top:10px; font-weight:700; color:var(--gold); }
+
+  /* 대진표 */
+  .bracket { display:flex; gap:26px; overflow-x:auto; padding-bottom:10px; align-items:stretch; }
+  .col { min-width:250px; display:flex; flex-direction:column; gap:10px; } .col .ms { flex:1; display:flex; flex-direction:column; gap:12px; justify-content:space-around; } .col h3 { text-align:center; color:var(--muted); font-size:.95rem; }
+  .match { background:var(--panel2); border:2px solid var(--line); border-radius:12px; overflow:hidden; } .match.now { border-color:var(--gold); }
+  .mrow { display:flex; align-items:center; gap:8px; padding:8px 10px; border-left:5px solid transparent; } .mrow.a { border-left-color:var(--blue); } .mrow.b { border-left-color:var(--red); }
+  .mrow + .mrow { border-top:1px solid var(--line); } .mrow .n { flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mrow .s { font-variant-numeric:tabular-nums; font-weight:800; } .mrow.w { background:rgba(255,210,63,.14); } .mrow.l { opacity:.5; } .mrow.empty .n { color:#667; font-weight:500; }
+  .mfoot { padding:6px 10px; background:#1a1d27; font-size:.82rem; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+
+  /* 컷오프 표 */
+  .stages { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; } .stg { padding:.3em .9em; border-radius:999px; background:var(--panel2); font-size:.9rem; font-weight:700; color:var(--muted); } .stg.now { background:#fff; color:#11141b; }
+  table.t { width:100%; border-collapse:collapse; } .t th, .t td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; } .t th { color:var(--muted); font-size:.85rem; }
+  .t tr.adv td { background:rgba(46,204,113,.12); } .t tr.cut td { opacity:.55; } .t tr.nowp td { background:rgba(255,210,63,.18); }
+  .gname { font-weight:900; margin:14px 0 6px; } .badge { display:inline-block; padding:.1em .6em; border-radius:999px; font-size:.78rem; font-weight:800; background:#1d5a3a; color:#b6f5d0; }
+
+  .podium { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+  .pod { text-align:center; padding:22px 12px; border-radius:16px; background:var(--panel2); } .pod .m { font-size:2.4rem; } .pod .pn { font-size:1.6rem; font-weight:900; margin-top:6px; }
+  .pod.g { background:linear-gradient(180deg, rgba(255,210,63,.3), var(--panel2)); }
+
+  .overlay { position:fixed; inset:0; background:rgba(10,12,18,.94); display:none; align-items:center; justify-content:center; z-index:60; flex-direction:column; gap:14px; }
+  .overlay.show { display:flex; } .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#b3261e; color:#fff; padding:.7em 1.2em; border-radius:12px; font-weight:700; z-index:70; display:none; max-width:90vw; }
+  body.present .ctl { display:none !important; }
+  @media (max-width:700px) { .sides.two { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <a class="back ctl" href="/#tkd">← 플레이 라운지</a>
+  <h1 id="title">태권도 경기</h1>
+  <span class="eid">대회 코드 <b id="eid"></b></span>
+  <div class="seats" id="seats" aria-label="심판 접속 현황"></div>
+  <button class="small" id="btn-present">대화면 모드</button>
+</div>
+
+<div class="wrap">
+  <section class="card ctl" id="setup" hidden>
+    <h2 id="setup-title">대회 설정</h2>
+    <div class="grid2">
+      <div>
+        <label class="f">참가 선수 (한 줄에 한 명, "이름 / 소속" 형식)
+          <textarea id="entrants" placeholder="홍길동 / 한빛도장&#10;김철수 / 청룡도장&#10;이영희"></textarea>
+        </label>
+      </div>
+      <div>
+        <label class="f">심판 수 (1~5명)
+          <select id="judges"><option value="1">1명</option><option value="2">2명</option><option value="3" selected>3명</option><option value="4">4명</option><option value="5">5명 (최고·최저 제외 평균)</option></select>
+        </label>
+        <label class="f" id="pool-wrap">경기 품새 목록 (쉼표로 구분, 경기마다 무작위 지정)
+          <input id="pool" type="text" value="태극 1장, 태극 2장, 태극 3장, 태극 4장, 태극 5장, 태극 6장, 태극 7장, 태극 8장">
+        </label>
+        <div class="plan" id="plan"></div>
+        <div class="row"><button class="primary" id="btn-draw">대진 추첨 시작</button><span class="muted" id="draw-hint"></span></div>
+        <div class="qr" style="margin-top:16px">
+          <div class="qrbox" id="qr"></div>
+          <div><b>심판 접속</b><div class="muted" style="font-size:.9rem;margin:4px 0">심판 휴대폰으로 QR을 스캔하고<br>심판 번호를 선택하세요.</div><div class="muted" id="judge-url" style="font-size:.8rem;word-break:break-all;max-width:260px"></div><div id="code-line" class="muted" style="margin-top:6px"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card cur" id="cur" hidden></section>
+  <section class="card" id="board" hidden></section>
+  <section class="card" id="final" hidden></section>
+  <div class="row ctl" id="footer-acts" hidden><button class="danger small" id="btn-reset">처음부터 다시 (대진 초기화)</button></div>
+</div>
+
+<div class="overlay show" id="login">
+  <h2>관리자 로그인</h2>
+  <form id="login-form" style="display:flex;flex-direction:column;gap:12px;width:min(340px,86vw)">
+    <input id="login-pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" aria-label="관리자 비밀번호">
+    <button class="primary" type="submit">입장</button>
+    <div id="login-err" role="alert" style="color:#ff8a80;min-height:1.3em"></div>
+  </form>
+</div>
+<div class="toast" id="toast" role="alert"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const f2 = (x) => (x == null ? '-' : Number(x).toFixed(2));
+
+  const params = new URLSearchParams(location.search);
+  const kind = params.get('kind') === 'freestyle' ? 'freestyle' : 'recognized';
+  const KIND_KO = { recognized: '공인품새 대전', freestyle: '자유품새 대전' };
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let eventId = (params.get('event') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  if (eventId.length < 4) {
+    const b = new Uint8Array(6); crypto.getRandomValues(b);
+    eventId = Array.from(b, (x) => chars[x % chars.length]).join('');
+    params.set('event', eventId); params.set('kind', kind);
+    history.replaceState(null, '', `?${params.toString()}`);
+  }
+  $('eid').textContent = eventId;
+  $('title').textContent = KIND_KO[kind];
+  document.title = `${KIND_KO[kind]} - 플레이 라운지`;
+  if (kind === 'freestyle') $('pool-wrap').hidden = true;
+
+  const socket = io();
+  let S = null, cfg = null, adminPw = '', accessCode = null;
+  try { adminPw = sessionStorage.getItem('strike-admin') || ''; } catch (_) {}
+
+  const ERR = {
+    'no-judge': '접속한 심판이 없습니다. 심판이 먼저 입장해야 시작할 수 있어요.', busy: '진행 중인 채점이 있습니다. 먼저 확정하거나 취소하세요.',
+    'not-ready': '아직 모든 심판이 제출하지 않았습니다. (강제 마감으로 제출된 점수만 집계할 수 있어요)', 'few-entrants': '선수가 2명 이상 필요합니다.',
+    'bad-match': '시작할 수 없는 경기입니다.', 'not-setup': '이미 대진이 시작되었습니다.', 'stage-not-complete': '아직 모든 선수의 채점이 끝나지 않았습니다.',
+  };
+  let toastT;
+  const toast = (m) => { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => (t.style.display = 'none'), 4200); };
+
+  /* ------------ 접속 / 로그인 ------------ */
+  const join = () => socket.emit('tkd:join', { role: 'admin', event: eventId, kind, password: adminPw });
+  socket.on('connect', join);
+  socket.on('tkd:join:result', (r) => {
+    if (r.ok) {
+      $('login').classList.remove('show'); accessCode = r.accessCode;
+      try { sessionStorage.setItem('strike-admin', adminPw); } catch (_) {}
+      renderJoinInfo();
+    } else {
+      if (r.reason === 'bad-password') { adminPw = ''; try { sessionStorage.removeItem('strike-admin'); } catch (_) {} }
+      $('login-err').textContent = { 'bad-password': '비밀번호가 맞지 않습니다.', 'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.' }[r.reason] || '';
+      $('login').classList.add('show'); $('login-pw').focus();
+    }
+  });
+  $('login-form').addEventListener('submit', (e) => { e.preventDefault(); adminPw = $('login-pw').value; join(); });
+  socket.on('tkd:error', (e) => toast(ERR[e.code] || `오류: ${e.code}`));
+  socket.on('tkd:state', (s) => { S = s; render(); });
+
+  const isLocal = (h) => h === 'localhost' || h === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
+  fetch('/api/config').then((r) => r.json()).then((c) => { cfg = c; renderJoinInfo(); });
+  function renderJoinInfo() {
+    if (!cfg) return;
+    const origin = isLocal(location.hostname) && cfg.ips.length ? `${cfg.protocol}://${cfg.ips[0]}:${cfg.port}` : location.origin;
+    const url = `${origin}/judge.html?event=${eventId}`;
+    $('judge-url').textContent = url;
+    $('code-line').textContent = accessCode ? `참가 코드: ${accessCode}` : '';
+    const box = $('qr'); box.innerHTML = '';
+    if (typeof QRCode !== 'undefined') new QRCode(box, { text: url, width: 134, height: 134, correctLevel: QRCode.CorrectLevel.M });
+  }
+
+  /* ------------ 설정 화면 ------------ */
+  let cfgTimer = null, lastSent = '';
+  const parseCount = () => $('entrants').value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).length;
+  function planText(n) {
+    if (n < 2) return '선수를 2명 이상 입력하면 진행 방식이 표시됩니다.';
+    if (kind === 'recognized') {
+      let size = 2; while (size < n) size *= 2;
+      return `<b>${n}명 · 토너먼트</b><br>${size}강 대진표 (${Math.log2(size)}라운드), 부전승 ${size - n}명<br><span class="muted">청·홍 두 선수가 같은 품새를 수행하고 점수가 높은 쪽이 승리합니다.</span>`;
+    }
+    if (n <= 8) return `<b>${n}명 · 컷오프</b><br>결승 한 번으로 순위를 결정합니다.`;
+    if (n <= 19) return `<b>${n}명 · 컷오프</b><br>준결승(상위 8명 진출) → 결승`;
+    const g = n < 40 ? 2 : 3;
+    return `<b>${n}명 · 컷오프</b><br>예선(${g}개 조, 조별 상위 50% 진출) → 준결승(상위 8명) → 결승<br><span class="muted">진출자가 20명 이상이면 예선을 한 번 더 진행합니다.</span>`;
+  }
+  function sendConfig() {
+    const payload = { judgeCount: Number($('judges').value), entrants: $('entrants').value, poomsaePool: $('pool').value };
+    const key = JSON.stringify(payload); if (key === lastSent) return; lastSent = key;
+    socket.emit('tkd:config', payload);
+  }
+  const queueConfig = () => { $('plan').innerHTML = planText(parseCount()); clearTimeout(cfgTimer); cfgTimer = setTimeout(sendConfig, 350); };
+  ['entrants', 'judges', 'pool'].forEach((id) => $(id).addEventListener('input', queueConfig));
+  $('btn-draw').addEventListener('click', () => { sendConfig(); setTimeout(() => socket.emit('tkd:draw'), 120); });
+  $('btn-reset').addEventListener('click', () => { if (confirm('대진과 지금까지의 점수를 모두 지우고 설정 화면으로 돌아갈까요?')) socket.emit('tkd:reset'); });
+  $('btn-present').addEventListener('click', () => { document.body.classList.toggle('present'); $('btn-present').textContent = document.body.classList.contains('present') ? '조작 화면' : '대화면 모드'; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.body.classList.remove('present'); });
+
+  /* ------------ 렌더링 ------------ */
+  const nameOf = (id) => (S.entrants.find((e) => e.id === id) || {}).name || '';
+  const teamOf = (id) => (S.entrants.find((e) => e.id === id) || {}).team || '';
+  const LBL = () => S.schema.labels;
+  const busy = () => S.current && S.current.status !== 'done';
+  const noJudge = () => !S.seats.some((s) => s.connected);
+
+  function render() {
+    if (!S) return;
+    const setup = S.phase === 'setup';
+    $('setup').hidden = !setup;
+    $('cur').hidden = setup || !S.current;
+    $('board').hidden = setup;
+    $('final').hidden = S.phase !== 'finished';
+    $('footer-acts').hidden = setup;
+    $('seats').innerHTML = S.seats.map((s) => `<span class="seat ${s.submitted ? 'sub' : s.connected ? 'on' : ''}">심판 ${s.seat} ${s.submitted ? '제출' : s.connected ? '접속' : '대기'}</span>`).join('');
+    if (setup) renderSetup(); else { renderCurrent(); if (S.kind === 'recognized') renderBracket(); else renderStages(); }
+    if (S.phase === 'finished') renderFinal();
+  }
+  function renderSetup() {
+    const ae = document.activeElement;
+    if (ae !== $('entrants')) $('entrants').value = S.entrants.map((e) => (e.team ? `${e.name} / ${e.team}` : e.name)).join('\n');
+    if (ae !== $('judges')) $('judges').value = String(S.judgeCount);
+    if (ae !== $('pool')) $('pool').value = S.poomsaePool.join(', ');
+    $('plan').innerHTML = planText(S.entrants.length);
+    $('btn-draw').disabled = S.entrants.length < 2;
+    $('draw-hint').textContent = noJudge() ? '※ 경기를 시작하려면 심판이 1명 이상 접속해야 합니다.' : '';
+  }
+
+  function dedButtons(side, c) {
+    if (c.status === 'done') return '';
+    const d = c.deductions[side] || {};
+    const v = S.deductionValues;
+    const keys = { time: `시간 −${v.time}`, line: `경계선 −${v.line}`, restart: `재시작 −${v.restart}` };
+    return `<div class="ded ctl">${S.deductionKeys.map((k) => k === 'restart'
+      ? `<button data-ded="${side}:restart:-1">−</button><button class="${d.restart ? 'on' : ''}" disabled>${keys.restart} ×${d.restart || 0}</button><button data-ded="${side}:restart:1">+</button>`
+      : `<button class="${d[k] ? 'on' : ''}" data-ded="${side}:${k}:${d[k] ? 0 : 1}">${keys[k]}</button>`).join('')}</div>`;
+  }
+  function renderCurrent() {
+    const c = S.current, el = $('cur');
+    if (!c) { el.hidden = true; return; }
+    el.classList.toggle('live', c.status !== 'done');
+    const roundTxt = c.matchId ? (S.bracket.find((r) => r.matches.some((m) => m.id === c.matchId)) || {}).name : (S.stages[S.stageIdx] || {}).name;
+    const subm = Object.keys(c.submitted).length, total = c.activeSeats.length;
+    const statusTxt = c.status === 'scoring' ? `채점 중 · 제출 ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : (c.result && c.result.tie ? '동점 — 재경기가 필요합니다' : '확정 완료');
+    const sides = c.sides.map((s) => {
+      const r = c.result && c.result[s.side];
+      const win = c.result && c.result.winner && c.result.winner === s.side;
+      const cls = s.side === 'solo' ? '' : s.side;
+      const jl = c.judgeScores && c.judgeScores[s.side] ? Object.entries(c.judgeScores[s.side]).map(([k, v]) => `심판${k} ${f2(v.total)}`).join(' · ') : '';
+      return `<div class="side ${cls} ${win ? 'win' : ''}">
+        <div class="corner">${s.label ? (s.side === 'a' ? '청 (靑)' : '홍 (紅)') : '연기 중'}${win ? ' · 승리' : ''}</div>
+        <div class="pname">${esc(s.name)}</div><div class="pteam">${esc(s.team)}</div>
+        ${r ? `<div class="bigscore">${f2(r.total)}</div>
+          <table class="brk"><tr><td>${LBL().a} 평균</td><td>${f2(r.a)}</td></tr><tr><td>${LBL().p} 평균</td><td>${f2(r.p)}</td></tr><tr><td>감점</td><td>${r.ded ? '−' + f2(r.ded) : '0.00'}</td></tr></table>
+          <div class="jlist">${esc(jl)}${r.dropped ? '<br>(최고·최저 점수 제외 평균)' : ''}</div>` : ''}
+        ${dedButtons(s.side, c)}</div>`;
+    }).join('');
+    let acts = '';
+    if (c.status === 'scoring') acts = `<button class="ctl" id="a-force" ${subm ? '' : 'disabled'}>강제 마감 (제출된 점수만)</button><button class="ctl danger" id="a-cancel">경기 취소</button>`;
+    else if (c.status === 'review') acts = `<button class="primary ctl" id="a-final">점수 확정</button><button class="ctl danger" id="a-cancel">경기 취소</button>`;
+    else if (c.result && c.result.tie) acts = `<button class="primary ctl" id="a-rematch" data-m="${esc(c.matchId)}">재경기 시작 (새 품새 추첨)</button>`;
+    el.innerHTML = `<div class="cur-head"><div class="cur-title">${esc(roundTxt)} ${c.poomsae && c.type === 'match' ? '· <span style="color:var(--gold)">' + esc(c.poomsae) + '</span>' : ''}</div><span class="pill">${statusTxt}</span></div>
+      <div class="sides ${c.sides.length === 2 ? 'two' : ''}">${sides}</div><div class="acts">${acts}</div>`;
+    el.querySelectorAll('[data-ded]').forEach((b) => b.addEventListener('click', () => {
+      const [side, key, val] = b.dataset.ded.split(':');
+      const cur = (c.deductions[side] || {}).restart || 0;
+      socket.emit('tkd:deduct', { side, key, value: key === 'restart' ? cur + Number(val) : Number(val) === 1 });
+    }));
+    const on = (id, fn) => { const b = el.querySelector('#' + id); if (b) b.addEventListener('click', fn); };
+    on('a-force', () => { if (confirm('아직 제출하지 않은 심판을 제외하고 집계할까요?')) socket.emit('tkd:finalize', { force: true }); });
+    on('a-final', () => socket.emit('tkd:finalize', {}));
+    on('a-cancel', () => { if (confirm('이 경기의 채점을 취소할까요? 제출된 점수는 사라집니다.')) socket.emit('tkd:cancel'); });
+    on('a-rematch', () => socket.emit('tkd:startMatch', { matchId: c.matchId }));
+  }
+
+  function renderBracket() {
+    const nowId = S.current && S.current.status !== 'done' ? S.current.matchId : null;
+    const cols = S.bracket.map((r) => `<div class="col"><h3>${esc(r.name)}</h3><div class="ms">${r.matches.map((m) => {
+      const row = (side) => {
+        const id = m[side]; const res = m.result && m.result[side];
+        const w = m.result && m.result.winner === side, l = m.result && m.result.winner && !w && !m.result.bye;
+        return `<div class="mrow ${side} ${id ? '' : 'empty'} ${w ? 'w' : ''} ${l ? 'l' : ''}"><span class="n">${id ? esc(nameOf(id)) : (m.bye ? '—' : '대기')}</span><span class="s">${res ? f2(res.total) : ''}</span></div>`;
+      };
+      const ready = m.state === 'pending' && m.a && m.b;
+      const foot = m.bye ? '<span>부전승</span>' : m.state === 'done' ? `<span>${esc(m.result.poomsae || '')}</span>` : `<span>${m.a && m.b ? '대기' : '상대 미정'}</span>${ready ? `<button class="primary small ctl" data-start="${m.id}" ${busy() || noJudge() ? 'disabled' : ''}>경기 시작</button>` : ''}`;
+      return `<div class="match ${nowId === m.id ? 'now' : ''}">${row('a')}${row('b')}<div class="mfoot">${foot}</div></div>`;
+    }).join('')}</div></div>`).join('');
+    $('board').innerHTML = `<h2>토너먼트 대진표</h2><div class="bracket">${cols}</div>`;
+    $('board').querySelectorAll('[data-start]').forEach((b) => b.addEventListener('click', () => socket.emit('tkd:startMatch', { matchId: b.dataset.start })));
+  }
+
+  function renderStages() {
+    const st = S.stages[S.stageIdx];
+    const nowE = S.current && S.current.status !== 'done' ? S.current.entrantId : null;
+    const chips = S.stages.map((x, i) => `<span class="stg ${i === S.stageIdx ? 'now' : ''}">${esc(x.name)}</span>`).join('');
+    const groups = st.groups.map((g, gi) => {
+      const rk = st.rankings && st.rankings[gi];
+      const rows = (rk ? rk.entries : g.ids.map((id) => ({ id, res: st.scores[id] }))).map((e, i) => {
+        const r = e.res;
+        const cls = rk ? (e.advance ? 'adv' : (g.advance ? 'cut' : '')) : (nowE === e.id ? 'nowp' : '');
+        const act = !r && !busy() && !noJudge() ? `<button class="primary small ctl" data-solo="${e.id}">시작</button>` : '';
+        return `<tr class="${cls}"><td>${rk ? e.rank : i + 1}</td><td><b>${esc(nameOf(e.id))}</b> <span class="muted">${esc(teamOf(e.id))}</span></td>
+          <td>${r ? f2(r.a) : ''}</td><td>${r ? f2(r.p) : ''}</td><td>${r && r.ded ? '−' + f2(r.ded) : ''}</td><td><b>${r ? f2(r.total) : ''}</b></td><td>${rk && e.advance ? '<span class="badge">진출</span>' : act}</td></tr>`;
+      }).join('');
+      return `<div class="gname">${esc(g.name)}${g.advance ? ` <span class="muted">· 상위 ${g.advance}명 진출 (동점자 포함)</span>` : ''}</div>
+        <table class="t"><thead><tr><th>${rk ? '순위' : '순서'}</th><th>선수</th><th>${LBL().a}</th><th>${LBL().p}</th><th>감점</th><th>합계</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    }).join('');
+    const done = Object.keys(st.scores).length, all = st.groups.reduce((n, g) => n + g.ids.length, 0);
+    const next = !busy() && !st.complete && !noJudge() ? `<button class="primary ctl" id="b-next">다음 선수 시작</button>` : '';
+    const adv = st.complete && S.phase === 'running' ? `<button class="primary ctl" id="b-adv">${st.type === 'final' ? '최종 순위 확정' : '다음 단계로 (추첨)'}</button>` : '';
+    $('board').innerHTML = `<h2>컷오프 · ${esc(st.name)} <span class="muted" style="font-size:.9rem;font-weight:600">${done}/${all}명 완료</span></h2><div class="stages">${chips}</div>
+      <div class="row" style="margin-bottom:6px">${next}${adv}</div>${groups}`;
+    const on = (id, fn) => { const b = $('board').querySelector('#' + id); if (b) b.addEventListener('click', fn); };
+    on('b-next', () => socket.emit('tkd:startSolo', {}));
+    on('b-adv', () => socket.emit('tkd:advance'));
+    $('board').querySelectorAll('[data-solo]').forEach((b) => b.addEventListener('click', () => socket.emit('tkd:startSolo', { entrantId: b.dataset.solo })));
+  }
+
+  function renderFinal() {
+    const p = S.podium; if (!p) return;
+    const medal = (m, label, names, cls) => names.map((n) => `<div class="pod ${cls}"><div class="m">${m}</div><div>${label}</div><div class="pn">${esc(nameOf(n))}</div><div class="muted">${esc(teamOf(n))}</div></div>`).join('');
+    let html = '';
+    if (S.kind === 'recognized') html = medal('🥇', '우승', p.gold, 'g') + medal('🥈', '준우승', p.silver, '') + medal('🥉', '공동 3위', p.bronze, '');
+    else {
+      const ranks = p.ranks.slice(0, 8);
+      const top = ranks.filter((r) => r.rank <= 3);
+      html = top.map((r) => `<div class="pod ${r.rank === 1 ? 'g' : ''}"><div class="m">${['🥇', '🥈', '🥉'][r.rank - 1]}</div><div>${r.rank}위</div><div class="pn">${esc(nameOf(r.id))}</div><div class="muted">${esc(teamOf(r.id))} · ${f2(r.res.total)}점</div></div>`).join('');
+      const rest = ranks.filter((r) => r.rank > 3).map((r) => `${r.rank}위 ${esc(nameOf(r.id))} (${f2(r.res.total)})`).join(' · ');
+      if (rest) html += `<div class="muted" style="grid-column:1/-1;text-align:center">${rest}</div>`;
+    }
+    $('final').innerHTML = `<h2>🏆 최종 결과</h2><div class="podium">${html}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
