@@ -265,7 +265,7 @@ function finalizePerf(ev) {
   if (c.type === 'match') {
     const m = ev.bracket[c.round][c.index];
     const diff = cmpResult(ev.kind, result.a, result.b);
-    if (diff === 0) { c.result.tie = true; return true; }                    // 완전 동점: 재경기 필요
+    if (diff === 0) { c.result.tie = true; m.plan = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch); return true; }   // 재경기는 품새를 새로 추첨                    // 완전 동점: 재경기 필요
     m.state = 'done';
     m.poomsae = c.poomsaeList.join(' · ');
     m.result = { winner: diff > 0 ? 'a' : 'b', a: result.a, b: result.b, poomsae: c.poomsaeList.join(' · '), passes: c.passResults.map((pr) => ({ poomsae: pr.poomsae, a: pr.a.total, b: pr.b.total })) };
@@ -402,7 +402,10 @@ function attach(io, socket, auth) {
     if (ev.phase !== 'setup') return err('not-setup');
     if (ev.entrants.length < 2) return err('few-entrants');
     ev.current = null; ev.podium = null; ev.prelimCount = 0;
-    if (ev.kind === 'recognized') { ev.bracket = buildBracket(ev.entrants); ev.stages = null; }
+    if (ev.kind === 'recognized') {
+      ev.bracket = buildBracket(ev.entrants); ev.stages = null;
+      for (const m of ev.bracket.flat()) if (!m.bye) m.plan = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);   // 대진 추첨과 함께 경기별 품새도 미리 추첨
+    }
     else { ev.bracket = null; ev.stages = [planStage(ev.entrants.map((e) => e.id), 0)]; ev.stageIdx = 0; }
     ev.phase = 'running';
     broadcast(ev);
@@ -429,7 +432,7 @@ function attach(io, socket, auth) {
     if (ev.kind !== 'recognized' || ev.phase !== 'running') return;
     const m = ev.bracket.flat().find((x) => x.id === p.matchId);
     if (!m || m.state !== 'pending' || !m.a || !m.b) return err('bad-match');
-    const poomsaeList = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);
+    const poomsaeList = m.plan && m.plan.length ? m.plan.slice() : drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);
     startPerf(ev, { type: 'match', matchId: m.id, round: m.round, index: m.index, poomsae: poomsaeList[0], poomsaeList, pass: 0, passCount: poomsaeList.length, passResults: [] });
   }));
 

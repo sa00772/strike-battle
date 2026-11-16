@@ -60,7 +60,7 @@
   .mrow { display:flex; align-items:center; gap:8px; padding:8px 10px; border-left:5px solid transparent; } .mrow.a { border-left-color:var(--blue); } .mrow.b { border-left-color:var(--red); }
   .mrow + .mrow { border-top:1px solid var(--line); } .mrow .n { flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mrow .s { font-variant-numeric:tabular-nums; font-weight:800; } .mrow.w { background:rgba(255,210,63,.14); } .mrow.l { opacity:.5; } .mrow.empty .n { color:#667; font-weight:500; }
-  .mfoot { padding:6px 10px; background:#1a1d27; font-size:.82rem; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .plan-t { color:var(--gold); font-weight:700; } .mfoot { padding:6px 10px; background:#1a1d27; font-size:.82rem; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
 
   /* 컷오프 표 */
   .stages { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; } .stg { padding:.3em .9em; border-radius:999px; background:var(--panel2); font-size:.9rem; font-weight:700; color:var(--muted); } .stg.now { background:#fff; color:#11141b; }
@@ -483,7 +483,8 @@
         return `<div class="mrow ${side} ${id ? '' : 'empty'} ${w ? 'w' : ''} ${l ? 'l' : ''}"><span class="n">${id ? esc(nameOf(id)) : (m.bye ? '—' : '대기')}</span><span class="s">${res ? f2(res.total) : ''}</span></div>`;
       };
       const ready = m.state === 'pending' && m.a && m.b;
-      const foot = m.bye ? '<span>부전승</span>' : m.state === 'done' ? `<span>${esc(m.result.poomsae || '')}</span>` : `<span>${m.a && m.b ? '대기' : '상대 미정'}</span>${ready ? `<button class="primary small ctl" data-start="${m.id}" ${busy() || noJudge() ? 'disabled' : ''}>경기 시작</button>` : ''}`;
+      const planTxt = m.plan && m.plan.length ? m.plan.join(' · ') : '';
+      const foot = m.bye ? '<span>부전승</span>' : m.state === 'done' ? `<span>${esc(m.result.poomsae || '')}</span>` : `<span class="plan-t" title="이 경기의 품새">${planTxt ? '📋 ' + esc(planTxt) : (m.a && m.b ? '대기' : '상대 미정')}</span>${ready ? `<button class="primary small ctl" data-start="${m.id}" ${busy() || noJudge() ? 'disabled' : ''}>경기 시작</button>` : ''}`;
       return `<div class="match ${nowId === m.id ? 'now' : ''}">${row('a')}${row('b')}<div class="mfoot">${foot}</div></div>`;
     }).join('')}</div></div>`).join('');
     $('board').innerHTML = `<h2>토너먼트 대진표</h2><div class="bracket">${cols}</div>`;
