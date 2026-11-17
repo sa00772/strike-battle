@@ -8,12 +8,13 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
   :root{color-scheme:dark;--ink:#0d0c0b;--ink-2:#171513;--paper:#f1ebdd;--muted:#a8a090;--brass:#c9a862;--line:rgba(241,235,221,.14);
-    --go:#d9573f;--rest:#4e9b7c;
+    --go:#e5533c;--rest:#35a577;--ready:#e9a92b;
     --serif:"Noto Serif KR","Nanum Myeongjo","Batang",serif;--sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
   *{box-sizing:border-box;margin:0;padding:0}
   [hidden]{display:none!important}
-  body{background:var(--ink);color:var(--paper);font-family:var(--sans);min-height:100vh;-webkit-font-smoothing:antialiased;transition:background .4s}
-  body.phase-go{background:#1d0f0b} body.phase-rest{background:#0b1a14}
+  body{background:var(--ink);color:var(--paper);font-family:var(--sans);min-height:100vh;-webkit-font-smoothing:antialiased;transition:background .25s}
+  body.phase-ready{background:#7a5208} body.phase-go{background:#a3281a} body.phase-rest{background:#14684a} body.phase-done{background:#2b2147}
+  body[class*=phase-] .top,body[class*=phase-] .tabs{border-color:rgba(255,255,255,.18)}
   a{color:inherit;text-decoration:none}
   button{font:inherit;color:inherit;cursor:pointer}
   button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
@@ -38,14 +39,20 @@
   .chip:hover{color:var(--paper);border-color:var(--brass)}
 
   /* 타이머 */
-  .face{text-align:center;padding:28px 0 22px;border:1px solid var(--line);border-radius:16px;margin-bottom:20px;background:rgba(23,21,19,.6)}
-  .phase{font-family:var(--serif);font-weight:900;font-size:1.5rem;letter-spacing:.1em;color:var(--muted);min-height:2.2rem}
-  body.phase-go .phase{color:var(--go)} body.phase-rest .phase{color:var(--rest)}
-  .clock{font-weight:700;font-size:clamp(4.5rem,24vw,8rem);line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .face{text-align:center;padding:28px 0 22px;border:1px solid var(--line);border-radius:16px;margin-bottom:20px;background:rgba(23,21,19,.6);transition:background .25s,border-color .25s}
+  body[class*=phase-] .face{background:rgba(0,0,0,.22);border-color:rgba(255,255,255,.2)}
+  .phase{font-family:var(--serif);font-weight:900;font-size:clamp(1.6rem,6vw,2.4rem);letter-spacing:.1em;color:var(--muted);min-height:2.2rem}
+  body[class*=phase-] .phase,body[class*=phase-] .round{color:#fff}
+  .clock{font-weight:800;font-size:clamp(5rem,30vw,10rem);line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
   .round{color:var(--muted);font-size:.95rem;margin-top:4px}
   .bar{height:6px;background:var(--line);border-radius:3px;margin:20px 28px 0;overflow:hidden}
   .bar i{display:block;height:100%;width:0;background:var(--brass);transition:width .25s linear}
-  body.phase-go .bar i{background:var(--go)} body.phase-rest .bar i{background:var(--rest)}
+  body[class*=phase-] .bar{background:rgba(255,255,255,.2)} body[class*=phase-] .bar i{background:#fff}
+  .f4{grid-template-columns:repeat(4,1fr)}
+  #p-timer.active .fields,#p-timer.active .presets{display:none}   /* 진행 중에는 타이머만 크게 */
+  @media(max-width:520px){.f4{grid-template-columns:1fr 1fr}}
+  body[class*=phase-] .btn.main{background:#fff;border-color:#fff;color:#1a1210}
+  body[class*=phase-] .btn{border-color:rgba(255,255,255,.4)}
   .ctl{display:flex;gap:10px}
   .btn{flex:1;padding:15px;border-radius:999px;border:1px solid var(--line);background:none;font-weight:700;font-size:1.05rem}
   .btn.main{background:var(--brass);border-color:var(--brass);color:var(--ink)}
@@ -87,22 +94,24 @@
 <main>
   <h1>도구실</h1>
   <div class="tabs" role="tablist">
-    <button role="tab" id="tab-timer" aria-selected="true">인터벌 타이머</button>
+    <button role="tab" id="tab-timer" aria-selected="true">멀티 인터벌</button>
     <button role="tab" id="tab-metro" aria-selected="false">메트로놈</button>
     <button role="tab" id="tab-dice" aria-selected="false">주사위</button>
   </div>
 
-  <!-- 인터벌 타이머 -->
+  <!-- 멀티 인터벌 타이머 -->
   <section id="p-timer">
-    <div class="fields">
-      <label class="field">시작 시간<span class="in"><input id="go-m" inputmode="numeric" maxlength="2" aria-label="시작 분"><span class="u">분</span><input id="go-s" inputmode="numeric" maxlength="2" aria-label="시작 초"><span class="u">초</span></span></label>
+    <div class="fields f4">
+      <label class="field">대기 시간<span class="in"><input id="rd-m" inputmode="numeric" maxlength="2" aria-label="대기 분"><span class="u">분</span><input id="rd-s" inputmode="numeric" maxlength="2" aria-label="대기 초"><span class="u">초</span></span></label>
+      <label class="field">운동 시간<span class="in"><input id="go-m" inputmode="numeric" maxlength="2" aria-label="운동 분"><span class="u">분</span><input id="go-s" inputmode="numeric" maxlength="2" aria-label="운동 초"><span class="u">초</span></span></label>
       <label class="field">휴식 시간<span class="in"><input id="rs-m" inputmode="numeric" maxlength="2" aria-label="휴식 분"><span class="u">분</span><input id="rs-s" inputmode="numeric" maxlength="2" aria-label="휴식 초"><span class="u">초</span></span></label>
-      <label class="field">반복<span class="in"><input id="rounds" inputmode="numeric" maxlength="2" aria-label="반복 횟수"><span class="u">회</span></span></label>
+      <label class="field">세트 수<span class="in"><input id="rounds" inputmode="numeric" maxlength="2" aria-label="세트 수"></span></label>
     </div>
     <div class="presets" id="presets">
-      <button class="chip" data-p="180,60,3">경기 3분 / 휴식 1분 × 3</button>
-      <button class="chip" data-p="60,30,5">1분 / 30초 × 5</button>
-      <button class="chip" data-p="30,10,8">30초 / 10초 × 8 (타바타식)</button>
+      <button class="chip" data-p="10,20,10,8">타바타 (20초 / 10초 × 8)</button>
+      <button class="chip" data-p="10,40,20,6">서킷 (40초 / 20초 × 6)</button>
+      <button class="chip" data-p="5,180,60,3">섀도우 복싱 (3분 / 1분 × 3)</button>
+      <button class="chip" data-p="5,60,30,5">줄넘기 (1분 / 30초 × 5)</button>
     </div>
     <div class="face" aria-live="off">
       <div class="phase" id="phase">준비</div>
@@ -113,9 +122,10 @@
     <div class="ctl">
       <button class="btn" id="t-reset">처음으로</button>
       <button class="btn main" id="t-go">시작</button>
+      <button class="btn" id="t-full" style="flex:0 0 auto;padding:15px 20px" aria-label="전체화면">⛶</button>
     </div>
-    <label class="snd"><input type="checkbox" id="t-sound" checked> 소리 알림 (끝나기 3초 전, 시작·휴식이 바뀔 때)</label>
-    <p class="note">화면이 꺼지지 않게 해 두면 더 정확해요. 휴식은 마지막 반복 뒤에는 건너뛰어요.</p>
+    <label class="snd"><input type="checkbox" id="t-sound" checked> 소리 알림 (끝나기 3초 전 삐-삐-삑, 운동·휴식이 바뀔 때 큰 소리)</label>
+    <p class="note">운동은 빨강, 휴식은 초록, 대기는 노랑으로 화면이 바뀌어요. 마지막 세트 뒤에는 휴식 없이 끝나요.</p>
   </section>
 
   <!-- 메트로놈 -->
@@ -193,16 +203,18 @@ async function keepAwake(on) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (T.running || M.running)) keepAwake(true); });
 
-/* ---------- 인터벌 타이머 ---------- */
-const cfg = Object.assign({ go: 180, rest: 60, rounds: 3, sound: true }, store.get('pl-timer', {}));
+/* ---------- 멀티 인터벌 타이머 ---------- */
+const cfg = Object.assign({ ready: 10, go: 40, rest: 20, rounds: 6, sound: true }, store.get('pl-timer', {}));
 const T = { running: false, phase: 'idle', n: 0, endAt: 0, total: 0, last: -1, raf: 0, pausedLeft: 0 };
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function fillInputs() {
+  $('#rd-m').value = Math.floor(cfg.ready / 60); $('#rd-s').value = String(cfg.ready % 60).padStart(2, '0');
   $('#go-m').value = Math.floor(cfg.go / 60); $('#go-s').value = String(cfg.go % 60).padStart(2, '0');
   $('#rs-m').value = Math.floor(cfg.rest / 60); $('#rs-s').value = String(cfg.rest % 60).padStart(2, '0');
   $('#rounds').value = cfg.rounds; $('#t-sound').checked = cfg.sound;
 }
 function readInputs() {
+  cfg.ready = clamp(num($('#rd-m'), 0) * 60 + num($('#rd-s'), 0), 0, 5999);
   cfg.go = clamp(num($('#go-m'), 0) * 60 + num($('#go-s'), 0), 1, 5999);
   cfg.rest = clamp(num($('#rs-m'), 0) * 60 + num($('#rs-s'), 0), 0, 5999);
   cfg.rounds = clamp(num($('#rounds'), 1), 1, 99);
@@ -210,15 +222,15 @@ function readInputs() {
   store.set('pl-timer', cfg);
 }
 function setPhaseUI(p) {
-  document.body.classList.toggle('phase-go', p === 'go');
-  document.body.classList.toggle('phase-rest', p === 'rest');
-  $('#phase').textContent = { idle: '준비', go: '시작!', rest: '휴식', done: '끝!' }[p];
-  $('#round').textContent = p === 'idle' || p === 'done' ? `${cfg.rounds}회 반복` : `${T.n} / ${cfg.rounds} 회`;
+  $('#p-timer').classList.toggle('active', p === 'ready' || p === 'go' || p === 'rest');
+  for (const k of ['ready', 'go', 'rest', 'done']) document.body.classList.toggle('phase-' + k, p === k);
+  $('#phase').textContent = { idle: '준비됐나요?', ready: '대기', go: '운동!', rest: '휴식', done: '끝! 수고했어요' }[p];
+  $('#round').textContent = p === 'idle' || p === 'done' ? `${cfg.rounds}세트` : p === 'ready' ? `곧 시작 · 총 ${cfg.rounds}세트` : `${T.n} / ${cfg.rounds} 세트`;
 }
 function begin(p, sec) {
   T.phase = p; T.total = sec * 1000; T.endAt = performance.now() + T.total; T.last = -1;
   setPhaseUI(p);
-  if (cfg.sound) { p === 'go' ? (beep(1175, 0.5, undefined, 0.45)) : beep(660, 0.5, undefined, 0.4); }
+  if (cfg.sound) { if (p === 'go') beep(1320, 0.7, undefined, 0.5); else if (p === 'rest') beep(520, 0.55, undefined, 0.45); else beep(740, 0.3, undefined, 0.35); }
 }
 function tick() {
   if (!T.running) return;
@@ -226,14 +238,15 @@ function tick() {
   const sec = Math.max(0, Math.ceil(left / 1000));
   if (sec !== T.last) {
     T.last = sec; $('#clock').textContent = fmt(sec);
-    if (cfg.sound && sec > 0 && sec <= 3) beep(880, 0.12);
+    if (cfg.sound && sec > 0 && sec <= 3) beep(sec === 1 ? 990 : 880, 0.14, undefined, 0.4);          // 삐- 삐- 삑!
   }
   $('#prog').style.width = clamp(100 - (left / T.total) * 100, 0, 100) + '%';
   if (left <= 0) return next();
   T.raf = requestAnimationFrame(tick);
 }
 function next() {
-  if (T.phase === 'go') {
+  if (T.phase === 'ready') { T.n = 1; begin('go', cfg.go); }
+  else if (T.phase === 'go') {
     if (T.n >= cfg.rounds) return finish();
     if (cfg.rest > 0) begin('rest', cfg.rest); else { T.n += 1; begin('go', cfg.go); }
   } else { T.n += 1; begin('go', cfg.go); }
@@ -247,7 +260,7 @@ function finish() {
 }
 function resetTimer() {
   cancelAnimationFrame(T.raf); T.running = false; T.phase = 'idle'; T.n = 0; T.pausedLeft = 0;
-  readInputs(); setPhaseUI('idle'); $('#clock').textContent = fmt(cfg.go); $('#prog').style.width = '0';
+  readInputs(); setPhaseUI('idle'); $('#clock').textContent = fmt(cfg.ready > 0 ? cfg.ready : cfg.go); $('#prog').style.width = '0';
   $('#t-go').textContent = '시작'; keepAwake(false);
 }
 $('#t-go').onclick = () => {
@@ -256,15 +269,19 @@ $('#t-go').onclick = () => {
     T.running = false; cancelAnimationFrame(T.raf); T.pausedLeft = T.endAt - performance.now();
     $('#t-go').textContent = '계속'; keepAwake(false); return;
   }
-  if (T.phase === 'idle' || T.phase === 'done') { readInputs(); T.n = 1; T.running = true; begin('go', cfg.go); }
+  if (T.phase === 'idle' || T.phase === 'done') {
+    readInputs(); T.running = true;
+    if (cfg.ready > 0) { T.n = 0; begin('ready', cfg.ready); } else { T.n = 1; begin('go', cfg.go); }
+  }
   else { T.running = true; T.endAt = performance.now() + T.pausedLeft; }   // 이어서
   $('#t-go').textContent = '일시정지'; keepAwake(true); T.raf = requestAnimationFrame(tick);
 };
 $('#t-reset').onclick = resetTimer;
-document.querySelectorAll('#p-timer .field input, #t-sound').forEach((el) => el.addEventListener('change', () => { if (!T.running && T.phase !== 'go' && T.phase !== 'rest') resetTimer(); else readInputs(); }));
+document.querySelectorAll('#p-timer .field input, #t-sound').forEach((el) => el.addEventListener('change', () => { if (T.phase === 'idle' || T.phase === 'done') resetTimer(); else readInputs(); }));
 $('#presets').onclick = (e) => {
   const p = e.target.dataset.p; if (!p) return;
-  const [g, r, n] = p.split(',').map(Number); cfg.go = g; cfg.rest = r; cfg.rounds = n; store.set('pl-timer', cfg); fillInputs(); resetTimer();
+  const [rd, g, r, n] = p.split(',').map(Number); cfg.ready = rd; cfg.go = g; cfg.rest = r; cfg.rounds = n; store.set('pl-timer', cfg); $('#t-full').onclick = () => { const d = document; if (d.fullscreenElement) d.exitFullscreen(); else (d.documentElement.requestFullscreen || (() => {})).call(d.documentElement); };
+fillInputs(); resetTimer();
 };
 fillInputs(); resetTimer();
 
