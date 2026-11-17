@@ -376,7 +376,17 @@
   .more-body > * { width: 100%; }
   .more-body .cap { margin-bottom: 0; }
   #dodge-events { display: none; } body.dodge #dodge-events { display: grid; }
+  /* ================= 홈페이지 먹 배경 위에 반투명 패널 ================= */
+  body { background: #0d0c0b; }
+  .team, .center { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); border-color: rgba(241,235,221,.2); box-shadow: 0 10px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.18); }
+  .team.blue   { background: linear-gradient(165deg, rgba(110,150,255,.40) 0%, rgba(90,110,235,.12) 100%); }
+  .team.red    { background: linear-gradient(195deg, rgba(255,120,140,.40) 0%, rgba(255,130,110,.12) 100%); }
+  .team.violet { background: linear-gradient(165deg, rgba(170,140,255,.40) 0%, rgba(140,120,255,.12) 100%); }
+  .team.amber  { background: linear-gradient(195deg, rgba(255,200,110,.38) 0%, rgba(255,170,90,.12) 100%); }
+  .center { background: rgba(13,12,11,.16); }
+  .team-name, .score, .time { text-shadow: 0 2px 18px rgba(0,0,0,.55); }
 </style>
+<link rel="stylesheet" href="/ink-bg.css">
 </head>
 <body>
 <div class="evt" id="evt" role="alert"><div class="eb" id="evt-b"></div><div class="es" id="evt-s"></div></div>
