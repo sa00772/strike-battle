@@ -1,7 +1,7 @@
 {
   "name": "strike-battle",
   "version": "1.0.0",
-  "description": "청팀 vs 홍팀 실시간 모션 센서 타격 대결",
+  "description": "플레이 라운지 - 도장/체육관 실시간 게임 모음",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
