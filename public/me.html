@@ -36,6 +36,7 @@
     <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
       <a class="btn sm" id="admin-link" href="/admin.html" hidden>회원 관리</a>
       <button class="btn ghost sm" id="logout">로그아웃</button>
+      <button class="btn ghost sm" id="logout-all">모든 기기에서 로그아웃</button>
       <button class="btn danger sm" id="leave">회원 탈퇴</button>
     </div>
   </section>
@@ -88,6 +89,7 @@ $('#add').onsubmit = async (e) => {
 };
 $('#roster').onclick = async (e) => { const id = e.target.dataset.del; if (id) { await api('/api/my/roster/' + id, { method: 'DELETE' }); loadRoster(); } };
 $('#records').onclick = async (e) => { const id = e.target.dataset.rec; if (id && confirm('이 기록을 삭제할까요?')) { await api('/api/my/records/' + id, { method: 'DELETE' }); loadRecords(); } };
+$('#logout-all').onclick = async () => { if (!confirm('이 계정으로 로그인된 모든 기기에서 로그아웃할까요?')) return; await api('/api/logout-all', { method: 'POST' }); location.href = '/'; };
 $('#logout').onclick = async () => { await api('/api/logout', { method: 'POST' }); location.href = '/'; };
 $('#leave').onclick = async () => {
   const pw = prompt('회원 탈퇴 시 명단과 경기 기록이 모두 삭제돼요.\n계속하려면 비밀번호를 입력하세요.');

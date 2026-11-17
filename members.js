@@ -205,6 +205,18 @@ function ensureMaster() {
     memberDb(Number(r.lastInsertRowid));
   }
   console.log(`  마스터 계정 : ${username}`);
+  // 환경변수 MASTER_LOGOUT_ALL 값이 바뀌면(처음 보는 값이면) 마스터의 모든 기기 로그인을 한 번만 해제한다
+  const tag = String(process.env.MASTER_LOGOUT_ALL || '').trim();
+  if (tag) {
+    const f = path.join(DATA_DIR, 'master-logout.tag');
+    let last = ''; try { last = fs.readFileSync(f, 'utf8'); } catch (_) {}
+    if (last !== tag) {
+      const id = main.prepare('SELECT id FROM members WHERE username = ?').get(username)?.id;
+      if (id) main.prepare('DELETE FROM sessions WHERE member_id = ?').run(id);
+      try { fs.writeFileSync(f, tag); } catch (_) {}
+      console.log('  마스터 계정의 모든 기기 로그인을 해제했습니다.');
+    }
+  }
 }
 
 /* ------------------------------ 백업 ------------------------------ */
@@ -382,6 +394,13 @@ function mount(app, express) {
   app.post('/api/logout', off, (req, res) => {
     const token = parseCookies(req.headers.cookie)[COOKIE];
     if (token) main.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha(token));
+    clearCookie(res);
+    res.json({ ok: true });
+  });
+
+  // 이 계정의 모든 기기 로그아웃 (지금 쓰는 기기 포함)
+  app.post('/api/logout-all', off, auth, (req, res) => {
+    main.prepare('DELETE FROM sessions WHERE member_id = ?').run(req.member.id);
     clearCookie(res);
     res.json({ ok: true });
   });
