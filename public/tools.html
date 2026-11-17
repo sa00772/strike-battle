@@ -67,6 +67,17 @@
   .beats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;align-items:center}
   .beats span{color:var(--muted);font-size:.85rem;margin-right:4px}
   .chip[aria-pressed=true]{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+  /* 주사위 */
+  .dice-area{display:flex;gap:clamp(14px,4vw,28px);justify-content:center;align-items:center;min-height:190px;margin:10px 0 6px;flex-wrap:wrap}
+  .die{width:clamp(92px,26vw,128px);aspect-ratio:1;border-radius:22%;background:#fdf6e6;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:clamp(12px,3.8vw,18px);gap:clamp(3px,1vw,5px);box-shadow:inset 0 -6px 0 rgba(0,0,0,.12),0 10px 24px rgba(0,0,0,.5);cursor:pointer;border:0;transition:transform .12s}
+  .die:active{transform:scale(.96)}
+  .die i{border-radius:50%;background:transparent;min-width:0;min-height:0}
+  .die i.p{background:#2a1d12}
+  .die.one i.p{background:#c8402b}
+  .die.roll{animation:tumble .55s ease-in-out infinite}
+  @keyframes tumble{0%{transform:rotate(0) translateY(0)}25%{transform:rotate(-14deg) translateY(-14px)}50%{transform:rotate(10deg) translateY(0)}75%{transform:rotate(-8deg) translateY(-8px)}100%{transform:rotate(0) translateY(0)}}
+  .dice-sum{text-align:center;font-family:var(--serif);font-weight:900;font-size:1.5rem;color:var(--brass);min-height:2.4rem;margin-bottom:18px}
+  @media(prefers-reduced-motion:reduce){.die.roll{animation:none}}
   @media(max-width:420px){.fields{gap:8px}.field input{font-size:1.1rem}}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -78,6 +89,7 @@
   <div class="tabs" role="tablist">
     <button role="tab" id="tab-timer" aria-selected="true">인터벌 타이머</button>
     <button role="tab" id="tab-metro" aria-selected="false">메트로놈</button>
+    <button role="tab" id="tab-dice" aria-selected="false">주사위</button>
   </div>
 
   <!-- 인터벌 타이머 -->
@@ -123,6 +135,17 @@
     <div class="ctl"><button class="btn main" id="m-go">시작</button></div>
     <p class="note">20 ~ 300 BPM · 첫 박은 높은 소리로 울려요</p>
   </section>
+  <!-- 주사위 -->
+  <section id="p-dice" hidden>
+    <div class="beats" id="dice-n" style="justify-content:center;margin-bottom:18px"><span>주사위 개수</span>
+      <button class="chip" data-n="1" aria-pressed="false">1개</button><button class="chip" data-n="2" aria-pressed="false">2개</button><button class="chip" data-n="3" aria-pressed="false">3개</button>
+    </div>
+    <div class="dice-area" id="dice-area" aria-live="polite"></div>
+    <div class="dice-sum" id="dice-sum"></div>
+    <div class="ctl"><button class="btn main" id="d-go">굴리기</button></div>
+    <label class="snd"><input type="checkbox" id="d-sound" checked> 굴리는 소리</label>
+    <p class="note">주사위를 직접 눌러도 굴러가요. 1~3개까지 한 번에 굴릴 수 있어요.</p>
+  </section>
 </main>
 
 <script>
@@ -133,14 +156,16 @@ const num = (el, d) => { const n = parseInt(el.value, 10); return Number.isFinit
 
 /* ---------- 탭 ---------- */
 function showTab(which) {
-  $('#p-timer').hidden = which !== 'timer'; $('#p-metro').hidden = which !== 'metro';
+  $('#p-timer').hidden = which !== 'timer'; $('#p-metro').hidden = which !== 'metro'; $('#p-dice').hidden = which !== 'dice';
+  $('#tab-dice').setAttribute('aria-selected', String(which === 'dice'));
   $('#tab-timer').setAttribute('aria-selected', String(which === 'timer'));
   $('#tab-metro').setAttribute('aria-selected', String(which === 'metro'));
   history.replaceState(null, '', '#' + which);
 }
 $('#tab-timer').onclick = () => showTab('timer');
 $('#tab-metro').onclick = () => showTab('metro');
-showTab(location.hash === '#metronome' || location.hash === '#metro' ? 'metro' : 'timer');
+$('#tab-dice').onclick = () => showTab('dice');
+showTab(location.hash === '#metronome' || location.hash === '#metro' ? 'metro' : location.hash === '#dice' ? 'dice' : 'timer');
 
 /* ---------- 소리 ---------- */
 let ac = null;
@@ -293,6 +318,50 @@ $('#m-go').onclick = () => {
   $('#m-go').textContent = '멈춤'; keepAwake(true);
 };
 setBpm(mc.bpm, false); drawBeats();
+
+/* ---------- 주사위 (1~3개) ---------- */
+const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+const dc = Object.assign({ n: 2, sound: true }, store.get('pl-dice', {}));
+const D = { rolling: false, vals: [] };
+const rand6 = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return (a[0] % 6) + 1; };   // 치우침 없는 난수
+function dieHtml(v, rolling) {
+  const pips = PIPS[v] || [];
+  return `<div class="die ${v === 1 ? 'one' : ''} ${rolling ? 'roll' : ''}" role="button" tabindex="0" aria-label="주사위 ${v}">${Array.from({ length: 9 }, (_, i) => `<i class="${pips.includes(i) ? 'p' : ''}"></i>`).join('')}</div>`;
+}
+function drawDice(rolling) {
+  if (D.vals.length !== dc.n) D.vals = Array.from({ length: dc.n }, (_, i) => D.vals[i] || 1 + (i * 2) % 6);
+  $('#dice-area').innerHTML = D.vals.map((v) => dieHtml(v, rolling)).join('');
+  document.querySelectorAll('#dice-n .chip').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === dc.n)));
+  $('#d-sound').checked = dc.sound;
+}
+function showSum() {
+  $('#dice-sum').textContent = D.vals.length > 1 ? `합계 ${D.vals.reduce((a, b) => a + b, 0)}  (${D.vals.join(' + ')})` : '';
+}
+function rollDice() {
+  if (D.rolling) return;
+  audio(); D.rolling = true; $('#d-go').disabled = true; $('#dice-sum').textContent = '';
+  const final = Array.from({ length: dc.n }, rand6);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const total = reduce ? 200 : 1100, t0 = performance.now(); let lastTick = 0;
+  (function frame(now) {
+    const el = now - t0;
+    if (el < total) {
+      if (now - lastTick > 90) {                              // 굴러가는 동안 눈이 계속 바뀜
+        lastTick = now; D.vals = D.vals.map(() => rand6()); drawDice(true);
+        if (dc.sound) beep(300 + Math.random() * 400, 0.04, undefined, 0.18);
+      }
+      return requestAnimationFrame(frame);
+    }
+    D.vals = final; D.rolling = false; $('#d-go').disabled = false; drawDice(false); showSum();
+    if (dc.sound) { beep(520, 0.1, undefined, 0.3); }
+  })(t0);
+}
+$('#dice-n').onclick = (e) => { const n = +e.target.dataset.n; if (n && !D.rolling) { dc.n = n; store.set('pl-dice', dc); drawDice(false); showSum(); } };
+$('#d-go').onclick = rollDice;
+$('#dice-area').onclick = (e) => { if (e.target.closest('.die')) rollDice(); };
+$('#dice-area').onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.die')) { e.preventDefault(); rollDice(); } };
+$('#d-sound').onchange = (e) => { dc.sound = e.target.checked; store.set('pl-dice', dc); };
+drawDice(false);
 </script>
 </body>
 </html>

@@ -97,7 +97,7 @@
   .row[data-open] { cursor: pointer; }
   .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
   .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; }
-  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
+  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
     border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(37,36,43,.18), inset 0 0 0 3px rgba(0,0,0,.12), inset 0 0 0 4px rgba(255,255,255,.4); transition: transform .3s; }
   .row[data-open]:hover .seal { transform: rotate(0deg) scale(1.04); }
@@ -254,6 +254,14 @@
         <details class="info"><summary>설명 보기</summary><p class="sub">BPM을 슬라이더, 숫자 입력, 탭으로 정하고 1~8박 한 마디로 울립니다. 품새 연습이나 리듬 훈련에 쓰세요.</p></details>
       </div>
       <a class="act" href="/tools.html#metro">메트로놈 열기</a>
+    </article>
+    <article class="row tool3" id="tool-dice">
+      <div class="seal" aria-hidden="true"></div>
+      <div class="main">
+        <h3>주사위<span class="tag">1 ~ 3개</span></h3>
+        <details class="info"><summary>설명 보기</summary><p class="sub">주사위를 1개에서 3개까지 한 번에 굴리고 합계를 보여 줍니다. 순서 정하기나 보드게임, 벌칙 정하기에 쓰세요.</p></details>
+      </div>
+      <a class="act" href="/tools.html#dice">주사위 열기</a>
     </article>
   </div>
 </section>
