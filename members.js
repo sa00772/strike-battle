@@ -46,6 +46,10 @@ function init() {
       expires_at INTEGER NOT NULL
     );
   `);
+  // 이전 버전 DB 호환: 역할(role) / 이용 정지(disabled) 열 추가
+  const cols = main.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
+  if (!cols.includes('role')) main.exec("ALTER TABLE members ADD COLUMN role TEXT NOT NULL DEFAULT 'member'");
+  if (!cols.includes('disabled')) main.exec('ALTER TABLE members ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
   return main;
 }
 
@@ -100,9 +104,9 @@ function memberFromCookieHeader(header) {
   const token = parseCookies(header)[COOKIE];
   if (!token) return null;
   const row = main.prepare(
-    `SELECT m.id, m.username, m.name, m.org_type, m.org, m.phone, m.created_at
+    `SELECT m.id, m.username, m.name, m.org_type, m.org, m.phone, m.created_at, m.role
        FROM sessions s JOIN members m ON m.id = s.member_id
-      WHERE s.token_hash = ? AND s.expires_at > ?`
+      WHERE s.token_hash = ? AND s.expires_at > ? AND m.disabled = 0`
   ).get(sha(token), Date.now());
   return row || null;
 }
@@ -112,9 +116,12 @@ function startSession(res, memberId, secure) {
   const maxAge = SESSION_DAYS * 86400;
   main.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
   // 기기 제한: 새 로그인이 들어오면 가장 오래된 로그인부터 풀어서 최대 MAX_DEVICES 대만 유지
-  main.prepare(`DELETE FROM sessions WHERE member_id = ? AND token_hash NOT IN (
-      SELECT token_hash FROM sessions WHERE member_id = ? ORDER BY rowid DESC LIMIT ?)`)
-    .run(memberId, memberId, MAX_DEVICES - 1);
+  const isMaster = main.prepare('SELECT role FROM members WHERE id = ?').get(memberId)?.role === 'master';
+  if (!isMaster) {                                  // 마스터 계정은 기기 수 제한 없음
+    main.prepare(`DELETE FROM sessions WHERE member_id = ? AND token_hash NOT IN (
+        SELECT token_hash FROM sessions WHERE member_id = ? ORDER BY rowid DESC LIMIT ?)`)
+      .run(memberId, memberId, MAX_DEVICES - 1);
+  }
   main.prepare('INSERT INTO sessions (token_hash, member_id, expires_at) VALUES (?, ?, ?)')
     .run(sha(token), memberId, Date.now() + maxAge * 1000);
   res.setHeader('Set-Cookie',
@@ -147,8 +154,42 @@ function validateSignup(b) {
 
 const publicMember = (m) => ({
   id: m.id, username: m.username, name: m.name, orgType: m.org_type, org: m.org, phone: m.phone,
-  createdAt: m.created_at,
+  createdAt: m.created_at, role: m.role || 'member',
 });
+
+/* ------------------------------ 회원 삭제 / 마스터 ------------------------------ */
+function removeMember(id) {
+  main.prepare('DELETE FROM sessions WHERE member_id = ?').run(id);
+  main.prepare('DELETE FROM members WHERE id = ?').run(id);
+  const db = memberDbs.get(id);
+  if (db) { try { db.close(); } catch (_) {} memberDbs.delete(id); }
+  for (const ext of ['', '-wal', '-shm']) {
+    try { fs.unlinkSync(path.join(DATA_DIR, 'members', `${id}.db${ext}`)); } catch (_) {}
+  }
+}
+
+// 마스터 계정: 환경변수 MASTER_USERNAME / MASTER_PASSWORD 로 지정 (서버 시작 시 생성·갱신, 비밀번호는 코드에 저장하지 않음)
+function ensureMaster() {
+  const username = String(process.env.MASTER_USERNAME || '').trim().toLowerCase();
+  const password = String(process.env.MASTER_PASSWORD || '');
+  if (!main || !username || !password) return;
+  if (!USERNAME_RE.test(username) || password.length < 8) {
+    console.error('⚠ MASTER_USERNAME(영문 소문자·숫자·밑줄 4~20자) 또는 MASTER_PASSWORD(8자 이상) 형식이 올바르지 않아 마스터 계정을 만들지 못했습니다.');
+    return;
+  }
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = hashPw(password, salt);
+  const cur = main.prepare('SELECT id, role FROM members WHERE username = ?').get(username);
+  if (cur && cur.role !== 'master') { console.error('⚠ MASTER_USERNAME 과 같은 아이디의 일반 회원이 이미 있어 마스터로 만들지 못했습니다. 다른 아이디를 쓰세요.'); return; }
+  main.prepare("UPDATE members SET role = 'member' WHERE role = 'master' AND username != ?").run(username);   // 마스터는 항상 1명
+  if (cur) main.prepare('UPDATE members SET salt = ?, pw_hash = ?, disabled = 0 WHERE id = ?').run(salt, hash, cur.id);
+  else {
+    const r = main.prepare("INSERT INTO members (username, salt, pw_hash, name, org_type, org, phone, created_at, role) VALUES (?,?,?,?,?,?,?,?, 'master')")
+      .run(username, salt, hash, '마스터', 'etc', '관리자', '-', Date.now());
+    memberDb(Number(r.lastInsertRowid));
+  }
+  console.log(`  마스터 계정 : ${username}`);
+}
 
 /* ------------------------------ 라우터 ------------------------------ */
 function mount(app, express) {
@@ -203,6 +244,7 @@ function mount(app, express) {
     const row = main.prepare('SELECT * FROM members WHERE username = ?').get(username);
     const ok = row ? checkPw(password, row.salt, row.pw_hash) : (hashPw(password, 'x'.repeat(32)), false);
     if (!ok) return res.status(401).json({ error: '아이디 또는 비밀번호가 맞지 않아요.' });
+    if (row.disabled) return res.status(403).json({ error: '이용이 정지된 계정이에요. 관리자에게 문의해 주세요.' });
     startSession(res, row.id, isSecure(req));
     res.json({ ok: true });
   });
@@ -213,7 +255,7 @@ function mount(app, express) {
   app.post('/api/find-id', off, json, (req, res) => {
     if (limited(req)) return res.status(429).json({ error: '시도가 너무 많아요. 잠시 후 다시 해 주세요.' });
     const name = clean((req.body || {}).name, 20), phone = digits((req.body || {}).phone);
-    const rows = main.prepare('SELECT username, phone FROM members WHERE name = ?').all(name).filter((r) => digits(r.phone) === phone);
+    const rows = main.prepare("SELECT username, phone FROM members WHERE name = ? AND role = 'member'").all(name).filter((r) => digits(r.phone) === phone);
     if (!rows.length) return res.status(404).json({ error: '일치하는 회원을 찾지 못했어요. 이름과 전화번호를 확인해 주세요.' });
     res.json({ usernames: rows.map((r) => mask(r.username)) });
   });
@@ -227,6 +269,7 @@ function mount(app, express) {
     const f = resetFails.get(username);
     if (f && f.until > Date.now()) return res.status(429).json({ error: '확인에 여러 번 실패해 15분간 잠겼어요. 잠시 후 다시 해 주세요.' });
     const row = main.prepare('SELECT * FROM members WHERE username = ?').get(username);
+    if (row && row.role === 'master') return res.status(400).json({ error: '입력한 정보가 가입 정보와 맞지 않아요.' });
     const match = row && row.name === clean(b.name, 20) && digits(row.phone) === digits(b.phone);
     if (!match) {
       const n = ((f && !(f.until && f.until <= Date.now())) ? f.n : 0) + 1;
@@ -259,17 +302,52 @@ function mount(app, express) {
   // 회원 탈퇴: 비밀번호 확인 후 회원 정보와 개인 DB 파일까지 삭제
   app.delete('/api/me', off, auth, json, (req, res) => {
     const row = main.prepare('SELECT * FROM members WHERE id = ?').get(req.member.id);
+    if (row.role === 'master') return res.status(403).json({ error: '마스터 계정은 탈퇴할 수 없어요.' });
     if (!checkPw(String((req.body || {}).password || ''), row.salt, row.pw_hash)) {
       return res.status(403).json({ error: '비밀번호가 맞지 않아요.' });
     }
-    main.prepare('DELETE FROM sessions WHERE member_id = ?').run(row.id);
-    main.prepare('DELETE FROM members WHERE id = ?').run(row.id);
-    const db = memberDbs.get(row.id);
-    if (db) { try { db.close(); } catch (_) {} memberDbs.delete(row.id); }
-    for (const ext of ['', '-wal', '-shm']) {
-      try { fs.unlinkSync(path.join(DATA_DIR, 'members', `${row.id}.db${ext}`)); } catch (_) {}
-    }
+    removeMember(row.id);
     clearCookie(res);
+    res.json({ ok: true });
+  });
+
+  /* ---------------------- 마스터 전용: 회원 관리 ---------------------- */
+  const masterOnly = (req, res, next) => {
+    if (req.member.role !== 'master') return res.status(403).json({ error: '마스터 계정만 사용할 수 있어요.' });
+    next();
+  };
+  const targetOf = (req, res) => {
+    const t = main.prepare('SELECT * FROM members WHERE id = ?').get(Number(req.params.id) || 0);
+    if (!t) { res.status(404).json({ error: '회원을 찾을 수 없어요.' }); return null; }
+    if (t.role === 'master') { res.status(400).json({ error: '마스터 계정은 건드릴 수 없어요.' }); return null; }
+    return t;
+  };
+  app.get('/api/admin/members', off, auth, masterOnly, (_req, res) => {
+    const rows = main.prepare(`SELECT m.id, m.username, m.name, m.org_type, m.org, m.phone, m.created_at, m.role, m.disabled,
+        (SELECT COUNT(*) FROM sessions s WHERE s.member_id = m.id AND s.expires_at > ?) AS devices
+        FROM members m ORDER BY m.id DESC`).all(Date.now());
+    res.json({ maxDevices: MAX_DEVICES, items: rows.map((r) => ({ ...publicMember(r), disabled: !!r.disabled, devices: r.devices })) });
+  });
+  // 임시 비밀번호 발급 (비밀번호를 잊은 회원용) — 발급하면 모든 기기 로그아웃
+  app.post('/api/admin/members/:id/reset', off, auth, masterOnly, (req, res) => {
+    const t = targetOf(req, res); if (!t) return;
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    let tmp = 'a1'; for (let i = 0; i < 8; i++) tmp += alphabet[crypto.randomInt(alphabet.length)];
+    const salt = crypto.randomBytes(16).toString('hex');
+    main.prepare('UPDATE members SET salt = ?, pw_hash = ? WHERE id = ?').run(salt, hashPw(tmp, salt), t.id);
+    main.prepare('DELETE FROM sessions WHERE member_id = ?').run(t.id);
+    res.json({ ok: true, password: tmp });
+  });
+  app.post('/api/admin/members/:id/disable', off, auth, masterOnly, json, (req, res) => {
+    const t = targetOf(req, res); if (!t) return;
+    const off_ = (req.body || {}).disabled ? 1 : 0;
+    main.prepare('UPDATE members SET disabled = ? WHERE id = ?').run(off_, t.id);
+    if (off_) main.prepare('DELETE FROM sessions WHERE member_id = ?').run(t.id);
+    res.json({ ok: true });
+  });
+  app.delete('/api/admin/members/:id', off, auth, masterOnly, (req, res) => {
+    const t = targetOf(req, res); if (!t) return;
+    removeMember(t.id);
     res.json({ ok: true });
   });
 
@@ -319,5 +397,7 @@ function saveRecord(memberId, game, title, data) {
     return false;
   }
 }
+
+ensureMaster();
 
 module.exports = { MAX_DEVICES, mount, memberFromCookieHeader, saveRecord, enabled: !!main, DATA_DIR };

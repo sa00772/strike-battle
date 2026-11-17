@@ -34,6 +34,7 @@
     <h2>내 정보</h2>
     <dl id="info"></dl>
     <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+      <a class="btn sm" id="admin-link" href="/admin.html" hidden>회원 관리</a>
       <button class="btn ghost sm" id="logout">로그아웃</button>
       <button class="btn danger sm" id="leave">회원 탈퇴</button>
     </div>
@@ -74,6 +75,7 @@ async function loadRecords() {
   $('#hello').textContent = `${m.name} 님의 공간`;
   $('#org').textContent = `${ORG[m.orgType] || ''} · ${m.org}`;
   $('#info').innerHTML = `<dt>아이디</dt><dd>${esc(m.username)}</dd><dt>전화번호</dt><dd>${esc(m.phone)}</dd><dt>소속</dt><dd>${esc(m.org)}</dd>`;
+  if (m.role === 'master') { $('#admin-link').hidden = false; $('#leave').hidden = true; }
   $('#app').hidden = false;
   await Promise.all([loadRoster(), loadRecords()]);
 })();
