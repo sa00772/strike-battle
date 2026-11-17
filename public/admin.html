@@ -28,6 +28,12 @@
 <main class="wide" id="app" hidden>
   <h1>회원 관리</h1>
   <p class="sub">마스터 계정 전용 화면이에요. 기기 수 제한 없이 모든 기능을 쓸 수 있어요.</p>
+  <section class="box" id="backup">
+    <h2>백업</h2>
+    <p class="hint" style="margin-bottom:12px">회원 정보와 모든 회원의 선수 명단·경기 기록을 하루에 한 번 자동으로 백업해요. 최근 <span id="keep">10</span>개만 서버에 보관해요. 서버가 잘못되어도 데이터를 지킬 수 있게, <b>가끔 내 컴퓨터로 내려받아 두세요.</b></p>
+    <div class="acts" style="margin:0 0 12px"><button class="btn sm" id="b-now">지금 백업하고 내려받기</button></div>
+    <ul class="list" id="b-list"></ul>
+  </section>
   <div class="bar"><input id="q" placeholder="이름 · 아이디 · 소속 · 전화번호 검색" aria-label="회원 검색"><span class="cnt" id="cnt"></span></div>
   <div id="list"></div>
 </main>
@@ -78,11 +84,29 @@ $('#list').onclick = async (e) => {
     await load();
   } catch (er) { alert(er.message); }
 };
+const fmtSize = (n) => n > 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB';
+async function loadBackups() {
+  const j = await api('/api/admin/backups'); $('#keep').textContent = j.keep;
+  $('#b-list').innerHTML = j.items.length ? j.items.map((b) =>
+    `<li><span class="grow">${new Date(b.createdAt).toLocaleString('ko-KR')}<small>${esc(b.name)} · ${fmtSize(b.size)}</small></span>
+      <a class="btn ghost sm" href="/api/admin/backups/${encodeURIComponent(b.name)}" download>내려받기</a>
+      <button class="btn ghost sm" data-bdel="${esc(b.name)}">삭제</button></li>`).join('')
+    : '<p class="empty">아직 백업이 없어요. 서버가 켜진 뒤 1분쯤 지나면 첫 자동 백업이 만들어져요.</p>';
+}
+$('#b-now').onclick = async () => {
+  const btn = $('#b-now'); btn.disabled = true; btn.textContent = '백업 만드는 중…';
+  try { const j = await api('/api/admin/backups', { method: 'POST' }); await loadBackups(); location.href = '/api/admin/backups/' + encodeURIComponent(j.name); }
+  catch (er) { alert(er.message); } finally { btn.disabled = false; btn.textContent = '지금 백업하고 내려받기'; }
+};
+$('#b-list').onclick = async (e) => {
+  const n = e.target.dataset.bdel; if (!n || !confirm('이 백업을 삭제할까요?')) return;
+  try { await api('/api/admin/backups/' + encodeURIComponent(n), { method: 'DELETE' }); loadBackups(); } catch (er) { alert(er.message); }
+};
 (async () => {
   const { member: m } = await api('/api/me');
   if (!m) { location.href = '/login.html?next=/admin.html'; return; }
   if (m.role !== 'master') { location.href = '/me.html'; return; }
-  $('#app').hidden = false; load();
+  $('#app').hidden = false; load(); loadBackups();
 })();
 </script>
 </body>

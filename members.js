@@ -191,6 +191,66 @@ function ensureMaster() {
   console.log(`  마스터 계정 : ${username}`);
 }
 
+/* ------------------------------ 백업 ------------------------------ */
+// 공용 DB + 모든 회원 개인 DB 를 SQLite 의 VACUUM INTO 로 일관된 복사본으로 만든 뒤 하나의 .tar.gz 로 묶어 DATA_DIR/backups 에 보관
+const zlib = require('zlib');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const BACKUP_KEEP = 10;                                   // 최근 10개만 보관
+const BACKUP_EVERY_MS = 24 * 60 * 60 * 1000;              // 하루에 한 번 자동 백업
+const BACKUP_RE = /^backup-\d{8}-\d{6}\.tar\.gz$/;
+
+function tarEntry(name, data) {                           // ustar 형식 항목 1개 (헤더 512바이트 + 내용 + 패딩)
+  const h = Buffer.alloc(512);
+  h.write(name, 0, 100, 'utf8'); h.write('0000644\0', 100); h.write('0000000\0', 108); h.write('0000000\0', 116);
+  h.write(data.length.toString(8).padStart(11, '0') + '\0', 124);
+  h.write(Math.floor(Date.now() / 1000).toString(8).padStart(11, '0') + '\0', 136);
+  h.write('        ', 148); h.write('0', 156); h.write('ustar\0', 257); h.write('00', 263);
+  let sum = 0; for (const b of h) sum += b;
+  h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148);
+  const pad = Buffer.alloc((512 - (data.length % 512)) % 512);
+  return Buffer.concat([h, data, pad]);
+}
+const pad2 = (n) => String(n).padStart(2, '0');
+function stamp(d = new Date()) {
+  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+}
+function listBackups() {
+  try {
+    return fs.readdirSync(BACKUP_DIR).filter((f) => BACKUP_RE.test(f)).sort().reverse().map((f) => {
+      const st = fs.statSync(path.join(BACKUP_DIR, f));
+      return { name: f, size: st.size, createdAt: st.mtimeMs };
+    });
+  } catch (_) { return []; }
+}
+function createBackup() {
+  if (!main) throw new Error('회원 기능이 꺼져 있어요.');
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const tmp = fs.mkdtempSync(path.join(BACKUP_DIR, 'tmp-'));
+  try {
+    const parts = [];
+    const dump = (db, rel) => {                           // VACUUM INTO: 사용 중인 DB 도 안전하게 복사
+      const out = path.join(tmp, rel.replace(/\//g, '_'));
+      db.exec(`VACUUM INTO '${out.replace(/'/g, "''")}'`);
+      parts.push(tarEntry(rel, fs.readFileSync(out)));
+    };
+    dump(main, 'main.db');
+    for (const { id } of main.prepare('SELECT id FROM members ORDER BY id').all()) dump(memberDb(id), `members/${id}.db`);
+    parts.push(tarEntry('README.txt', Buffer.from(`플레이 라운지 백업 (${new Date().toISOString()})\n복원: 서버를 멈추고 이 안의 main.db 와 members 폴더를 DATA_DIR 에 덮어쓴 뒤 다시 시작하세요.\n`)));
+    parts.push(Buffer.alloc(1024));                       // tar 끝 표시
+    const name = `backup-${stamp()}.tar.gz`;
+    fs.writeFileSync(path.join(BACKUP_DIR, name), zlib.gzipSync(Buffer.concat(parts), { level: 9 }));
+    for (const old of listBackups().slice(BACKUP_KEEP)) { try { fs.unlinkSync(path.join(BACKUP_DIR, old.name)); } catch (_) {} }
+    return name;
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+function autoBackup() {
+  try {
+    const last = listBackups()[0];
+    if (!last || Date.now() - last.createdAt >= BACKUP_EVERY_MS) console.log('  자동 백업 :', createBackup());
+  } catch (e) { console.error('자동 백업 실패:', e.message); }
+}
+if (main) { setTimeout(autoBackup, 60 * 1000).unref(); setInterval(autoBackup, 60 * 60 * 1000).unref(); }   // 시작 1분 뒤 확인, 이후 1시간마다 확인
+
 /* ------------------------------ 라우터 ------------------------------ */
 function mount(app, express) {
   const json = express.json({ limit: '20kb' });
@@ -322,6 +382,23 @@ function mount(app, express) {
     if (t.role === 'master') { res.status(400).json({ error: '마스터 계정은 건드릴 수 없어요.' }); return null; }
     return t;
   };
+  app.get('/api/admin/backups', off, auth, masterOnly, (_req, res) => res.json({ items: listBackups(), keep: BACKUP_KEEP }));
+  app.post('/api/admin/backups', off, auth, masterOnly, (_req, res) => {
+    try { res.json({ ok: true, name: createBackup() }); } catch (e) { res.status(500).json({ error: '백업을 만들지 못했어요: ' + e.message }); }
+  });
+  app.get('/api/admin/backups/:name', off, auth, masterOnly, (req, res) => {
+    const name = String(req.params.name || '');
+    if (!BACKUP_RE.test(name) || !fs.existsSync(path.join(BACKUP_DIR, name))) return res.status(404).json({ error: '백업 파일을 찾을 수 없어요.' });
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename="playlounge-${name}"`);
+    fs.createReadStream(path.join(BACKUP_DIR, name)).pipe(res);
+  });
+  app.delete('/api/admin/backups/:name', off, auth, masterOnly, (req, res) => {
+    const name = String(req.params.name || '');
+    if (!BACKUP_RE.test(name)) return res.status(404).json({ error: '백업 파일을 찾을 수 없어요.' });
+    try { fs.unlinkSync(path.join(BACKUP_DIR, name)); } catch (_) {}
+    res.json({ ok: true });
+  });
   app.get('/api/admin/members', off, auth, masterOnly, (_req, res) => {
     const rows = main.prepare(`SELECT m.id, m.username, m.name, m.org_type, m.org, m.phone, m.created_at, m.role, m.disabled,
         (SELECT COUNT(*) FROM sessions s WHERE s.member_id = m.id AND s.expires_at > ?) AS devices
