@@ -24,7 +24,8 @@
   main{max-width:640px;margin:0 auto;padding:30px 20px 70px}
   h1{font-family:var(--serif);font-weight:900;font-size:1.6rem;margin-bottom:18px}
   .tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:28px}
-  .tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:12px 0;color:var(--muted);font-weight:600;font-size:1rem}
+  .tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:1 0 auto;padding-left:14px!important;padding-right:14px!important;white-space:nowrap;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:12px 0;color:var(--muted);font-weight:600;font-size:1rem}
   .tabs button[aria-selected=true]{color:var(--paper);border-bottom-color:var(--brass)}
 
   /* 공통 입력 */
@@ -85,6 +86,39 @@
   @keyframes tumble{0%{transform:rotate(0) translateY(0)}25%{transform:rotate(-14deg) translateY(-14px)}50%{transform:rotate(10deg) translateY(0)}75%{transform:rotate(-8deg) translateY(-8px)}100%{transform:rotate(0) translateY(0)}}
   .dice-sum{text-align:center;font-family:var(--serif);font-weight:900;font-size:1.5rem;color:var(--brass);min-height:2.4rem;margin-bottom:18px}
   @media(prefers-reduced-motion:reduce){.die.roll{animation:none}}
+
+  /* 팀 나누기 */
+  .tm-in{width:100%;min-height:150px;resize:vertical;background:var(--ink-2);border:1px solid var(--line);border-radius:12px;color:var(--paper);font:500 1rem/1.7 var(--sans);padding:12px 14px;outline:none}
+  .tm-in:focus{border-color:var(--brass)}
+  .tm-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0 18px;color:var(--muted);font-size:.86rem}
+  .stepper{display:flex;align-items:center;gap:6px}
+  .stepper b{min-width:2.2em;text-align:center;font-size:1.15rem;color:var(--paper);font-variant-numeric:tabular-nums}
+  .stepper .step{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:none;font-size:1.3rem;line-height:1}
+  .teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px}
+  .team{background:var(--ink-2);border:1px solid var(--line);border-top:4px solid var(--tc,var(--brass));border-radius:12px;padding:12px 14px 14px;animation:pop .35s ease both}
+  .team h3{font-family:var(--serif);font-size:1.05rem;margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline}
+  .team h3 span{color:var(--muted);font:500 .8rem var(--sans)}
+  .team li{list-style:none;padding:4px 0;font-size:1rem;border-top:1px solid var(--line)}
+  .team li:first-child{border-top:0}
+  .tm-msg{color:var(--muted);text-align:center;font-size:.9rem;margin-top:14px;min-height:1.3em}
+  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  /* 반응 훈련 */
+  .rx-sec{margin:4px 0 8px;color:var(--muted);font-size:.84rem}
+  .rx-list{display:grid;gap:8px;margin-bottom:16px}
+  .rx-row{display:grid;grid-template-columns:auto 44px 1fr;gap:10px;align-items:center;background:var(--ink-2);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+  .rx-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--brass)}
+  .rx-sw{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--c,#444);color:#fff}
+  .rx-sw svg{width:22px;height:22px}
+  .rx-row input[type=text]{min-width:0;background:none;border:0;border-bottom:1px solid var(--line);color:var(--paper);font:600 1.05rem var(--sans);padding:6px 2px;outline:none}
+  .rx-row input[type=text]:focus{border-bottom-color:var(--brass)}
+  .rx-stage{min-height:min(52vh,420px);border-radius:18px;margin:18px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;background:#1b1815;border:1px solid var(--line);color:#fff;padding:20px;transition:background .08s}
+  .rx-stage.light{color:#1a1308}
+  .rx-stage .rx-big{font-family:var(--serif);font-weight:900;font-size:clamp(2.6rem,13vw,5.6rem);line-height:1.15;word-break:keep-all}
+  .rx-stage .rx-small{font-size:1rem;opacity:.8}
+  .rx-stage svg{width:clamp(110px,34vw,200px);height:auto}
+  .rx-stage .cue{animation:pop .15s ease both;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .rx-info{text-align:center;color:var(--muted);font-size:.9rem;min-height:1.4em;margin-bottom:12px}
+  @media(prefers-reduced-motion:reduce){.team,.rx-stage .cue{animation:none}}
   @media(max-width:420px){.fields{gap:8px}.field input{font-size:1.1rem}}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -97,6 +131,8 @@
     <button role="tab" id="tab-timer" aria-selected="true">멀티 인터벌</button>
     <button role="tab" id="tab-metro" aria-selected="false">메트로놈</button>
     <button role="tab" id="tab-dice" aria-selected="false">주사위</button>
+    <button role="tab" id="tab-teams" aria-selected="false">팀 나누기</button>
+    <button role="tab" id="tab-react" aria-selected="false">반응 훈련</button>
   </div>
 
   <!-- 멀티 인터벌 타이머 -->
@@ -156,6 +192,34 @@
     <label class="snd"><input type="checkbox" id="d-sound" checked> 굴리는 소리</label>
     <p class="note">주사위를 직접 눌러도 굴러가요. 1~3개까지 한 번에 굴릴 수 있어요.</p>
   </section>
+
+  <!-- 팀 나누기 -->
+  <section id="p-teams" hidden>
+    <label for="tm-names" class="rx-sec">이름을 한 줄에 한 명씩 적거나 쉼표로 구분해 주세요.</label>
+    <textarea class="tm-in" id="tm-names" placeholder="김하늘&#10;이도윤&#10;박서준&#10;최지우" spellcheck="false"></textarea>
+    <div class="tm-meta">
+      <span id="tm-count">0명</span>
+      <span class="stepper"><button class="step" id="tm-m" aria-label="팀 줄이기">−</button><b id="tm-n">2</b><span>팀</span><button class="step" id="tm-p" aria-label="팀 늘리기">+</button></span>
+    </div>
+    <div class="ctl"><button class="btn" id="tm-copy">결과 복사</button><button class="btn main" id="tm-go">팀 나누기</button></div>
+    <div class="tm-msg" id="tm-msg" aria-live="polite"></div>
+    <div class="teams" id="tm-out"></div>
+  </section>
+
+  <!-- 색깔·방향 반응 훈련 -->
+  <section id="p-react" hidden>
+    <div class="rx-sec">쓸 신호를 체크하고, 신호마다 할 동작을 직접 적어 주세요.</div>
+    <div class="rx-list" id="rx-list"></div>
+    <div class="fields" style="grid-template-columns:repeat(3,1fr)">
+      <label class="field">최소 간격<span class="in"><input id="rx-min" inputmode="numeric" maxlength="2" aria-label="최소 간격 초"><span class="u">초</span></span></label>
+      <label class="field">최대 간격<span class="in"><input id="rx-max" inputmode="numeric" maxlength="2" aria-label="최대 간격 초"><span class="u">초</span></span></label>
+      <label class="field">횟수 (0=계속)<span class="in"><input id="rx-cnt" inputmode="numeric" maxlength="3" aria-label="횟수"></span></label>
+    </div>
+    <div class="rx-stage" id="rx-stage" aria-live="assertive"><div class="rx-big" style="font-size:1.4rem;opacity:.7">시작을 누르면 신호가 나옵니다</div></div>
+    <div class="rx-info" id="rx-info"></div>
+    <div class="ctl"><button class="btn" id="rx-full" style="flex:0 0 auto;padding:15px 20px" aria-label="전체화면">⛶</button><button class="btn main" id="rx-go">시작</button></div>
+    <label class="snd"><input type="checkbox" id="rx-sound" checked> 신호가 바뀔 때 소리</label>
+  </section>
 </main>
 
 <script>
@@ -165,17 +229,16 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const num = (el, d) => { const n = parseInt(el.value, 10); return Number.isFinite(n) ? n : d; };
 
 /* ---------- 탭 ---------- */
+const TABS = ['timer', 'metro', 'dice', 'teams', 'react'];
 function showTab(which) {
-  $('#p-timer').hidden = which !== 'timer'; $('#p-metro').hidden = which !== 'metro'; $('#p-dice').hidden = which !== 'dice';
-  $('#tab-dice').setAttribute('aria-selected', String(which === 'dice'));
-  $('#tab-timer').setAttribute('aria-selected', String(which === 'timer'));
-  $('#tab-metro').setAttribute('aria-selected', String(which === 'metro'));
+  if (!TABS.includes(which)) which = 'timer';
+  TABS.forEach((t) => { $('#p-' + t).hidden = t !== which; $('#tab-' + t).setAttribute('aria-selected', String(t === which)); });
+  if (which !== 'react' && window.rxStop) window.rxStop();
   history.replaceState(null, '', '#' + which);
+  const sel = $('#tab-' + which); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
-$('#tab-timer').onclick = () => showTab('timer');
-$('#tab-metro').onclick = () => showTab('metro');
-$('#tab-dice').onclick = () => showTab('dice');
-showTab(location.hash === '#metronome' || location.hash === '#metro' ? 'metro' : location.hash === '#dice' ? 'dice' : 'timer');
+TABS.forEach((t) => { $('#tab-' + t).onclick = () => showTab(t); });
+showTab(location.hash === '#metronome' ? 'metro' : location.hash.slice(1));
 
 /* ---------- 소리 ---------- */
 let ac = null;
@@ -379,6 +442,120 @@ $('#dice-area').onclick = (e) => { if (e.target.closest('.die')) rollDice(); };
 $('#dice-area').onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.die')) { e.preventDefault(); rollDice(); } };
 $('#d-sound').onchange = (e) => { dc.sound = e.target.checked; store.set('pl-dice', dc); };
 drawDice(false);
+
+/* ---------- 팀 나누기 ---------- */
+const TEAM_NAMES = ['청', '홍', '황', '녹', '백', '흑', '자', '주'];
+const TEAM_COLORS = ['#3f7bd6', '#d6483a', '#e0b030', '#3a9a62', '#e8e2d2', '#6d6a66', '#8b5bd0', '#e58a2b'];
+const tm = store.get('pl-teams', { names: '', n: 2 });
+let tmLast = [];
+function tmParse() { return $('#tm-names').value.split(/[\n,，、]+/).map((x) => x.trim()).filter(Boolean); }
+function tmMeta() {
+  const c = tmParse().length;
+  $('#tm-count').textContent = c + '명';
+  $('#tm-n').textContent = tm.n;
+  store.set('pl-teams', { names: $('#tm-names').value, n: tm.n });
+}
+$('#tm-names').value = tm.names || '';
+$('#tm-names').addEventListener('input', tmMeta);
+$('#tm-m').onclick = () => { tm.n = clamp(tm.n - 1, 2, 8); tmMeta(); };
+$('#tm-p').onclick = () => { tm.n = clamp(tm.n + 1, 2, 8); tmMeta(); };
+$('#tm-go').onclick = () => {
+  const names = tmParse(), msg = $('#tm-msg'), out = $('#tm-out');
+  if (names.length < 2) { msg.textContent = '이름을 두 명 이상 적어 주세요.'; out.innerHTML = ''; tmLast = []; return; }
+  const n = Math.min(tm.n, names.length);
+  for (let i = names.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [names[i], names[j]] = [names[j], names[i]]; }
+  const teams = Array.from({ length: n }, () => []);
+  names.forEach((nm, i) => teams[i % n].push(nm));
+  tmLast = teams;
+  msg.textContent = n < tm.n ? `사람이 적어서 ${n}팀으로 나눴어요.` : '다시 누르면 새로 섞여요.';
+  out.innerHTML = '';
+  teams.forEach((list, i) => {
+    const d = document.createElement('div'); d.className = 'team'; d.style.setProperty('--tc', TEAM_COLORS[i]); d.style.animationDelay = (i * 70) + 'ms';
+    const h = document.createElement('h3'); h.textContent = TEAM_NAMES[i] + '팀'; const sp = document.createElement('span'); sp.textContent = list.length + '명'; h.appendChild(sp);
+    const ul = document.createElement('ul'); list.forEach((nm) => { const li = document.createElement('li'); li.textContent = nm; ul.appendChild(li); });
+    d.append(h, ul); out.appendChild(d);
+  });
+};
+$('#tm-copy').onclick = async () => {
+  if (!tmLast.length) { $('#tm-msg').textContent = '먼저 팀을 나눠 주세요.'; return; }
+  const text = tmLast.map((l, i) => TEAM_NAMES[i] + '팀: ' + l.join(', ')).join('\n');
+  try { await navigator.clipboard.writeText(text); $('#tm-msg').textContent = '복사했어요.'; } catch (_) { $('#tm-msg').textContent = '복사가 막혀 있어요. 화면을 캡처해 주세요.'; }
+};
+tmMeta();
+
+/* ---------- 색깔·방향 반응 훈련 ---------- */
+const ARROW = (deg) => `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8 L90 52 H64 V92 H36 V52 H10 Z" fill="currentColor" transform="rotate(${deg} 50 50)"/></svg>`;
+const RX_DEFAULT = [
+  { k: 'c', name: '빨강', c: '#d63a2a', on: true, act: '앞차기' },
+  { k: 'c', name: '파랑', c: '#2a62d6', on: true, act: '돌려차기' },
+  { k: 'c', name: '노랑', c: '#e9b520', on: true, act: '옆차기', light: true },
+  { k: 'c', name: '초록', c: '#2f9a5f', on: true, act: '지르기' },
+  { k: 'a', name: '위', deg: 0, on: false, act: '앞으로 이동' },
+  { k: 'a', name: '아래', deg: 180, on: false, act: '뒤로 이동' },
+  { k: 'a', name: '왼쪽', deg: 270, on: false, act: '왼쪽 막기' },
+  { k: 'a', name: '오른쪽', deg: 90, on: false, act: '오른쪽 막기' },
+];
+const rxSaved = store.get('pl-react', null);
+const rx = { items: RX_DEFAULT.map((d, i) => ({ ...d, ...(rxSaved && rxSaved.items && rxSaved.items[i] ? { on: !!rxSaved.items[i].on, act: String(rxSaved.items[i].act ?? d.act).slice(0, 20) } : {}) })),
+  min: rxSaved?.min ?? 2, max: rxSaved?.max ?? 4, cnt: rxSaved?.cnt ?? 20, sound: rxSaved?.sound ?? true };
+function rxSave() { store.set('pl-react', { items: rx.items.map((i) => ({ on: i.on, act: i.act })), min: rx.min, max: rx.max, cnt: rx.cnt, sound: rx.sound }); }
+const rxList = $('#rx-list');
+rx.items.forEach((it, i) => {
+  const row = document.createElement('div'); row.className = 'rx-row';
+  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = it.on; cb.setAttribute('aria-label', it.name + ' 신호 사용');
+  cb.onchange = () => { it.on = cb.checked; rxSave(); };
+  const sw = document.createElement('span'); sw.className = 'rx-sw'; sw.setAttribute('role', 'img'); sw.setAttribute('aria-label', it.name);
+  if (it.k === 'c') sw.style.setProperty('--c', it.c); else sw.innerHTML = ARROW(it.deg);
+  const tx = document.createElement('input'); tx.type = 'text'; tx.value = it.act; tx.maxLength = 20; tx.placeholder = '동작 이름'; tx.setAttribute('aria-label', it.name + ' 신호의 동작');
+  tx.oninput = () => { it.act = tx.value; rxSave(); };
+  row.append(cb, sw, tx);
+  if (i === 0 || i === 4) { const t = document.createElement('div'); t.className = 'rx-sec'; t.style.margin = '6px 0 0'; t.textContent = i === 0 ? '색깔 신호' : '방향 신호'; rxList.appendChild(t); }
+  rxList.appendChild(row);
+});
+$('#rx-min').value = rx.min; $('#rx-max').value = rx.max; $('#rx-cnt').value = rx.cnt; $('#rx-sound').checked = rx.sound;
+['rx-min', 'rx-max', 'rx-cnt'].forEach((id) => $('#' + id).addEventListener('change', () => {
+  rx.min = clamp(num($('#rx-min'), 2), 1, 30); rx.max = clamp(num($('#rx-max'), 4), rx.min, 60); rx.cnt = clamp(num($('#rx-cnt'), 20), 0, 500);
+  $('#rx-min').value = rx.min; $('#rx-max').value = rx.max; $('#rx-cnt').value = rx.cnt; rxSave();
+}));
+$('#rx-sound').onchange = () => { rx.sound = $('#rx-sound').checked; rxSave(); };
+$('#rx-full').onclick = () => { const el = $('#rx-stage'); try { (document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen && el.requestFullscreen()); } catch (_) {} };
+
+const rxRun = { on: false, t: 0, n: 0, last: -1 };
+const stage = $('#rx-stage');
+function rxShow(html, bg, light) { stage.innerHTML = html; stage.style.background = bg || ''; stage.classList.toggle('light', !!light); }
+window.rxStop = function (msg) {
+  rxRun.on = false; clearTimeout(rxRun.t);
+  $('#rx-go').textContent = '시작'; $('#rx-info').textContent = msg || '';
+  if (!msg) rxShow('<div class="rx-big" style="font-size:1.4rem;opacity:.7">시작을 누르면 신호가 나옵니다</div>');
+};
+function rxCue() {
+  if (!rxRun.on) return;
+  const pool = rx.items.map((it, i) => i).filter((i) => rx.items[i].on);
+  let pick = pool[Math.floor(Math.random() * pool.length)];
+  if (pool.length > 1) while (pick === rxRun.last) pick = pool[Math.floor(Math.random() * pool.length)];
+  rxRun.last = pick; rxRun.n++;
+  const it = rx.items[pick];
+  const act = esc(it.act.trim() || it.name);
+  if (it.k === 'c') rxShow(`<div class="cue"><div class="rx-big">${act}</div><div class="rx-small">${it.name}</div></div>`, it.c, it.light);
+  else rxShow(`<div class="cue">${ARROW(it.deg)}<div class="rx-big">${act}</div></div>`, '#1b1815');
+  if (rx.sound) beep(it.k === 'c' ? 880 : 660, 0.12);
+  $('#rx-info').textContent = rx.cnt ? `${rxRun.n} / ${rx.cnt}` : `${rxRun.n}번째`;
+  const wait = (rx.min + Math.random() * (rx.max - rx.min)) * 1000;
+  rxRun.t = setTimeout(() => { if (rx.cnt && rxRun.n >= rx.cnt) { window.rxStop('모두 끝났습니다.'); rxShow('<div class="rx-big">끝!</div><div class="rx-small">수고했어요</div>'); } else rxCue(); }, wait);
+}
+function esc(t) { return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+$('#rx-go').onclick = () => {
+  if (rxRun.on) { window.rxStop(); return; }
+  if (rx.items.filter((i) => i.on).length < 2) { $('#rx-info').textContent = '신호를 두 개 이상 체크해 주세요.'; return; }
+  audio(); rxRun.on = true; rxRun.n = 0; rxRun.last = -1; $('#rx-go').textContent = '멈추기'; $('#rx-info').textContent = '';
+  let c = 3;
+  const tick = () => {
+    if (!rxRun.on) return;
+    if (c > 0) { rxShow(`<div class="rx-big" style="font-size:clamp(5rem,30vw,9rem)">${c}</div><div class="rx-small">준비</div>`); if (rx.sound) beep(520, 0.1); c--; rxRun.t = setTimeout(tick, 900); }
+    else rxCue();
+  };
+  tick();
+};
 </script>
 </body>
 </html>
