@@ -175,11 +175,11 @@
           <div class="m-title" id="m-title"></div>
           <button id="m-play">▶ 재생</button><button id="m-stop">■ 정지</button>
           <label>음량 <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="음악 음량"></label>
-          <label><input type="checkbox" id="m-auto" checked> 음악과 연기 시간을 함께 움직이기</label>
+          <label><input type="checkbox" id="m-auto" checked> 음악과 시연 시간을 함께 움직이기</label>
         </div>
       </div>
       <div class="timer" id="timer">
-        <div class="tl">연기 시간</div>
+        <div class="tl">시연 시간</div>
         <div class="tv"><span id="t-val">0.0</span><small>초</small></div>
         <div class="tbar"><i id="t-bar"></i><b id="t-min"></b></div>
         <div class="tverdict" id="t-verdict"></div>
@@ -354,7 +354,7 @@
     $('cue-row').querySelectorAll('[data-cue]').forEach((b) => b.addEventListener('click', () => fireCue(b.dataset.cue)));
   }
 
-  /* ------------ 연기 시간 (스톱워치) ------------ */
+  /* ------------ 시연 시간 (스톱워치) ------------ */
   const LIM_DEF = kind === 'recognized' ? { min: 0, max: 90 } : { min: 0, max: 100 };
   let lim = { ...LIM_DEF };
   try { const sv = JSON.parse(localStorage.getItem('tkd-lim-' + kind) || 'null'); if (sv && sv.max > 0) lim = sv; } catch (_) {}
@@ -476,7 +476,7 @@
       if (auKey === k) { mStop(); auKey = null; } await musicDB.del(k).catch(() => {}); trackCache.delete(k); renderMusicSetup(); musicRefresh();
     }));
   }
-  // 음악과 연기 시간은 서로 따라 움직임: 음악 재생 → 시간 시작 / 일시정지 → 시간 정지 / 끝남 → 시간 정지
+  // 음악과 시연 시간은 서로 따라 움직임: 음악 재생 → 시간 시작 / 일시정지 → 시간 정지 / 끝남 → 시간 정지
   const linked = () => kind === 'freestyle' && $('m-auto').checked && !!S && S.phase === 'running' && !!curKey() && auKey === curKey();
   au.addEventListener('play', () => { musicBarState(); if (linked() && !tRun) timerStart(); });
   au.addEventListener('pause', () => { musicBarState(); if (linked() && tRun) timerStop(); });
