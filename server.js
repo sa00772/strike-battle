@@ -124,6 +124,14 @@ function loadOrCreateCert(ips) {
 
 /* ------------------------------ 서버 ------------------------------ */
 const app = express();
+app.disable('x-powered-by');
+app.use((_req, res, next) => {                        // 기본 보안 헤더
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  if (USE_HTTP) res.setHeader('Strict-Transport-Security', 'max-age=15552000');   // 클라우드(HTTPS 프록시) 배포에서만
+  next();
+});
 members.mount(app, express);
 app.use(express.static(path.join(__dirname, 'public')));
 
