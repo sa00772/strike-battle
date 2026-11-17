@@ -25,7 +25,10 @@ const DEFAULT_ROUND_SEC = Number(process.env.ROUND_SEC) || 180; // 라운드 기
 const DEFAULT_REST_SEC = Number(process.env.REST_SEC) || 60;    // 휴식 기본 1분
 const ALLOWED_DURATIONS = [180, 90, 60, 30];                        // 선택 가능한 시간: 3분 / 1분 / 30초
 const HIT_MIN_INTERVAL_MS = 250;                                // 서버측 연타 방지
-const TEAMS = ['blue', 'red'];
+const TEAMS = ['blue', 'red'];                                   // 2팀 대결 게임(판 뒤집기·피구)
+const ALL_TEAMS = ['blue', 'red', 'violet', 'amber'];            // 타격 대결·반응속도: 최대 4팀
+const DEFAULT_TEAM_NAMES = { blue: '1팀', red: '2팀', violet: '3팀', amber: '4팀' };
+const MAX_TEAM_NAME = 8;
 const ROOM_ID_RE = /^[A-Z0-9]{4,12}$/;
 const EMPTY_ROOM_TTL_MS = 30 * 60 * 1000;                       // 접속자가 없는 방은 30분 뒤 삭제
 
@@ -144,21 +147,25 @@ const FLIP_DEFAULT_ROUND_SEC = 90;                       // 판 뒤집기 기본
 const MISSION_SOUNDS = ['alarm', 'cheer', 'wrong', 'none'];
 const DODGE_MODES = ['survival', 'score'];               // 생존 피구(아웃/부활) | 점수 피구(맞추면 득점)
 const DODGE_EVENTS = ['revive', 'freeze', 'thaw'];      // 전체 부활 | 얼음! | 땡!
-const newDodge = () => ({ mode: 'survival', frozen: false, over: null });
+const DODGE_DEFAULT_SIZE = 5, DODGE_MAX_SIZE = 30;
+const newDodge = () => ({ mode: 'survival', frozen: false, over: null,
+  counts: { blue: { total: DODGE_DEFAULT_SIZE, alive: DODGE_DEFAULT_SIZE }, red: { total: DODGE_DEFAULT_SIZE, alive: DODGE_DEFAULT_SIZE } } });
 const newFlip = () => ({ tiles: Array(FLIP_TILES).fill('0') });   // '0' 비어 있음, 'b' 청, 'r' 홍
 const newMission = () => ({ active: false, text: '', sec: 10, sound: 'alarm', phoneSound: false, endsAt: 0, wasRunning: false });
 const NEON_COLORS = [{ name: '초록', hex: '#22c55e' }];   // 신호는 항상 초록불
 const NEON_WAIT_MIN_MS = 2000, NEON_WAIT_MAX_MS = 5000;  // 신호가 뜨기까지 무작위 대기
 const NEON_GO_TIMEOUT_MS = 3000;                         // 신호 후 아무도 안 누르면 무효
 const NEON_RESULT_MS = 1800;                             // 결과 표시 시간
-const newNeon = () => ({ phase: 'idle', roundNo: 0, nextAt: 0, goAt: 0, resultUntil: 0, color: null, last: null, best: { blue: null, red: null } });
+const newNeon = () => ({ phase: 'idle', roundNo: 0, nextAt: 0, goAt: 0, resultUntil: 0, color: null, last: null, best: { blue: null, red: null, violet: null, amber: null } });
 
 function getOrCreateRoom(id) {
   let room = rooms.get(id);
   if (!room) {
     room = {
       id,
-      scores: { blue: 0, red: 0 },
+      scores: { blue: 0, red: 0, violet: 0, amber: 0 },
+      teamCount: 2,
+      teamNames: { ...DEFAULT_TEAM_NAMES },
       roundSec: DEFAULT_ROUND_SEC,
       restSec: DEFAULT_REST_SEC,
       game: {
@@ -201,34 +208,36 @@ function publicState(room) {
 }
 function connectedCounts(room) {
   const size = (name) => io.sockets.adapter.rooms.get(rn(room, name))?.size || 0;
-  return {
-    blue: size('team:blue'),
-    red: size('team:red'),
-  };
+  const out = {};
+  for (const t of ALL_TEAMS) out[t] = size(`team:${t}`);
+  out.ref = size('ref');
+  return out;
 }
+const ROOM_PARTS = ['scoreboard', 'ref', ...ALL_TEAMS.map((t) => `team:${t}`)];
 const roomSocketCount = (room) =>
-  ['scoreboard', 'team:blue', 'team:red']
-    .reduce((n, name) => n + (io.sockets.adapter.rooms.get(rn(room, name))?.size || 0), 0);
+  ROOM_PARTS.reduce((n, name) => n + (io.sockets.adapter.rooms.get(rn(room, name))?.size || 0), 0);
 
 // 인증을 통과해 해당 경기방에 들어온 소켓에게만 전송
-const toJoined = (room, event, data) =>
-  io.to(rn(room, 'scoreboard')).to(rn(room, 'team:blue')).to(rn(room, 'team:red')).emit(event, data);
-
-// 피구: 접속한 선수 기기마다 생존 여부(socket.data.alive)를 들고 있고, 인원수는 접속 기기 수
-const teamSockets = (room, team) =>
-  [...(io.sockets.adapter.rooms.get(rn(room, `team:${team}`)) || [])]
-    .map((id) => io.sockets.sockets.get(id)).filter(Boolean);
-const dodgeSnapshot = (room) => {
-  const teams = {};
-  for (const t of TEAMS) {
-    const list = teamSockets(room, t);
-    teams[t] = { total: list.length, alive: list.filter((x) => x.data.alive !== false).length };
-  }
-  return { mode: room.dodge.mode, frozen: room.dodge.frozen, over: room.dodge.over, teams, scores: { ...room.scores } };
+const toJoined = (room, event, data) => {
+  let b = io;
+  for (const name of ROOM_PARTS) b = b.to(rn(room, name));
+  b.emit(event, data);
 };
+
+// 이 방에서 실제로 쓰는 팀 (타격·반응속도: 설정한 팀 수, 그 외 2팀)
+const activeTeams = (room) =>
+  (room.gameType === 'strike' || room.gameType === 'neon') ? ALL_TEAMS.slice(0, room.teamCount) : TEAMS;
+const roomConfig = (room) => ({ gameType: room.gameType, teamCount: room.teamCount, teams: ALL_TEAMS.slice(0, room.teamCount), names: { ...room.teamNames } });
+const emitConfig = (room) => toJoined(room, 'room:config', roomConfig(room));
+const zeroScores = (room) => { for (const t of ALL_TEAMS) room.scores[t] = 0; };
+
+// 피구: 심판이 팀별 인원/점수를 직접 조작 (선수 기기는 접속하지 않음)
+const dodgeSnapshot = (room) => ({
+  mode: room.dodge.mode, frozen: room.dodge.frozen, over: room.dodge.over,
+  teams: { blue: { ...room.dodge.counts.blue }, red: { ...room.dodge.counts.red } }, scores: { ...room.scores },
+});
 const emitDodge = (room) => toJoined(room, 'dodge:state', dodgeSnapshot(room));
-const emitDodgeMe = (sock) => sock.emit('dodge:me', { alive: sock.data.alive !== false });
-// 생존 피구: 인원이 있는 한 팀이 전멸하면 상대 팀 승리 (점수판이 알림)
+// 생존 피구: 인원이 있는 한 팀이 전멸하면 상대 팀 승리
 function checkDodgeOver(room) {
   if (room.gameType !== 'dodge' || room.dodge.mode !== 'survival' || room.dodge.over) return;
   const { teams } = dodgeSnapshot(room);
@@ -241,9 +250,10 @@ function checkDodgeOver(room) {
 }
 function resetDodge(room, keepMode = true) {
   const mode = room.dodge.mode;
+  const sizes = { blue: room.dodge.counts.blue.total, red: room.dodge.counts.red.total };
   room.dodge = newDodge();
   if (keepMode) room.dodge.mode = mode;
-  for (const t of TEAMS) for (const x of teamSockets(room, t)) { x.data.alive = true; emitDodgeMe(x); }
+  for (const t of TEAMS) room.dodge.counts[t] = { total: sizes[t], alive: sizes[t] };
   emitDodge(room);
 }
 
@@ -265,8 +275,7 @@ const flipSnapshot = (room) => ({ tiles: room.flip.tiles.join(''), ...flipCounts
 const emitFlip = (room) => toJoined(room, 'flip:state', flipSnapshot(room));
 function resetFlip(room) {
   room.flip = newFlip();
-  room.scores.blue = 0;
-  room.scores.red = 0;
+  zeroScores(room);
   emitFlip(room);
 }
 
@@ -299,7 +308,6 @@ function emitState(room) {
 const emitScores = (room, lastHit = null) => toJoined(room, 'score:update', { ...room.scores, lastHit });
 const emitCounts = (room) => {
   io.to(rn(room, 'scoreboard')).emit('team:count', connectedCounts(room));
-  if (room.gameType === 'dodge') { checkDodgeOver(room); emitDodge(room); }
 };
 
 function finishTimer(room) {
@@ -308,13 +316,16 @@ function finishTimer(room) {
   g.running = false;
   g.remainingMs = 0;
   g.finished = true;
-  let { blue, red } = room.scores;
+  const teams = activeTeams(room);
+  const scores = {};
+  for (const t of teams) scores[t] = room.scores[t];
   if (room.gameType === 'dodge' && room.dodge.mode === 'survival') {          // 생존 피구: 살아남은 인원이 많은 팀이 승리
-    const { teams } = dodgeSnapshot(room);
-    blue = teams.blue.alive; red = teams.red.alive;
+    for (const t of TEAMS) scores[t] = room.dodge.counts[t].alive;
   }
-  const winner = blue === red ? 'draw' : blue > red ? 'blue' : 'red';
-  toJoined(room, 'timer:end', { mode: finishedMode, scores: { blue, red }, winner });
+  const top = Math.max(...teams.map((t) => scores[t]));
+  const leaders = teams.filter((t) => scores[t] === top);
+  const winner = leaders.length === 1 ? leaders[0] : 'draw';
+  toJoined(room, 'timer:end', { mode: finishedMode, scores, winner });
   emitState(room);
 }
 
@@ -408,13 +419,14 @@ io.on('connection', (socket) => {
         room.neon = newNeon();
         room.flip = newFlip();
         room.dodge = newDodge();
+        zeroScores(room);
         room.roundSec = payload.game === 'flip' ? FLIP_DEFAULT_ROUND_SEC : DEFAULT_ROUND_SEC;
         if (!room.game.running && room.game.mode === 'round') room.game.remainingMs = room.roundSec * 1000;
       }
       socket.data.role = 'scoreboard';
       socket.join(rn(room, 'scoreboard'));
       socket.emit('join:result', { ok: true, role: 'scoreboard', room: roomId, accessCode: ACCESS_CODE || null });
-    } else if (TEAMS.includes(payload.team)) {
+    } else if (payload.role === 'referee') {
       if (ACCESS_CODE) {
         if (!payload.code) return reject('code-required');
         if (!safeEqual(payload.code, ACCESS_CODE)) { recordFail(ip); return reject('bad-code'); }
@@ -422,9 +434,20 @@ io.on('connection', (socket) => {
       }
       room = rooms.get(roomId);
       if (!room) return reject('no-room');
+      socket.data.role = 'referee';
+      socket.join(rn(room, 'ref'));
+      socket.emit('join:result', { ok: true, role: 'referee', room: roomId });
+    } else if (ALL_TEAMS.includes(payload.team)) {
+      if (ACCESS_CODE) {
+        if (!payload.code) return reject('code-required');
+        if (!safeEqual(payload.code, ACCESS_CODE)) { recordFail(ip); return reject('bad-code'); }
+        failures.delete(ip);
+      }
+      room = rooms.get(roomId);
+      if (!room) return reject('no-room');
+      if (!activeTeams(room).includes(payload.team)) return reject('no-team');
       socket.data.role = 'pad';
       socket.data.team = payload.team;
-      socket.data.alive = true;
       socket.join(rn(room, `team:${payload.team}`));
       socket.emit('join:result', { ok: true, role: socket.data.role, team: payload.team, room: roomId });
     } else {
@@ -435,7 +458,7 @@ io.on('connection', (socket) => {
     socket.emit('game:state', publicState(room));
     socket.emit('score:update', { ...room.scores, lastHit: null });
     socket.emit('dodge:state', dodgeSnapshot(room));
-    emitDodgeMe(socket);
+    socket.emit('room:config', roomConfig(room));
     socket.emit('neon:state', neonSnapshot(room));
     socket.emit('room:game', room.gameType);
     socket.emit('flip:state', flipSnapshot(room));
@@ -449,9 +472,7 @@ io.on('connection', (socket) => {
     const room = roomOf(socket);
     const team = socket.data.team;
     if (!room || socket.data.role !== 'pad' || !team) return reply({ accepted: false, reason: 'no-team' });
-    const dodgeScore = room.gameType === 'dodge' && room.dodge.mode === 'score';
-    if (room.gameType !== 'strike' && !dodgeScore) return reply({ accepted: false, reason: 'wrong-game' });
-    if (dodgeScore && room.dodge.frozen) return reply({ accepted: false, reason: 'frozen' });
+    if (room.gameType !== 'strike') return reply({ accepted: false, reason: 'wrong-game' });
 
     const now = Date.now();
     if (now - (socket.data.lastHit || 0) < HIT_MIN_INTERVAL_MS) {
@@ -472,6 +493,47 @@ io.on('connection', (socket) => {
     const room = roomOf(socket);
     if (room) fn(room, ...args);
   };
+
+  // 피구 심판(또는 점수판)만 허용
+  const onlyControl = (fn) => (...args) => {
+    if (socket.data.role !== 'scoreboard' && socket.data.role !== 'referee') return;
+    const room = roomOf(socket);
+    if (room && room.gameType === 'dodge') fn(room, ...args);
+  };
+
+  // 점수판 → 서버: 팀 수(2~4)와 팀 이름 설정 (타격 대결·반응속도)
+  socket.on('room:setTeams', onlyScoreboard((room, p = {}) => {
+    if (room.gameType !== 'strike' && room.gameType !== 'neon') return;
+    const oldCount = room.teamCount;
+    if (p.count !== undefined) {
+      const c = Math.round(Number(p.count));
+      if (c >= 2 && c <= 4) room.teamCount = c;
+    }
+    if (p.names && typeof p.names === 'object') {
+      for (const t of ALL_TEAMS) {
+        if (typeof p.names[t] !== 'string') continue;
+        const nm = p.names[t].replace(/\s+/g, ' ').trim().slice(0, MAX_TEAM_NAME).trim();
+        room.teamNames[t] = nm || DEFAULT_TEAM_NAMES[t];
+      }
+    }
+    if (room.teamCount < oldCount) {                    // 줄어든 팀의 기기는 내보내고 점수 초기화
+      for (const t of ALL_TEAMS.slice(room.teamCount)) {
+        for (const id of [...(io.sockets.adapter.rooms.get(rn(room, `team:${t}`)) || [])]) {
+          const x = io.sockets.sockets.get(id);
+          if (!x) continue;
+          x.emit('room:kicked', { reason: 'team-removed' });
+          x.leave(rn(room, `team:${t}`));
+          x.data.role = null; x.data.team = null;
+        }
+        room.scores[t] = 0;
+        room.neon.best[t] = null;
+      }
+      emitScores(room, null);
+      emitNeon(room);
+    }
+    emitConfig(room);
+    io.to(rn(room, 'scoreboard')).emit('team:count', connectedCounts(room));
+  }));
 
   // 모바일 → 서버: 판 뒤집기. 눌린 칸을 내 팀 색으로 뒤집고, 점유한 칸 수가 곧 점수
   socket.on('flip', (payload = {}, ack) => {
@@ -550,29 +612,12 @@ io.on('connection', (socket) => {
     reply({ accepted: true, ms });
   });
 
-  // 피구(생존): 내가 공에 맞아 아웃. 얼음 상태나 경기 중이 아닐 땐 무시
-  socket.on('dodge:out', (_payload, ack) => {
-    const reply = typeof ack === 'function' ? ack : () => {};
-    const room = roomOf(socket);
-    if (!room || socket.data.role !== 'pad') return reply({ accepted: false, reason: 'no-team' });
-    if (room.gameType !== 'dodge' || room.dodge.mode !== 'survival') return reply({ accepted: false, reason: 'wrong-game' });
-    if (room.dodge.frozen) return reply({ accepted: false, reason: 'frozen' });
-    if (!(room.game.running && room.game.mode === 'round')) return reply({ accepted: false, reason: 'inactive' });
-    if (socket.data.alive === false) return reply({ accepted: false, reason: 'already-out' });
-    socket.data.alive = false;
-    emitDodgeMe(socket);
-    emitDodge(room);
-    checkDodgeOver(room);
-    if (room.dodge.over) emitDodge(room);
-    reply({ accepted: true });
-  });
-
-  // 피구 전용 이벤트 (점수판): 전체 부활 / 얼음! / 땡!
-  socket.on('dodge:event', onlyScoreboard((room, type) => {
-    if (room.gameType !== 'dodge' || !DODGE_EVENTS.includes(type)) return;
+  // 피구 전용 이벤트 (심판/점수판): 전체 부활 / 얼음! / 땡!
+  socket.on('dodge:event', onlyControl((room, type) => {
+    if (!DODGE_EVENTS.includes(type)) return;
     if (type === 'revive') {
       room.dodge.over = null;
-      for (const t of TEAMS) for (const x of teamSockets(room, t)) { x.data.alive = true; emitDodgeMe(x); }
+      for (const t of TEAMS) room.dodge.counts[t].alive = room.dodge.counts[t].total;
     } else {
       room.dodge.frozen = type === 'freeze';
     }
@@ -581,29 +626,40 @@ io.on('connection', (socket) => {
   }));
 
   // 피구 모드 전환: 생존 피구 ↔ 점수 피구 (점수·생존 상태 초기화)
-  socket.on('dodge:mode', onlyScoreboard((room, mode) => {
-    if (room.gameType !== 'dodge' || !DODGE_MODES.includes(mode)) return;
+  socket.on('dodge:mode', onlyControl((room, mode) => {
+    if (!DODGE_MODES.includes(mode)) return;
     room.dodge.mode = mode;
-    room.scores.blue = 0; room.scores.red = 0;
+    zeroScores(room);
     emitScores(room, null);
     resetDodge(room);
   }));
 
-  // 점수판에서 보정: 생존 피구는 ±1명(아웃/부활), 점수 피구는 ±1점
-  socket.on('dodge:adjust', onlyScoreboard((room, payload = {}) => {
+  // 심판/점수판 보정: 생존 피구는 생존 인원 ±1(아웃/부활), 점수 피구는 ±1점
+  socket.on('dodge:adjust', onlyControl((room, payload = {}) => {
     const { team, delta } = payload;
-    if (room.gameType !== 'dodge' || !TEAMS.includes(team) || (delta !== 1 && delta !== -1)) return;
+    if (!TEAMS.includes(team) || (delta !== 1 && delta !== -1)) return;
     if (room.dodge.mode === 'score') {
       room.scores[team] = Math.max(0, room.scores[team] + delta);
       emitScores(room, delta > 0 ? team : null);
     } else {
-      const list = teamSockets(room, team);
-      const target = delta < 0 ? list.find((x) => x.data.alive !== false) : list.find((x) => x.data.alive === false);
-      if (!target) return;
-      target.data.alive = delta > 0;
+      const c = room.dodge.counts[team];
+      if (delta < 0 && room.dodge.frozen) return;
+      c.alive = Math.min(c.total, Math.max(0, c.alive + delta));
       if (delta > 0) room.dodge.over = null;
-      emitDodgeMe(target);
     }
+    emitDodge(room);
+    checkDodgeOver(room);
+    if (room.dodge.over) emitDodge(room);
+  }));
+
+  // 피구 팀 인원수 설정 (±1)
+  socket.on('dodge:size', onlyControl((room, payload = {}) => {
+    const { team, delta } = payload;
+    if (!TEAMS.includes(team) || (delta !== 1 && delta !== -1)) return;
+    const c = room.dodge.counts[team];
+    c.total = Math.min(DODGE_MAX_SIZE, Math.max(0, c.total + delta));
+    c.alive = delta > 0 ? Math.min(c.total, c.alive + 1) : Math.min(c.alive, c.total);
+    if (delta > 0) room.dodge.over = null;
     emitDodge(room);
     checkDodgeOver(room);
     if (room.dodge.over) emitDodge(room);
@@ -640,8 +696,7 @@ io.on('connection', (socket) => {
     g.running = false;
     g.finished = false;
     g.remainingMs = durationMs(room, g.mode);
-    room.scores.blue = 0;
-    room.scores.red = 0;
+    zeroScores(room);
     room.neon = newNeon();
     emitNeon(room);
     resetFlip(room);
@@ -676,8 +731,7 @@ io.on('connection', (socket) => {
 
   socket.on('score:reset', onlyScoreboard((room) => {
     if (room.gameType === 'flip') resetFlip(room);
-    room.scores.blue = 0;
-    room.scores.red = 0;
+    zeroScores(room);
     emitScores(room, null);
     if (room.gameType === 'dodge') resetDodge(room);
   }));

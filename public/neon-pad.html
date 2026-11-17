@@ -9,6 +9,8 @@
   :root { --bg: #1c1f27; --bg-deep: #101218; --ink: #fff; --font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
   body[data-team="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
   body[data-team="red"]  { --bg: #ff4536; --bg-deep: #8c1409; }
+  body[data-team="violet"] { --bg: #8b5cf6; --bg-deep: #3b1c8c; }
+  body[data-team="amber"]  { --bg: #f59e0b; --bg-deep: #7a4a00; }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
   body {
@@ -94,8 +96,8 @@
   const params = new URLSearchParams(location.search);
   const team = params.get('team');
   const room = (params.get('room') || '').toUpperCase();
-  const TEAM_LABEL = { blue: '청팀', red: '홍팀' };
-  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536' };
+  const TEAM_LABEL = { blue: '1팀', red: '2팀', violet: '3팀', amber: '4팀' };
+  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536', violet: '#8b5cf6', amber: '#f59e0b' };
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const fmtMs = (ms) => `${(ms / 1000).toFixed(3)}초`;
 
@@ -141,7 +143,7 @@
       sub.textContent = '먼저 누르세요!';
     } else if (n.phase === 'result') {
       if (n.last && n.last.team === team) { main.textContent = '우리 팀 +1!'; sub.textContent = fmtMs(n.last.ms); }
-      else if (n.last && n.last.team) { main.textContent = '아쉬워요'; sub.textContent = '상대 팀이 먼저 눌렀어요'; }
+      else if (n.last && n.last.team) { main.textContent = '아쉬워요'; sub.textContent = `${TEAM_LABEL[n.last.team]}이(가) 먼저 눌렀어요`; }
       else { main.textContent = '시간 초과'; sub.textContent = '아무도 누르지 않았어요'; }
     } else {
       main.textContent = '잠시 후 신호';
@@ -157,6 +159,14 @@
   const joinNow = () => socket.emit('join', { team, code: accessCode, room });
   const GATE_MSG = { 'bad-code': '참가 코드가 맞지 않습니다.', 'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.', 'code-required': '' };
 
+  // 방 설정(팀 이름·팀 수) 수신
+  let cfgTeams = ['blue', 'red'];
+  socket.on('room:config', (c) => {
+    Object.assign(TEAM_LABEL, c.names || {}); cfgTeams = c.teams || cfgTeams;
+    if (team && TEAM_LABEL[team]) { $('team-name').textContent = TEAM_LABEL[team]; document.title = `${TEAM_LABEL[team]} 반응속도`; }
+    if (window.__lastScore) window.__lastScore();
+  });
+  socket.on('room:kicked', () => { document.body.classList.add('no-room'); });
   socket.on('connect', () => { if (TEAM_LABEL[team] && room) joinNow(); });
   socket.on('disconnect', () => { $('tap-main').textContent = '재연결 중'; $('tap-sub').textContent = ''; });
   socket.on('join:result', (r) => {
@@ -188,7 +198,7 @@
     lastPhase = n.phase;
     render();
   });
-  socket.on('score:update', (s) => { $('scoreline').textContent = `청 ${s.blue} : ${s.red} 홍`; });
+  socket.on('score:update', (s) => { window.__lastScore = () => $('scoreline').textContent = cfgTeams.map((t) => `${TEAM_LABEL[t]} ${s[t] || 0}`).join(' : '); window.__lastScore(); });
   setInterval(() => { if (game && game.running) render(); }, 500);
 
   /* ---------------------- 터치 ---------------------- */

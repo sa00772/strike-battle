@@ -15,6 +15,8 @@
   }
   body[data-team="blue"] { --bg: #2f6bff; --bg-deep: #0b2a86; }
   body[data-team="red"]  { --bg: #ff4536; --bg-deep: #8c1409; }
+  body[data-team="violet"] { --bg: #8b5cf6; --bg-deep: #3b1c8c; }
+  body[data-team="amber"]  { --bg: #f59e0b; --bg-deep: #7a4a00; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -179,8 +181,8 @@
   const params = new URLSearchParams(location.search);
   const team = params.get('team');
   const room = (params.get('room') || '').toUpperCase();
-  const TEAM_LABEL = { blue: '청팀', red: '홍팀' };
-  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536' };
+  const TEAM_LABEL = { blue: '1팀', red: '2팀', violet: '3팀', amber: '4팀' };
+  const TEAM_COLOR = { blue: '#2f6bff', red: '#ff4536', violet: '#8b5cf6', amber: '#f59e0b' };
   const COOLDOWN_MS = 300;     // 중복 카운트 방지 쿨타임 (0.3초)
   const METER_MAX = 60;        // 미터 표시 최대값 (m/s²)
 
@@ -249,6 +251,14 @@
     'code-required': '',
   };
   if (TEAM_LABEL[team] && !room) document.body.classList.add('no-room');
+  // 방 설정(팀 이름·팀 수) 수신
+  let cfgTeams = ['blue', 'red'];
+  socket.on('room:config', (c) => {
+    Object.assign(TEAM_LABEL, c.names || {}); cfgTeams = c.teams || cfgTeams;
+    if (team && TEAM_LABEL[team]) { $('team-name').textContent = TEAM_LABEL[team]; document.title = `${TEAM_LABEL[team]} 타격 패드`; }
+    if (window.__lastScore) window.__lastScore();
+  });
+  socket.on('room:kicked', () => { document.body.classList.add('no-room'); });
   socket.on('connect', () => { if (TEAM_LABEL[team] && room) joinNow(); });
   socket.on('join:result', (r) => {
     if (r.ok) {
@@ -269,13 +279,14 @@
   $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
   socket.on('disconnect', () => { $('status').textContent = '연결 끊김 - 재연결 중'; });
   socket.on('game:state', (s) => { game = s; renderStatus(); });
+  const socketScore = (s) => { socket.listeners('score:update')[0](s); };
   socket.on('score:update', (s) => {
     if (!TEAM_LABEL[team]) return;
-    const other = team === 'blue' ? 'red' : 'blue';
+    window.__lastScore = () => socketScore(s);
     const el = $('my-score');
     const changed = el.textContent !== String(s[team]);
     el.textContent = s[team];
-    $('vs').textContent = `상대(${TEAM_LABEL[other]}) ${s[other]}점`;
+    $('vs').textContent = '상대  ' + cfgTeams.filter((t) => t !== team).map((t) => `${TEAM_LABEL[t]} ${s[t] || 0}점`).join(' · ');
     if (changed && s[team] > 0) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
   });
 

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1c1f27">
+<title>피구 심판 - 플레이 라운지</title>
+<style>
+  :root { --font: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: var(--font); color: #fff; background: #1c1f27; min-height: 100%; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  body.frozen { background: linear-gradient(170deg, #1c5a8c, #11141b); }
+  .app { max-width: 520px; margin: 0 auto; padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .title { font-weight: 900; font-size: 1.1rem; }
+  .timer { font-size: 2rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .tag { font-size: .85rem; font-weight: 800; padding: .25em .8em; border-radius: 999px; background: rgba(255,255,255,.14); }
+  .frozen-bar { display: none; text-align: center; font-weight: 900; background: #bfe8ff; color: #0b3a5a; padding: .5em; border-radius: 12px; }
+  body.frozen .frozen-bar { display: block; }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card { border-radius: 22px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .card.blue { background: linear-gradient(165deg, #2f6bff, #0b2a86); } .card.red { background: linear-gradient(195deg, #ff4536, #8c1409); }
+  .card h2 { font-size: 1.2rem; font-weight: 900; }
+  .num { font-size: 4.6rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .sub { font-size: .85rem; opacity: .9; font-weight: 700; min-height: 1.2em; }
+  .pm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  button { font: inherit; font-weight: 900; font-size: 1.5rem; border: 0; border-radius: 16px; color: #fff; background: rgba(0,0,0,.28); padding: .55em 0; }
+  button:active { transform: scale(.96); } button:disabled { opacity: .4; }
+  .pm button.plus { background: rgba(255,255,255,.3); }
+  .size { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px; align-items: center; width: 100%; font-size: .75rem; font-weight: 700; }
+  .size button { font-size: 1rem; padding: .35em 0; }
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .row.two { grid-template-columns: 1fr 1fr; }
+  .row button { font-size: 1.05rem; padding: .8em .2em; background: rgba(255,255,255,.14); }
+  .ev-revive { background: rgba(70,200,130,.55) !important; } .ev-freeze { background: rgba(90,170,235,.6) !important; } .ev-thaw { background: rgba(255,170,60,.6) !important; }
+  .mode.active { background: #fff; color: #11141b; }
+  .cap { font-size: .8rem; opacity: .7; font-weight: 700; }
+  .gate, .noroom { display: none; flex-direction: column; gap: 14px; align-items: center; text-align: center; margin-top: 12vh; line-height: 1.5; }
+  body.need-code .gate, body.no-room .noroom { display: flex; } body.need-code .main, body.no-room .main { display: none; }
+  .gate input { width: 100%; font: inherit; font-size: 1.5rem; text-align: center; padding: .7em; border-radius: 14px; border: 0; background: #fff; color: #11141b; user-select: text; -webkit-user-select: text; }
+  .gate button { width: 100%; background: #fff; color: #11141b; }
+  .over { display: none; text-align: center; font-size: 1.4rem; font-weight: 900; padding: .8em; border-radius: 16px; background: #fff; color: #11141b; } .over.show { display: block; }
+  .ev { position: fixed; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+  .ev.show { display: flex; } .ev .big { font-size: clamp(3rem, 18vw, 6rem); font-weight: 900; }
+  .ev.revive { background: rgba(46,204,113,.92); } .ev.freeze { background: rgba(80,170,230,.94); } .ev.thaw { background: rgba(255,170,40,.94); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="noroom"><p style="font-size:1.3rem;font-weight:800">경기방을 찾을 수 없습니다</p><p>점수판의 심판 QR을 다시 스캔해 주세요.<br>점수판이 열려 있으면 자동으로 다시 연결합니다.</p></div>
+  <div class="gate">
+    <p style="font-size:1.2rem;font-weight:800">참가 코드를 입력하세요</p>
+    <input id="code-input" type="text" autocomplete="off" maxlength="30" placeholder="참가 코드" aria-label="참가 코드">
+    <button id="code-btn">입장하기</button>
+    <div id="gate-msg" role="alert"></div>
+  </div>
+  <div class="main" style="display:contents">
+    <div class="top"><div class="title">🧑‍⚖️ 피구 심판</div><span class="tag" id="tag">연결 중</span><div class="timer" id="timer">3:00</div></div>
+    <div class="frozen-bar">❄ 얼음 상태 — 땡을 누르면 해제</div>
+    <div class="over" id="over"></div>
+    <div class="teams">
+      <section class="card blue">
+        <h2>청팀</h2><div class="num" id="n-blue">0</div><div class="sub" id="s-blue"></div>
+        <div class="pm"><button data-team="blue" data-d="-1" class="adj">−1</button><button data-team="blue" data-d="1" class="adj plus">+1</button></div>
+        <div class="size"><span>인원</span><button data-team="blue" data-d="-1" class="sz">−</button><button data-team="blue" data-d="1" class="sz">+</button></div>
+      </section>
+      <section class="card red">
+        <h2>홍팀</h2><div class="num" id="n-red">0</div><div class="sub" id="s-red"></div>
+        <div class="pm"><button data-team="red" data-d="-1" class="adj">−1</button><button data-team="red" data-d="1" class="adj plus">+1</button></div>
+        <div class="size"><span>인원</span><button data-team="red" data-d="-1" class="sz">−</button><button data-team="red" data-d="1" class="sz">+</button></div>
+      </section>
+    </div>
+    <div class="cap" id="adj-cap"></div>
+    <div class="cap">피구 이벤트</div>
+    <div class="row">
+      <button class="ev-revive" data-ev="revive">🔄 전체 부활</button>
+      <button class="ev-freeze" data-ev="freeze">❄ 얼음!</button>
+      <button class="ev-thaw" data-ev="thaw">🔔 땡!</button>
+    </div>
+    <div class="cap">피구 모드</div>
+    <div class="row two"><button class="mode" data-mode="survival">생존 피구</button><button class="mode" data-mode="score">점수 피구</button></div>
+  </div>
+</div>
+<div class="ev" id="ev" role="alert"><div class="big" id="ev-big"></div></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const room = (params.get('room') || '').toUpperCase();
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  if (!room) document.body.classList.add('no-room');
+  let game = null, dodge = null, scores = { blue: 0, red: 0 };
+  const survival = () => !dodge || dodge.mode === 'survival';
+
+  function render() {
+    if (game) $('timer').textContent = fmt(game.remainingSec);
+    document.body.classList.toggle('frozen', !!(dodge && dodge.frozen));
+    if (!dodge) return;
+    const sv = survival();
+    $('tag').textContent = sv ? '생존 피구' : '점수 피구';
+    ['blue', 'red'].forEach((t) => {
+      $('n-' + t).textContent = sv ? dodge.teams[t].alive : scores[t];
+      $('s-' + t).textContent = sv ? `생존 / 전체 ${dodge.teams[t].total}명` : `선수 ${dodge.teams[t].total}명`;
+    });
+    document.querySelectorAll('.size').forEach((el) => { el.style.display = sv ? '' : 'none'; });
+    $('adj-cap').textContent = sv ? '맞은(아웃) 팀은 −1, 부활은 +1' : '명중한 팀에 +1점 (실수는 −1)';
+    document.querySelectorAll('.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === dodge.mode));
+    const ov = $('over');
+    ov.classList.toggle('show', !!dodge.over);
+    if (dodge.over) ov.textContent = dodge.over === 'draw' ? '무승부' : `${dodge.over === 'blue' ? '청팀' : '홍팀'} 승리!`;
+  }
+
+  const socket = io();
+  let code = ''; try { code = localStorage.getItem('strike-code') || ''; } catch (_) {}
+  const joinNow = () => socket.emit('join', { role: 'referee', code, room });
+  socket.on('connect', () => { if (room) joinNow(); });
+  socket.on('join:result', (r) => {
+    if (r.ok) { document.body.classList.remove('need-code', 'no-room'); try { localStorage.setItem('strike-code', code); } catch (_) {} }
+    else if (r.reason === 'no-room' || r.reason === 'bad-room') { document.body.classList.remove('need-code'); document.body.classList.add('no-room'); if (r.reason === 'no-room') setTimeout(joinNow, 3000); }
+    else {
+      if (r.reason === 'bad-code') { code = ''; try { localStorage.removeItem('strike-code'); } catch (_) {} }
+      document.body.classList.add('need-code');
+      $('gate-msg').textContent = r.reason === 'bad-code' ? '참가 코드가 맞지 않습니다.' : r.reason === 'rate-limited' ? '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.' : '';
+    }
+  });
+  const submit = () => { code = $('code-input').value.trim(); joinNow(); };
+  $('code-btn').addEventListener('click', submit);
+  $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+
+  socket.on('game:state', (s) => { game = s; render(); });
+  socket.on('dodge:state', (d) => { dodge = d; scores = { blue: d.scores.blue, red: d.scores.red }; render(); });
+  socket.on('score:update', (s) => { scores = { blue: s.blue, red: s.red }; render(); });
+  setInterval(() => { if (game && game.running) render(); }, 500);
+  let evTimer = null;
+  socket.on('dodge:event', ({ type }) => {
+    const t = { revive: '전체 부활!', freeze: '❄ 얼음!', thaw: '땡!' }[type]; if (!t) return;
+    const el = $('ev'); el.className = `ev show ${type}`; $('ev-big').textContent = t;
+    if (navigator.vibrate) navigator.vibrate(type === 'revive' ? [80, 40, 80] : [120]);
+    clearTimeout(evTimer); evTimer = setTimeout(() => el.classList.remove('show'), 1400);
+  });
+
+  document.querySelectorAll('.adj').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:adjust', { team: b.dataset.team, delta: Number(b.dataset.d) })));
+  document.querySelectorAll('.sz').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:size', { team: b.dataset.team, delta: Number(b.dataset.d) })));
+  document.querySelectorAll('[data-ev]').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:event', b.dataset.ev)));
+  document.querySelectorAll('.mode').forEach((b) => b.addEventListener('click', () => {
+    if (dodge && dodge.mode === b.dataset.mode) return;
+    if (confirm('모드를 바꾸면 점수와 생존 상태가 초기화됩니다. 바꿀까요?')) socket.emit('dodge:mode', b.dataset.mode);
+  }));
+})();
+</script>
+</body>
+</html>
