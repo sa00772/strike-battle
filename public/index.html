@@ -135,6 +135,39 @@
   footer { border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--muted); font-size: .84rem; line-height: 1.8; }
   footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   footer b { font-family: var(--serif); color: var(--paper); font-weight: 900; }
+  /* 환영 안내창 */
+  .welcome { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; background: rgba(6,5,4,.72); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); opacity: 0; transition: opacity .35s; }
+  .welcome.show { opacity: 1; }
+  .welcome[hidden] { display: none; }
+  .w-card { position: relative; width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; background: #151311; border: 1px solid var(--brass-dim); border-radius: 20px; padding: clamp(26px, 5vw, 40px) clamp(22px, 5vw, 38px) 22px; box-shadow: 0 30px 80px rgba(0,0,0,.65); transform: translateY(14px) scale(.97); transition: transform .45s cubic-bezier(.2,.9,.3,1); }
+  .welcome.show .w-card { transform: none; }
+  .w-card::before { content: ""; position: absolute; left: 50%; top: 0; width: 56px; height: 4px; transform: translateX(-50%); background: var(--brass); border-radius: 0 0 4px 4px; }
+  .w-x { position: absolute; right: 12px; top: 10px; width: 40px; height: 40px; border: 0; background: none; color: var(--muted); font-size: 1.5rem; line-height: 1; cursor: pointer; border-radius: 50%; }
+  .w-x:hover { color: var(--paper); }
+  .w-brand { display: flex; align-items: center; gap: 10px; justify-content: center; color: var(--brass); font-family: var(--serif); font-weight: 900; letter-spacing: .12em; font-size: .95rem; }
+  .w-brand i { width: 14px; height: 14px; background: #b4432e; transform: rotate(-6deg); border-radius: 2px; box-shadow: 0 0 0 2px rgba(180,67,46,.35); }
+  .w-card h2 { font-family: var(--serif); font-weight: 900; font-size: clamp(1.55rem, 5.6vw, 2rem); line-height: 1.35; text-align: center; margin: 14px 0 8px; word-break: keep-all; }
+  .w-lead { text-align: center; color: var(--muted); font-size: .95rem; line-height: 1.7; word-break: keep-all; }
+  .w-need { margin: 22px 0 16px; padding: 14px 16px; border: 1px solid var(--brass-dim); border-left: 4px solid var(--brass); border-radius: 12px; background: rgba(201,168,98,.08); }
+  .w-need b { display: block; color: var(--brass); font-size: 1rem; margin-bottom: 4px; }
+  .w-need p { font-size: .9rem; line-height: 1.65; color: var(--paper); word-break: keep-all; }
+  .w-need p span { color: var(--muted); }
+  .w-list { list-style: none; display: grid; gap: 12px; margin: 0 0 22px; }
+  .w-list li { display: grid; grid-template-columns: 14px 1fr; gap: 12px; align-items: start; font-size: .9rem; line-height: 1.55; color: var(--muted); word-break: keep-all; }
+  .w-list li::before { content: ""; width: 12px; height: 12px; margin-top: .3em; background: var(--c); border-radius: 3px; transform: rotate(-6deg); }
+  .w-list b { color: var(--paper); font-weight: 600; }
+  .w-bottom { position: sticky; bottom: -22px; margin: 0 calc(-1 * clamp(22px, 5vw, 38px)) -22px; padding: 14px clamp(22px, 5vw, 38px) 22px; background: linear-gradient(to bottom, rgba(21,19,17,0), #151311 14px); }   /* 작은 화면에서도 버튼이 항상 보이게 */
+  .w-acts { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+  .w-btn { display: block; text-align: center; padding: 14px 10px; border-radius: 999px; font-weight: 700; font-size: 1rem; border: 1px solid var(--brass-dim); color: var(--paper); transition: background .2s, color .2s; }
+  .w-btn.main { background: var(--brass); border-color: var(--brass); color: var(--ink); }
+  .w-btn:hover { background: rgba(201,168,98,.18); } .w-btn.main:hover { background: #dbbd7c; }
+  .w-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: .82rem; }
+  .w-foot button { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 6px 2px; font: inherit; }
+  .w-foot button:hover { color: var(--paper); text-decoration: underline; }
+  .w-card :focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+  @media (max-width: 420px) { .w-acts { grid-template-columns: 1fr 1fr; } .w-btn { padding: 12px 6px; } }
+  @media (max-height: 720px) { .w-card h2 { font-size: 1.45rem; margin: 10px 0 6px; } .w-need { margin: 16px 0 12px; } .w-list { gap: 9px; margin-bottom: 8px; } .w-lead { font-size: .88rem; } }
+  @media (prefers-reduced-motion: reduce) { .welcome, .w-card { transition: none; } }
 </style>
 </head>
 <body>
@@ -360,6 +393,66 @@
 </script>
 <script>
 fetch('/api/me').then(r=>r.json()).then(j=>{ if(j.member){ const a=document.getElementById('nav-member'); a.textContent=j.member.name+' 님'; a.href='/me.html'; } }).catch(()=>{});
+</script>
+<div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="w-title" hidden>
+  <div class="w-card">
+    <button class="w-x" id="w-x" aria-label="안내창 닫기">×</button>
+    <div class="w-brand"><i aria-hidden="true"></i>플레이 라운지</div>
+    <h2 id="w-title">이용해 주셔서<br>감사합니다</h2>
+    <p class="w-lead">스마트폰 하나로 어디서든 경기장이 되는 곳.<br>친구들과 함께 뛰고, 겨루고, 점수를 확인해 보세요.</p>
+
+    <div class="w-need">
+      <b>회원가입 후 이용할 수 있어요</b>
+      <p>점수판을 열고 경기를 운영하려면 <b style="display:inline;color:var(--paper)">회원가입과 로그인</b>이 필요해요. <span>선수·심판 휴대폰은 QR을 스캔하면 가입 없이 바로 참여할 수 있어요.</span></p>
+    </div>
+
+    <ul class="w-list">
+      <li style="--c:#b4432e"><span><b>경기 기록이 자동으로 쌓여요</b><br>끝난 경기를 내 공간에 보관하고, 선수 명단도 따로 관리해요.</span></li>
+      <li style="--c:#4e7d68"><span><b>한 아이디로 5대까지</b><br>PC와 휴대폰 어디서든 같은 계정으로 들어올 수 있어요.</span></li>
+      <li style="--c:#3f5fa6"><span><b>게임부터 도구까지 한 곳에서</b><br>타격 대결, 피구, 미션 뽑기, 인터벌 타이머, 태권도 채점까지.</span></li>
+    </ul>
+
+    <div class="w-bottom">
+      <div class="w-acts">
+        <a class="w-btn main" href="/login.html#signup" id="w-signup">회원가입</a>
+        <a class="w-btn" href="/login.html" id="w-login">로그인</a>
+      </div>
+      <div class="w-foot"><button type="button" id="w-today">오늘 하루 보지 않기</button><button type="button" id="w-close">둘러보기</button></div>
+    </div>
+  </div>
+</div>
+<script>
+// 환영 안내창: 로그인하지 않은 방문자에게만, '오늘 하루 보지 않기'를 누르지 않았다면 표시
+(function () {
+  const box = document.getElementById('welcome'); if (!box) return;
+  const KEY = 'pl-welcome-hide', today = new Date().toDateString();
+  try { if (localStorage.getItem(KEY) === today) return; } catch (_) {}
+  let prev = null;
+  const close = () => {
+    box.classList.remove('show'); document.body.style.overflow = '';
+    setTimeout(() => { box.hidden = true; if (prev && prev.focus) prev.focus(); }, 300);
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') return close();
+    if (e.key !== 'Tab') return;                                  // 안내창 안에서만 포커스 이동
+    const f = [...box.querySelectorAll('a[href], button')].filter((x) => !x.disabled); if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  const open = () => {
+    prev = document.activeElement; box.hidden = false; document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => box.classList.add('show'));
+    document.addEventListener('keydown', onKey);
+    document.getElementById('w-signup').focus({ preventScroll: true });
+  };
+  document.getElementById('w-x').onclick = close;
+  document.getElementById('w-close').onclick = close;
+  document.getElementById('w-today').onclick = () => { try { localStorage.setItem(KEY, today); } catch (_) {} close(); };
+  box.addEventListener('click', (e) => { if (e.target === box) close(); });
+  fetch('/api/me').then((r) => r.json()).then((j) => { if (!j.member) open(); }).catch(() => open());
+})();
 </script>
 </body>
 </html>
