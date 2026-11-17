@@ -23,6 +23,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const USE_HTTP = process.argv.includes('--http') || process.env.USE_HTTP === '1';
 const DEFAULT_ROUND_SEC = Number(process.env.ROUND_SEC) || 180; // 라운드 기본 3분
 const DEFAULT_REST_SEC = Number(process.env.REST_SEC) || 60;    // 휴식 기본 1분
+const MIN_DURATION_SEC = 5, MAX_DURATION_SEC = 5999;                // 원하는 시간 직접 설정 (5초 ~ 99분 59초)
 const ALLOWED_DURATIONS = [180, 90, 60, 30];                        // 선택 가능한 시간: 3분 / 1분 / 30초
 const HIT_MIN_INTERVAL_MS = 250;                                // 서버측 연타 방지
 const TEAMS = ['blue', 'red'];                                   // 2팀 대결 게임(판 뒤집기·피구)
@@ -719,7 +720,7 @@ io.on('connection', (socket) => {
   // 현재 모드의 시간을 3분 / 1분 / 30초 중에서 변경 (점수는 유지)
   socket.on('timer:setDuration', onlyScoreboard((room, payload = {}) => {
     const { mode, sec } = payload;
-    if ((mode !== 'round' && mode !== 'rest') || !ALLOWED_DURATIONS.includes(sec)) return;
+    if ((mode !== 'round' && mode !== 'rest') || !Number.isInteger(sec) || sec < MIN_DURATION_SEC || sec > MAX_DURATION_SEC) return;
     if (mode === 'round') room.roundSec = sec; else room.restSec = sec;
     if (room.game.mode === mode) {
       room.game.running = false;

@@ -366,6 +366,7 @@
   }
   [hidden] { display: none !important; }
   body.multi .team-sub { display: none; }
+  #custom-time input { font: inherit; font-weight: 800; width: 100%; min-width: 0; padding: .45em .3em; text-align: center; border-radius: 12px; border: 1px solid var(--glass-line); background: rgba(255,255,255,.1); color: var(--ink); }
 </style>
 </head>
 <body>
@@ -433,6 +434,11 @@
       <button class="preset" data-sec="60">1분</button>
       <button class="preset" data-sec="30">30초</button>
     </div>
+    <form class="controls" id="custom-time" aria-label="원하는 시간 직접 설정" style="grid-template-columns:1fr auto 1fr auto auto;align-items:center">
+      <input id="ct-min" type="number" min="0" max="99" value="2" aria-label="분" inputmode="numeric"><span>분</span>
+      <input id="ct-sec" type="number" min="0" max="59" value="0" aria-label="초" inputmode="numeric"><span>초</span>
+      <button class="small" type="submit" style="padding:.5em .9em">시간 설정</button>
+    </form>
     <div id="dodge-panel" hidden>
       <div class="cap">피구 모드</div>
       <div class="controls sub" role="group" aria-label="피구 모드">
@@ -782,6 +788,8 @@
       b.classList.toggle('active', Number(b.dataset.sec) === totalSec);
       b.disabled = running;   // 진행 중에는 시간 변경 잠금
     });
+    document.querySelectorAll('#custom-time input, #custom-time button').forEach((el) => { el.disabled = running; });
+    if (document.activeElement.tagName !== 'INPUT') { $('ct-min').value = Math.floor(totalSec / 60); $('ct-sec').value = totalSec % 60; }
     $('btn-mode-round').textContent = `라운드 ${fmt(state.roundSec)}`;
     $('btn-mode-rest').textContent = `휴식 ${fmt(state.restSec)}`;
   }
@@ -979,6 +987,13 @@
   });
   $('btn-mode-round').addEventListener('click', () => socket.emit('timer:setMode', 'round'));
   $('btn-mode-rest').addEventListener('click', () => socket.emit('timer:setMode', 'rest'));
+  $('custom-time').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const sec = (Number($('ct-min').value) || 0) * 60 + (Number($('ct-sec').value) || 0);
+    if (!state || state.running) return;
+    if (sec < 5 || sec > 5999) { alert('5초 ~ 99분 59초 사이로 입력하세요.'); return; }
+    socket.emit('timer:setDuration', { mode: state.mode, sec });
+  });
   document.querySelectorAll('#presets .preset').forEach((b) => {
     b.addEventListener('click', () => {
       if (state) socket.emit('timer:setDuration', { mode: state.mode, sec: Number(b.dataset.sec) });
