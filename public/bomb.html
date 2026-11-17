@@ -61,7 +61,7 @@
 <header class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" href="/#games">홈으로</a></header>
 <main id="app">
   <h1>폭탄 돌리기</h1>
-  <p class="lead">폰 없이 소리로만 즐겨요. 시작을 누르고 공이나 인형을 옆 사람에게 돌리세요. 똑딱 소리가 점점 빨라지다가 언제 터질지는 아무도 몰라요. 터질 때 들고 있던 사람이 걸립니다.</p>
+  <p class="lead">폰 없이 소리로만 즐겨요. 시작을 누르고 공이나 인형을 옆 사람에게 돌리세요. 똑딱 소리는 판마다 달라서 빨라지기도 하고 느려지기도 하고 가끔 멈추기도 해요. 언제 터질지는 아무도 몰라요. 터질 때 들고 있던 사람이 걸립니다.</p>
   <div class="stage" id="stage" aria-live="assertive">
     <div>
       <svg class="bomb" id="bomb" viewBox="0 0 200 200" role="img" aria-label="폭탄"><circle class="body" cx="96" cy="118" r="70"/><ellipse class="shine" cx="70" cy="92" rx="18" ry="26" transform="rotate(30 70 92)"/><rect class="cap" x="82" y="30" width="30" height="20" rx="4"/><path class="fuse" d="M112 38 C130 22 150 30 156 14"/><circle class="spark" cx="158" cy="12" r="9"/></svg>
@@ -90,13 +90,27 @@ function tone(f, d, vol, type) {
   o.type = type || 'square'; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
   o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.02);
 }
+function noise(a, dur, decay) { const len = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay); const n = a.createBufferSource(); n.buffer = buf; return n; }
+function boomBig(a, t) {                                   // 묵직한 폭발
+  const n = noise(a, 1.6, 2.2), lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(5000, t); lp.frequency.exponentialRampToValueAtTime(180, t + 1.2);
+  n.connect(lp).connect(a.destination); n.start(t);
+  const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(34, t + 0.7);
+  g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 1);
+}
+function boomPop(a, t) {                                   // 짧고 날카로운 펑 + 파편 소리
+  const n = noise(a, 0.5, 3), hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 600; n.connect(hp).connect(a.destination); n.start(t);
+  const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(50, t + 0.25);
+  g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.4);
+  for (let i = 0; i < 6; i++) { const c = noise(a, 0.08, 2), cg = a.createGain(); cg.gain.value = 0.5; c.connect(cg).connect(a.destination); c.start(t + 0.25 + Math.random() * 0.7); }
+}
+function boomWhistle(a, t) {                               // 휘이익 하다가 쾅
+  const w = a.createOscillator(), wg = a.createGain(); w.type = 'sine'; w.frequency.setValueAtTime(1800, t); w.frequency.exponentialRampToValueAtTime(300, t + 0.45);
+  wg.gain.setValueAtTime(0.35, t); wg.gain.linearRampToValueAtTime(0, t + 0.45); w.connect(wg).connect(a.destination); w.start(t); w.stop(t + 0.5);
+  boomBig(a, t + 0.45);
+}
 function boom() {
-  const a = audio(); if (!a) return; const t = a.currentTime, len = a.sampleRate * 1.6, buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
-  const n = a.createBufferSource(); n.buffer = buf; const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(5000, t); lp.frequency.exponentialRampToValueAtTime(180, t + 1.2);
-  const g = a.createGain(); g.gain.value = 1; n.connect(lp).connect(g).connect(a.destination); n.start(t);
-  const o = a.createOscillator(), og = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(34, t + 0.7);
-  og.gain.setValueAtTime(1, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.9); o.connect(og).connect(a.destination); o.start(t); o.stop(t + 1);
+  const a = audio(); if (!a) return; const t = a.currentTime;
+  [boomBig, boomPop, boomWhistle][Math.floor(Math.random() * 3)](a, t);
 }
 let range = store.get('pl-bomb-range', '20,45'), run = null;
 document.querySelectorAll('#len .chip').forEach((b) => {
@@ -118,6 +132,8 @@ function stop() { if (run) { clearTimeout(run.t); run = null; } release(); }
 function start() {
   stop(); audio();
   const [lo, hi] = range.split(',').map(Number), total = (lo + Math.random() * (hi - lo)) * 1000;
+  // 판마다 소리 패턴을 다르게 해서 타이밍을 외울 수 없게 한다
+  const shape = { pow: 0.9 + Math.random() * 1.9, floor: 110 + Math.random() * 150, flat: Math.random() < 0.25, pauseP: 0.05 + Math.random() * 0.1 };
   run = { t: 0, begin: performance.now(), total, n: 0 };
   $('#go').textContent = '멈추기'; $('#say').textContent = '돌려요!'; $('#sub').textContent = $('#blind').checked ? '소리를 잘 들으세요' : '공을 옆 사람에게 넘기세요';
   setView('run'); keepAwake();
@@ -125,9 +141,12 @@ function start() {
     if (!run) return;
     const p = (performance.now() - run.begin) / run.total;
     if (p >= 1) { explode(); return; }
-    run.n++; tone(run.n % 2 ? 900 : 640, 0.06, 0.4, 'square');
-    const gap = 110 + 620 * Math.pow(1 - p, 1.7);         // 점점 빨라지는 간격
-    if (p > 0.8) { setView('hot'); $('#app').style.setProperty('--wob', Math.max(0.12, gap / 1000) + 's'); } else $('#app').style.setProperty('--wob', Math.max(0.2, gap / 900) + 's');
+    run.n++; tone((run.n % 2 ? 900 : 640) * (0.96 + Math.random() * 0.1), 0.06, 0.4, 'square');
+    let gap = shape.flat ? 330 + Math.random() * 120 : shape.floor + 620 * Math.pow(1 - p, shape.pow);   // 점점 빨라지는 판, 일정한 판이 섞여 있음
+    gap *= 0.7 + Math.random() * 0.6;                                                                   // 박자를 일부러 흔든다
+    if (Math.random() < shape.pauseP) gap += 500 + Math.random() * 1100;                                // 가끔 뚝 멈춰서 긴장감을 준다
+    const hot = !shape.flat && p > 0.75 && gap < 400;
+    if (hot) { setView('hot'); $('#app').style.setProperty('--wob', Math.max(0.12, gap / 1000) + 's'); } else { setView('run'); $('#app').style.setProperty('--wob', Math.max(0.2, gap / 900) + 's'); }
     run.t = setTimeout(tick, gap);
   };
   tick();
