@@ -60,20 +60,18 @@
 
   /* ---------------------------- 긴급 미션 오버레이 ---------------------------- */
   const css = `
-  .ms-overlay{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:2.2vh;text-align:center;
-    padding:3vh 4vw;color:#fff;background:repeating-linear-gradient(45deg,#14080a 0 28px,#2a0d10 28px 56px);font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+  .ms-overlay{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:2.4vh;text-align:center;
+    padding:3vh 5vw;color:#2b2a33;background:radial-gradient(90vmax 70vmax at 50% 0%,#fff6d6 0%,#ffe2b0 60%,#ffcf9a 100%);font-family:"Pretendard Variable",Pretendard,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
   .ms-overlay.show{display:flex}
-  .ms-title{font-weight:900;letter-spacing:.04em;font-size:clamp(1.3rem,5vw,4.2rem);color:#ff4d4d;text-shadow:0 0 .4em rgba(255,60,60,.7);animation:ms-blink .7s steps(2,start) infinite}
-  .ms-text{font-weight:900;line-height:1.25;font-size:clamp(1.8rem,7vw,6.4rem);max-width:92vw;word-break:keep-all;overflow-wrap:anywhere}
-  .ms-count{font-weight:900;font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(5rem,26vw,16rem);color:#ffd23f}
-  .ms-count small{font-size:.35em;margin-left:.1em}
-  .ms-bar{width:min(86vw,900px);height:14px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden}
-  .ms-bar i{display:block;height:100%;width:100%;background:#ffd23f}
-  .ms-sub{font-size:clamp(.95rem,2vw,1.6rem);opacity:.8}
-  .ms-overlay.resume{background:#0f3d22}
-  .ms-overlay.resume .ms-title{color:#7dffb0;text-shadow:none;animation:none}
-  @keyframes ms-blink{50%{opacity:.35}}
-  @media (prefers-reduced-motion:reduce){.ms-title{animation:none}}`;
+  .ms-title{font-weight:900;font-size:clamp(1.4rem,5vw,3.6rem);color:#d9480f;background:#fff;padding:.25em .9em;border-radius:999px;box-shadow:0 6px 0 rgba(217,72,15,.25)}
+  .ms-text{font-weight:900;line-height:1.3;font-size:clamp(2rem,7.4vw,6.4rem);max-width:92vw;word-break:keep-all;overflow-wrap:anywhere}
+  .ms-count{font-weight:900;font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(5rem,24vw,15rem);color:#e8590c}
+  .ms-count small{font-size:.35em;margin-left:.1em;color:#2b2a33}
+  .ms-bar{width:min(86vw,900px);height:18px;border-radius:99px;background:rgba(255,255,255,.7);overflow:hidden;box-shadow:inset 0 0 0 2px rgba(217,72,15,.2)}
+  .ms-bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff922b,#e8590c);border-radius:99px}
+  .ms-sub{font-size:clamp(1rem,2.2vw,1.7rem);color:#6b5b45;font-weight:600}
+  .ms-overlay.resume{background:radial-gradient(90vmax 70vmax at 50% 0%,#e9fbef 0%,#c9f2d9 70%,#aee8c5 100%)}
+  .ms-overlay.resume .ms-title{color:#1b8a4b;box-shadow:0 6px 0 rgba(27,138,75,.25)}`;
 
   function attach(socket, mode) {
     const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
@@ -95,10 +93,10 @@
       phoneSound = !!m.phoneSound;
       endsAt = Date.now() + m.remainingMs; totalMs = m.sec * 1000;
       el.className = 'ms-overlay show';
-      q('.ms-title').textContent = '🚨 EMERGENCY MISSION! 🚨';
+      q('.ms-title').textContent = '🚨 돌발 미션!';
       q('.ms-text').textContent = m.text;
       q('.ms-bar').style.display = '';
-      q('.ms-sub').textContent = '게임 일시정지 · 미션이 끝나면 자동으로 재개됩니다';
+      q('.ms-sub').textContent = '게임이 잠시 멈췄어요. 미션이 끝나면 자동으로 다시 시작해요!';
       tick(); timer = setInterval(tick, 100);
       if (m.sound !== 'none' && soundOn(phoneSound)) SFX.play(m.sound);
       if (mode === 'phone' && navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]);
@@ -110,8 +108,8 @@
       if (mode === 'phone' && navigator.vibrate) navigator.vibrate(300);
       if (e.resumed || e.reason === 'manual' || e.reason === 'timeout') {
         el.classList.add('resume');
-        q('.ms-title').textContent = '▶ 게임 재개!';
-        q('.ms-text').textContent = e.resumed ? '삐-익! 다시 시작!' : '미션 종료';
+        q('.ms-title').textContent = '▶ 다시 시작!';
+        q('.ms-text').textContent = e.resumed ? '삐-익! 게임 재개' : '미션 종료';
         q('.ms-count').textContent = '';
         q('.ms-bar').style.display = 'none';
         q('.ms-sub').textContent = '';

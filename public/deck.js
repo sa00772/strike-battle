@@ -4,30 +4,33 @@
  */
 (function () {
   const css = `
-  .dk{font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;color:#f5f7fb;display:flex;flex-direction:column;gap:12px}
-  .dk h3{font-size:1.1rem;font-weight:900}
-  .dk label{font-size:.85rem;color:#9aa3b5;display:flex;flex-direction:column;gap:4px}
-  .dk textarea,.dk select{font:inherit;font-size:1rem;background:#12141b;color:#f5f7fb;border:2px solid #3a4152;border-radius:10px;padding:.6em .7em;width:100%}
-  .dk textarea{resize:vertical;min-height:4.2em}
-  .dk textarea:focus-visible,.dk select:focus-visible,.dk button:focus-visible{outline:3px solid #fff;outline-offset:2px}
-  .dk .row{display:flex;gap:8px;flex-wrap:wrap}
-  .dk .row>*{flex:1;min-width:120px}
-  .dk button{font:inherit;font-weight:800;border:0;border-radius:10px;padding:.8em .6em;background:#323847;color:#f5f7fb;cursor:pointer}
-  .dk button:hover{background:#3f4659}
-  .dk .send{background:#e5352b;font-size:1.1rem;padding:1em}
-  .dk .send:hover{background:#ff4a3f}
-  .dk .resume{background:#1f9d57}
-  .dk .resume:hover{background:#25b566}
-  .dk .chk{flex-direction:row;align-items:center;gap:8px;font-size:.9rem;color:#c4cad8}
-  .dk .chk input{width:20px;height:20px}
-  .dk .presets{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .dk{font-family:"Pretendard Variable",Pretendard,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;color:#2b2a33;display:flex;flex-direction:column;gap:14px;background:#fffaf0;border-radius:20px;padding:18px}
+  .dk h3{font-size:1.15rem;font-weight:900;color:#2b2a33}
+  .dk label{font-size:.9rem;color:#6b5b45;font-weight:700;display:flex;flex-direction:column;gap:6px}
+  .dk textarea,.dk select{font:inherit;font-size:1.05rem;background:#fff;color:#2b2a33;border:2px solid #f0d9ad;border-radius:14px;padding:.7em .8em;width:100%}
+  .dk textarea{resize:vertical;min-height:4.4em}
+  .dk textarea:focus,.dk select:focus{outline:none;border-color:#ff922b;box-shadow:0 0 0 3px rgba(255,146,43,.25)}
+  .dk button:focus-visible{outline:3px solid #e8590c;outline-offset:2px}
+  .dk .row{display:flex;gap:10px;flex-wrap:wrap}
+  .dk .row>*{flex:1;min-width:130px}
+  .dk .row.stack{flex-direction:column}
+  .dk button{font:inherit;font-weight:800;border:0;border-radius:14px;padding:.85em .7em;background:#f3e6c8;color:#5b4a2e;cursor:pointer;transition:transform .1s,background .15s}
+  .dk button:hover{background:#ecd9ab} .dk button:active{transform:scale(.98)}
+  .dk .send{background:#e8590c;color:#fff;font-size:1.2rem;padding:1em;box-shadow:0 4px 0 #b8430a}
+  .dk .send:hover{background:#f76707}
+  .dk .resume{background:#2f9e5f;color:#fff;font-size:1.05rem;box-shadow:0 4px 0 #1f7a47}
+  .dk .resume:hover{background:#37b26c}
+  .dk .chk{flex-direction:row;align-items:center;gap:10px;font-size:.95rem;color:#5b4a2e}
+  .dk .chk input{width:22px;height:22px;accent-color:#e8590c}
+  .dk .presets{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .dk .pr{position:relative;display:flex}
-  .dk .pr .go{flex:1;text-align:left;background:#26304a;padding:.7em 2em .7em .8em;line-height:1.3}
-  .dk .pr .go:hover{background:#31406a}
-  .dk .pr .go small{display:block;font-weight:600;color:#9aa3b5;margin-top:2px}
-  .dk .pr .x{position:absolute;right:4px;top:4px;padding:.1em .45em;background:transparent;color:#9aa3b5;font-size:1rem}
-  .dk .add{background:transparent;border:1px dashed #3a4152;color:#9aa3b5}
-  .dk .status{min-height:1.4em;font-size:.95rem;color:#ffd23f;font-weight:700}`;
+  .dk .pr .go{flex:1;text-align:left;background:#fff;border:2px solid #f0d9ad;color:#2b2a33;padding:.8em 2.2em .8em .9em;line-height:1.35;font-size:1rem}
+  .dk .pr .go:hover{background:#fff1d6;border-color:#ffb457}
+  .dk .pr .go small{display:block;font-weight:600;color:#8a7757;margin-top:3px;font-size:.78rem}
+  .dk .pr .x{position:absolute;right:6px;top:6px;padding:.1em .5em;background:transparent;color:#a89674;font-size:1.1rem}
+  .dk .add{background:transparent;border:2px dashed #e3c995;color:#8a7757}
+  .dk .status{min-height:1.4em;font-size:1rem;color:#d9480f;font-weight:800}
+  @media(max-width:420px){.dk .presets{grid-template-columns:1fr}}`;
 
   const DEFAULT_PRESETS = [
     { t: '푸시업 5개!', s: 10 }, { t: '오리걸음으로 이동!', s: 10 }, { t: '양손 만세! 그대로 정지!', s: 5 },
@@ -46,7 +49,7 @@
     }
     root.classList.add('dk');
     root.innerHTML = `
-      <h3>미션 송출 덱</h3>
+      <h3>🚨 돌발 미션 보내기</h3>
       <label>미션 문구
         <textarea id="dk-text" maxlength="80" placeholder="예) [돌발] 전원 제자리 점프 10회 후 재개!"></textarea>
       </label>
@@ -59,15 +62,15 @@
         </label>
       </div>
       <label class="chk"><input type="checkbox" id="dk-phone"> 선수 휴대폰에서도 소리 재생</label>
-      <div class="row">
-        <button class="send" id="dk-send">미션 발송</button>
-        <button class="resume" id="dk-resume">게임 재개</button>
+      <div class="row stack">
+        <button class="send" id="dk-send">🚨 미션 보내기</button>
+        <button class="resume" id="dk-resume">▶ 게임 다시 시작</button>
       </div>
-      <button id="dk-preview" type="button">효과음 미리듣기</button>
+      <button id="dk-preview" type="button">🔊 효과음 미리듣기</button>
       <div class="status" id="dk-status" role="status" aria-live="polite"></div>
-      <h3>프리셋</h3>
+      <h3>자주 쓰는 미션 (누르면 바로 전송)</h3>
       <div class="presets" id="dk-presets"></div>
-      <button class="add" id="dk-add" type="button">+ 현재 문구를 프리셋으로 저장</button>`;
+      <button class="add" id="dk-add" type="button">＋ 위 문구를 자주 쓰는 미션으로 저장</button>`;
     const $ = (id) => root.querySelector('#' + id);
     let presets = load();
 
@@ -83,7 +86,7 @@
       presets.forEach((p, i) => {
         const wrap = document.createElement('div'); wrap.className = 'pr';
         const go = document.createElement('button'); go.className = 'go'; go.type = 'button';
-        go.textContent = p.t; const sm = document.createElement('small'); sm.textContent = `${p.s}초 · 누르면 즉시 발송`; go.appendChild(sm);
+        go.textContent = p.t; const sm = document.createElement('small'); sm.textContent = `${p.s}초 · 누르면 바로 보내요`; go.appendChild(sm);
         go.addEventListener('click', () => send(p.t, p.s));
         const x = document.createElement('button'); x.className = 'x'; x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', `${p.t} 프리셋 삭제`);
         x.addEventListener('click', () => { presets.splice(i, 1); save(presets); renderPresets(); });
@@ -106,7 +109,7 @@
     let timer = null, endsAt = 0;
     socket.on('mission:start', (m) => {
       endsAt = Date.now() + m.remainingMs; clearInterval(timer);
-      const upd = () => { $('dk-status').textContent = `미션 진행 중 · ${Math.ceil(Math.max(0, endsAt - Date.now()) / 1000)}초 남음`; };
+      const upd = () => { $('dk-status').textContent = `미션 진행 중! ${Math.ceil(Math.max(0, endsAt - Date.now()) / 1000)}초 남음`; };
       upd(); timer = setInterval(upd, 250);
     });
     socket.on('mission:end', (e) => {
