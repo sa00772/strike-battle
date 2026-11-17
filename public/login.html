@@ -23,7 +23,31 @@
     <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
     <p class="err" role="alert"></p>
     <button class="btn">로그인</button>
+    <p class="hint"><a href="#" id="go-find" style="text-decoration:underline">아이디 · 비밀번호 찾기</a></p>
   </form>
+
+  <div id="find" hidden>
+    <form id="f-findid">
+      <h2 style="font-family:var(--serif);font-size:1.1rem">아이디 찾기</h2>
+      <label>이름<input name="name" maxlength="20" required></label>
+      <label>전화번호<input name="phone" type="tel" inputmode="tel" maxlength="13" placeholder="010-1234-5678" required></label>
+      <p class="err" role="alert"></p>
+      <button class="btn ghost">아이디 찾기</button>
+    </form>
+    <hr style="border:0;border-top:1px solid var(--line);margin:28px 0">
+    <form id="f-reset">
+      <h2 style="font-family:var(--serif);font-size:1.1rem">비밀번호 재설정</h2>
+      <p class="hint">가입할 때 적은 정보가 모두 맞으면 새 비밀번호를 정할 수 있어요.</p>
+      <label>아이디<input name="username" autocapitalize="none" maxlength="20" required></label>
+      <label>이름<input name="name" maxlength="20" required></label>
+      <label>전화번호<input name="phone" type="tel" inputmode="tel" maxlength="13" placeholder="010-1234-5678" required></label>
+      <label>새 비밀번호<input name="password" type="password" autocomplete="new-password" maxlength="64" required>
+        <span class="hint">8자 이상, 영문과 숫자를 함께 넣어 주세요</span></label>
+      <p class="err" role="alert"></p>
+      <button class="btn">비밀번호 바꾸기</button>
+    </form>
+    <p class="hint" style="margin-top:18px"><a href="#" id="go-back" style="text-decoration:underline">로그인으로 돌아가기</a></p>
+  </div>
 
   <form id="f-signup" hidden autocomplete="on">
     <label>이름<input name="name" autocomplete="name" maxlength="20" required></label>
@@ -48,7 +72,27 @@ const $ = (s) => document.querySelector(s);
 const forms = { login: $('#f-login'), signup: $('#f-signup') };
 function show(which) {
   for (const k in forms) { forms[k].hidden = k !== which; $('#t-' + k).setAttribute('aria-selected', String(k === which)); }
+  $('#find').hidden = true; $('.tabs').hidden = false;
 }
+$('#go-find').onclick = (e) => { e.preventDefault(); forms.login.hidden = true; $('#find').hidden = false; $('.tabs').hidden = true; };
+$('#go-back').onclick = (e) => { e.preventDefault(); show('login'); };
+async function post(form, url) {
+  const err = form.querySelector('.err'); err.style.color = ''; err.textContent = '';
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) err.textContent = j.error || '문제가 생겼어요.';
+  return r.ok ? j : null;
+}
+$('#f-findid').onsubmit = async (e) => {
+  e.preventDefault();
+  const j = await post(e.target, '/api/find-id');
+  if (j) { const er = e.target.querySelector('.err'); er.style.color = 'var(--brass)'; er.textContent = '가입된 아이디: ' + j.usernames.join(', '); }
+};
+$('#f-reset').onsubmit = async (e) => {
+  e.preventDefault();
+  const j = await post(e.target, '/api/reset-password');
+  if (j) { e.target.reset(); show('login'); forms.login.querySelector('.err').style.color = 'var(--brass)'; forms.login.querySelector('.err').textContent = '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.'; }
+};
 $('#t-login').onclick = () => show('login');
 $('#t-signup').onclick = () => show('signup');
 if (location.hash === '#signup') show('signup');

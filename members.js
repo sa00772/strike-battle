@@ -200,6 +200,43 @@ function mount(app, express) {
     res.json({ ok: true });
   });
 
+  // 아이디 찾기: 이름 + 전화번호가 모두 맞으면 아이디 일부를 가려서 알려줌
+  const digits = (v) => String(v || '').replace(/\D/g, '');
+  const mask = (u) => u.slice(0, 2) + '*'.repeat(Math.max(2, u.length - 3)) + u.slice(-1);
+  app.post('/api/find-id', off, json, (req, res) => {
+    if (limited(req)) return res.status(429).json({ error: '시도가 너무 많아요. 잠시 후 다시 해 주세요.' });
+    const name = clean((req.body || {}).name, 20), phone = digits((req.body || {}).phone);
+    const rows = main.prepare('SELECT username, phone FROM members WHERE name = ?').all(name).filter((r) => digits(r.phone) === phone);
+    if (!rows.length) return res.status(404).json({ error: '일치하는 회원을 찾지 못했어요. 이름과 전화번호를 확인해 주세요.' });
+    res.json({ usernames: rows.map((r) => mask(r.username)) });
+  });
+
+  // 비밀번호 재설정: 아이디 + 이름 + 전화번호가 모두 맞으면 새 비밀번호로 변경 (아이디별 5회 실패 시 15분 잠금)
+  const resetFails = new Map();
+  app.post('/api/reset-password', off, json, (req, res) => {
+    if (limited(req)) return res.status(429).json({ error: '시도가 너무 많아요. 잠시 후 다시 해 주세요.' });
+    const b = req.body || {};
+    const username = clean(b.username, 20).toLowerCase();
+    const f = resetFails.get(username);
+    if (f && f.until > Date.now()) return res.status(429).json({ error: '확인에 여러 번 실패해 15분간 잠겼어요. 잠시 후 다시 해 주세요.' });
+    const row = main.prepare('SELECT * FROM members WHERE username = ?').get(username);
+    const match = row && row.name === clean(b.name, 20) && digits(row.phone) === digits(b.phone);
+    if (!match) {
+      const n = ((f && !(f.until && f.until <= Date.now())) ? f.n : 0) + 1;
+      resetFails.set(username, n >= 5 ? { n: 0, until: Date.now() + 15 * 60 * 1000 } : { n, until: 0 });
+      return res.status(400).json({ error: '입력한 정보가 가입 정보와 맞지 않아요.' });
+    }
+    const pw = String(b.password || '');
+    if (pw.length < 8 || pw.length > 64 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw) || pw.toLowerCase().includes(username)) {
+      return res.status(400).json({ error: '새 비밀번호는 8자 이상, 영문과 숫자를 함께 넣고 아이디는 넣지 말아 주세요.', field: 'password' });
+    }
+    const salt = crypto.randomBytes(16).toString('hex');
+    main.prepare('UPDATE members SET salt = ?, pw_hash = ? WHERE id = ?').run(salt, hashPw(pw, salt), row.id);
+    main.prepare('DELETE FROM sessions WHERE member_id = ?').run(row.id);     // 다른 기기 로그인 모두 해제
+    resetFails.delete(username);
+    res.json({ ok: true });
+  });
+
   app.post('/api/logout', off, (req, res) => {
     const token = parseCookies(req.headers.cookie)[COOKIE];
     if (token) main.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha(token));
