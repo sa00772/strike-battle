@@ -124,15 +124,14 @@
 </style>
 </head>
 <body>
-<header class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" href="/#tools">홈으로</a></header>
+<header class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" id="pg-back" href="/#tools">홈으로</a></header>
 <main>
-  <h1>도구실</h1>
+  <h1 id="pg-title">도구실</h1>
   <div class="tabs" role="tablist">
     <button role="tab" id="tab-timer" aria-selected="true">멀티 인터벌</button>
     <button role="tab" id="tab-metro" aria-selected="false">메트로놈</button>
     <button role="tab" id="tab-dice" aria-selected="false">주사위</button>
     <button role="tab" id="tab-teams" aria-selected="false">팀 나누기</button>
-    <button role="tab" id="tab-react" aria-selected="false">반응 훈련</button>
   </div>
 
   <!-- 멀티 인터벌 타이머 -->
@@ -232,13 +231,18 @@ const num = (el, d) => { const n = parseInt(el.value, 10); return Number.isFinit
 const TABS = ['timer', 'metro', 'dice', 'teams', 'react'];
 function showTab(which) {
   if (!TABS.includes(which)) which = 'timer';
-  TABS.forEach((t) => { $('#p-' + t).hidden = t !== which; $('#tab-' + t).setAttribute('aria-selected', String(t === which)); });
+  TABS.forEach((t) => { $('#p-' + t).hidden = t !== which; { const b = $('#tab-' + t); if (b) b.setAttribute('aria-selected', String(t === which)); } });
   if (which !== 'react' && window.rxStop) window.rxStop();
   history.replaceState(null, '', '#' + which);
   const sel = $('#tab-' + which); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
-TABS.forEach((t) => { $('#tab-' + t).onclick = () => showTab(t); });
+TABS.forEach((t) => { const b = $('#tab-' + t); if (b) b.onclick = () => showTab(t); });
 showTab(location.hash === '#metronome' ? 'metro' : location.hash.slice(1));
+if (location.hash === '#react') {   // 놀이 카테고리의 독립 화면처럼 보여 주기
+  document.querySelector('.tabs').hidden = true;
+  $('#pg-title').textContent = '색깔·방향 반응 훈련';
+  $('#pg-back').href = '/#games'; document.title = '색깔·방향 반응 훈련 · 플레이 라운지';
+}
 
 /* ---------- 소리 ---------- */
 let ac = null;
