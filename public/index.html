@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f6f2e6">
+<meta name="theme-color" content="#0d0c0b">
 <title>플레이 라운지</title>
 <meta name="description" content="스마트폰으로 함께 즐기는 도장·체육관 실시간 게임 모음">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,14 +12,14 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
   :root {
-    color-scheme: light;
-    --ink: #f6f2e6;          /* 한지 */
-    --ink-2: #fbf8ef;
-    --paper: #22201c;        /* 먹 (글자) */
-    --muted: #675f52;
-    --brass: #8d6c2b;        /* 놋쇠 */
-    --brass-dim: rgba(141,108,43,.38);
-    --line: rgba(34,32,28,.14);
+    color-scheme: dark;
+    --ink: #0d0c0b;          /* 먹빛 바탕 */
+    --ink-2: #171513;
+    --paper: #f1ebdd;        /* 한지빛 (글자) */
+    --muted: #a8a090;
+    --brass: #c9a862;        /* 놋쇠 */
+    --brass-dim: rgba(201,168,98,.38);
+    --line: rgba(241,235,221,.14);
     --serif: "Noto Serif KR", "Nanum Myeongjo", "Apple Myungjo", "Batang", serif;
     --sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   }
@@ -31,7 +31,7 @@
   /* 한지 위에 먹이 번진 배경 */
   body { position: relative; isolation: isolate; }
   body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3Cfilter id='b' x='-100%25' y='-100%25' width='300%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.005 .008' numOctaves='5' seed='11' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='240' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='20'/%3E%3C/filter%3E%3Cfilter id='c' x='-100%25' y='-100%25' width='300%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .02' numOctaves='5' seed='3' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='130' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='7'/%3E%3C/filter%3E%3Cfilter id='k' x='-100%25' y='-100%25' width='300%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.03 .008' numOctaves='4' seed='8' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='70' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='2.5'/%3E%3C/filter%3E%3C/defs%3E%3Cg fill='%23161412'%3E%3Cellipse cx='1580' cy='260' rx='420' ry='460' filter='url(%23b)' opacity='.26'/%3E%3Cellipse cx='1530' cy='300' rx='220' ry='280' filter='url(%23c)' opacity='.18'/%3E%3Cellipse cx='-150' cy='960' rx='470' ry='360' filter='url(%23b)' opacity='.28'/%3E%3Cellipse cx='10' cy='1000' rx='230' ry='170' filter='url(%23c)' opacity='.26'/%3E%3Cellipse cx='1450' cy='1010' rx='300' ry='200' filter='url(%23b)' opacity='.2'/%3E%3Cellipse cx='-60' cy='140' rx='220' ry='260' filter='url(%23b)' opacity='.15'/%3E%3Cpath d='M980 18 C1120 6 1260 40 1400 14 L1440 70 C1290 56 1130 90 980 60 Z' filter='url(%23k)' opacity='.2'/%3E%3Cpath d='M0 560 C90 540 170 575 260 548 L262 590 C170 612 80 590 0 612 Z' filter='url(%23k)' opacity='.16'/%3E%3C/g%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .36 0 0 0 0 .22 0 0 0 .5 -.2'/%3E%3C/filter%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.035 .09' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .42 0 0 0 0 .22 0 0 0 2.2 -1.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.3'/%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='.13'/%3E%3C/svg%3E"); background-size: cover, 600px 600px; background-position: center, 0 0; background-repeat: no-repeat, repeat; }
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3Cfilter id='b' x='-100%25' y='-100%25' width='300%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.005 .008' numOctaves='5' seed='11' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='240' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='20'/%3E%3C/filter%3E%3Cfilter id='c' x='-100%25' y='-100%25' width='300%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .02' numOctaves='5' seed='3' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='130' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='7'/%3E%3C/filter%3E%3Cfilter id='k' x='-100%25' y='-100%25' width='300%25' height='300%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.03 .008' numOctaves='4' seed='8' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='70' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='2.5'/%3E%3C/filter%3E%3C/defs%3E%3Cg fill='%23f4efe2'%3E%3Cellipse cx='1580' cy='260' rx='420' ry='460' filter='url(%23b)' opacity='.12'/%3E%3Cellipse cx='1530' cy='300' rx='220' ry='280' filter='url(%23c)' opacity='.08'/%3E%3Cellipse cx='-150' cy='960' rx='470' ry='360' filter='url(%23b)' opacity='.13'/%3E%3Cellipse cx='10' cy='1000' rx='230' ry='170' filter='url(%23c)' opacity='.12'/%3E%3Cellipse cx='1450' cy='1010' rx='300' ry='200' filter='url(%23b)' opacity='.2'/%3E%3Cellipse cx='-60' cy='140' rx='220' ry='260' filter='url(%23b)' opacity='.07'/%3E%3Cpath d='M980 18 C1120 6 1260 40 1400 14 L1440 70 C1290 56 1130 90 980 60 Z' filter='url(%23k)' opacity='.2'/%3E%3Cpath d='M0 560 C90 540 170 575 260 548 L262 590 C170 612 80 590 0 612 Z' filter='url(%23k)' opacity='.07'/%3E%3C/g%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 .8 0 0 0 .5 -.2'/%3E%3C/filter%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.035 .09' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .9 0 0 0 0 .8 0 0 0 2.2 -1.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='.12'/%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='.03'/%3E%3C/svg%3E"); background-size: cover, 600px 600px; background-position: center, 0 0; background-repeat: no-repeat, repeat; }
   @media (max-width: 760px) { body::before { background-position: 100% 0, 0 0; } }
   a { color: inherit; text-decoration: none; }
   a:focus-visible, summary:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; border-radius: 2px; }
@@ -40,7 +40,7 @@
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
 
   /* ---------- 상단 바 ---------- */
-  .gnav { position: sticky; top: 0; z-index: 50; background: rgba(246,242,230,.82); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border-bottom: 1px solid var(--line); }
+  .gnav { position: sticky; top: 0; z-index: 50; background: rgba(13,12,11,.8); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border-bottom: 1px solid var(--line); }
   .gnav .wrap { height: 58px; display: flex; align-items: center; gap: 32px; }
   .logo { font-family: var(--serif); font-weight: 900; font-size: 1.15rem; letter-spacing: .02em; white-space: nowrap; }
   .gnav ul { list-style: none; display: flex; gap: 30px; flex: 1; justify-content: flex-end; overflow-x: auto; scrollbar-width: none; }
@@ -53,8 +53,8 @@
 
   /* ---------- 히어로 ---------- */
   .hero { padding: clamp(56px, 11vh, 120px) 0 clamp(48px, 9vh, 96px); position: relative; }
-  .hero .wrap { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: end; }
-  .hero h1 { font-family: var(--serif); font-weight: 900; font-size: clamp(2.6rem, 7.4vw, 5.6rem); line-height: 1.12; letter-spacing: -.01em; word-break: keep-all; }
+  .hero .wrap { display: grid; grid-template-columns: 1.5fr 1fr; gap: 40px; align-items: end; }
+  .hero h1 { font-family: var(--serif); font-weight: 900; font-size: clamp(1.9rem, 4.2vw, 3.4rem); line-height: 1.22; letter-spacing: -.01em; word-break: keep-all; }
   .hero .lead { margin-top: 1.6em; max-width: 30em; color: var(--muted); font-size: clamp(.95rem, 1.3vw, 1.08rem); line-height: 1.8; word-break: keep-all; }
   .hero .go { display: inline-block; margin-top: 2em; font-weight: 600; color: var(--paper); padding-bottom: .3em; border-bottom: 1px solid var(--brass); transition: color .2s; }
   .hero .go:hover { color: var(--brass); }
@@ -71,7 +71,7 @@
 
   /* ---------- 공지사항 ---------- */
   .notice { margin-top: clamp(22px, 4vh, 36px); }
-  .notice details { border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.5); }
+  .notice details { border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.05); }
   .notice summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: .55em 1em; font-size: .88rem; }
   .notice summary::-webkit-details-marker { display: none; }
   .notice summary b { flex: none; color: var(--brass); font-family: var(--serif); font-weight: 900; }
@@ -91,19 +91,11 @@
   .room-head h2 { font-family: var(--serif); font-weight: 900; font-size: clamp(1.6rem, 3.4vw, 2.3rem); }
   .room-head p { color: var(--muted); font-size: .92rem; }
 
-  /* 미션 구역: 본문보다 한 톤 밝은 면 */
-  .room.light { color: #22201c; margin-top: clamp(32px, 6vh, 64px); padding-bottom: clamp(32px, 6vh, 56px); }
-  .room.light .room-head { border-color: rgba(43,42,51,.2); }
-  .room.light .room-head p, .room.light .row .sub, .room.light .row .tag, .room.light .info summary { color: #6b5b45; }
-  .room.light .info summary { border-color: #6b5b45; } .room.light .info summary:hover, .room.light .info[open] summary { color: #2b2a33; }
-  .room.light .row { border-color: rgba(43,42,51,.15); }
-  .room.light .row[data-open]:hover { background: linear-gradient(90deg, rgba(168,42,42,.07), transparent 70%); }
-  .room.light .row .act { color: #a52a2a; border-color: rgba(165,42,42,.4); } .room.light .row .act:hover, .room.light .row[data-open]:hover .act { color: #22201c; border-color: #22201c; }
 
   /* ---------- 종목 행 ---------- */
   .row { --seal: #b4432e; position: relative; display: grid; grid-template-columns: 72px 1fr auto; gap: 8px 28px; align-items: center; padding: 28px 12px; border-bottom: 1px solid var(--line); scroll-margin-top: 70px; transition: background .25s; }
   .row[data-open] { cursor: pointer; }
-  .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.55), transparent 70%); }
+  .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
   .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; }
   .row.mission { --seal: #a52a2a; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
@@ -161,8 +153,8 @@
 <header class="hero" id="top">
   <div class="wrap">
     <div>
-      <h1>함께 뛰고,<br>함께 겨룬다.</h1>
-      <p class="lead">스마트폰만 있으면 어디든지 경기장이 됩니다. 컴퓨터와 휴대폰으로 더욱 즐겁게 운동해보세요.</p>
+      <h1>터치하는 순간,<br>여기가 바로 진짜 경기장!</h1>
+      <p class="lead">친구들과 함께 뛰고, 소리치고, 실시간으로 점수를 확인하는 가장 스마트한 체육 놀이 플랫폼, 플레이 라운지!</p>
       <a class="go" href="#games">게임 둘러보기</a>
     </div>
     <div class="clock" role="timer" aria-label="현재 시각"><span class="hm"><span id="c-h">--</span><i class="colon">:</i><span id="c-m">--</span></span><small id="c-date"></small></div>
@@ -220,7 +212,7 @@
   </div>
 </section>
 
-<section class="room light" id="mission" aria-labelledby="h-mission">
+<section class="room" id="mission" aria-labelledby="h-mission">
   <div class="wrap">
     <div class="room-head"><h2 id="h-mission">미션</h2><p>경기 중간에 모두에게 미션을 보냅니다</p></div>
     <article class="row mission" id="mission-row">
