@@ -130,10 +130,14 @@ app.use((_req, res, next) => {                        // 기본 보안 헤더
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   if (USE_HTTP) res.setHeader('Strict-Transport-Security', 'max-age=15552000');   // 클라우드(HTTPS 프록시) 배포에서만
+  if (_req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');   // 로그인 상태 등은 캐시 금지
   next();
 });
 members.mount(app, express);
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {   // 홈 화면 바로가기·사파리가 옛 화면을 붙들고 있지 않도록 항상 재확인
+  etag: true,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+}));
 
 app.get('/api/config', (_req, res) => {
   res.json({
