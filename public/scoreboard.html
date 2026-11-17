@@ -367,6 +367,15 @@
   [hidden] { display: none !important; }
   body.multi .team-sub { display: none; }
   #custom-time input { font: inherit; font-weight: 800; width: 100%; min-width: 0; padding: .45em .3em; text-align: center; border-radius: 12px; border: 1px solid var(--glass-line); background: rgba(255,255,255,.1); color: var(--ink); }
+  details.more { width: 100%; }
+  details.more > summary { cursor: pointer; list-style: none; text-align: center; font-weight: 700; font-size: clamp(.8rem, 1.7vh, .95rem); padding: .55em; border-radius: 14px; border: 1px solid var(--glass-line); background: rgba(255,255,255,.08); color: #d5dbea; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more[open] > summary { background: rgba(255,255,255,.18); }
+  details.more.mini > summary { border: 0; background: transparent; font-weight: 500; font-size: .75rem; color: var(--muted); }
+  .more-body { display: flex; flex-direction: column; gap: 1.2vh; margin-top: 1.2vh; align-items: center; }
+  .more-body > * { width: 100%; }
+  .more-body .cap { margin-bottom: 0; }
+  #dodge-events { display: none; } body.dodge #dodge-events { display: grid; }
 </style>
 </head>
 <body>
@@ -410,6 +419,18 @@
       <div class="join-url" id="url-ref"></div>
       <div class="join-count"><span class="jl">심판 기기</span> <span id="count-ref">0</span>대</div>
     </div>
+    <div class="controls">
+      <button class="primary" id="btn-start">시작</button>
+      <button id="btn-pause" disabled>일시정지</button>
+      <button id="btn-reset">초기화</button>
+    </div>
+    <div class="controls" id="dodge-events" role="group" aria-label="피구 이벤트">
+      <button class="dev" data-ev="revive">🔄 전체 부활</button>
+      <button class="dev" data-ev="freeze">❄ 얼음!</button>
+      <button class="dev" data-ev="thaw">🔔 땡!</button>
+    </div>
+    <details class="more"><summary>⚙ 설정 (시간 · 팀 · 점수)</summary>
+    <div class="more-body">
     <div id="team-panel">
       <div class="cap">참가 팀 수 (최대 4팀)</div>
       <div class="cnts" role="group" aria-label="참가 팀 수">
@@ -419,11 +440,6 @@
       <div class="names" id="name-list"></div>
     </div>
 
-    <div class="controls">
-      <button class="primary" id="btn-start">시작</button>
-      <button id="btn-pause" disabled>일시정지</button>
-      <button id="btn-reset">초기화</button>
-    </div>
     <div class="controls sub">
       <button class="small" id="btn-mode-round">라운드</button>
       <button class="small" id="btn-mode-rest">휴식</button>
@@ -445,12 +461,6 @@
         <button class="dmode" data-mode="survival">생존 피구</button>
         <button class="dmode" data-mode="score">점수 피구</button>
       </div>
-      <div class="cap">피구 이벤트</div>
-      <div class="controls" role="group" aria-label="피구 이벤트">
-        <button class="dev" data-ev="revive">🔄 전체 부활</button>
-        <button class="dev" data-ev="freeze">❄ 얼음!</button>
-        <button class="dev" data-ev="thaw">🔔 땡!</button>
-      </div>
       <div class="cap">팀 인원수 설정</div>
       <div class="controls size" role="group" aria-label="팀 인원수">
         <button class="adj-b" data-team="blue" data-delta="-1">청 인원 −</button>
@@ -469,22 +479,28 @@
       </div>
     </div>
     <button class="small" id="btn-score-reset" style="width:100%">점수 0점으로 초기화</button>
+    </div>
+    </details>
 
     <div class="meta">
       <div><span class="dot" id="conn-dot"></span><span id="conn-text">서버 연결 중</span></div>
+      <div class="code-box">경기방<b id="room-val"></b></div>
+      <details class="more mini"><summary>게임 바꾸기 · 경기방 정보</summary>
+      <div class="more-body">
       <div class="game-links" aria-label="게임 선택">
         <a href="/scoreboard.html?game=strike" id="gl-strike" target="_blank" rel="noopener">타격 대결</a>
         <a href="/scoreboard.html?game=dodge" id="gl-dodge" target="_blank" rel="noopener">피구</a>
         <a href="/scoreboard.html?game=neon" id="gl-neon" target="_blank" rel="noopener">반응속도</a>
         <a href="/scoreboard.html?game=flip" id="gl-flip" target="_blank" rel="noopener">판 뒤집기</a>
       </div>
-      <div class="code-box">경기방<b id="room-val"></b></div>
       <a class="new-room" id="new-room" href="/scoreboard.html" target="_blank" rel="noopener">새 경기방 만들기</a>
       <a class="back-menu" href="/">← 플레이 라운지 메뉴</a>
       <div class="code-box" id="code-box" hidden>참가 코드<b id="code-val"></b></div>
       <label id="ip-picker" hidden>QR 주소
         <select id="ip-select" aria-label="QR 코드에 사용할 네트워크 주소"></select>
       </label>
+      </div>
+      </details>
     </div>
   </section>
 
@@ -1003,7 +1019,7 @@
     if (dodge && dodge.mode === b.dataset.mode) return;
     if (confirm('피구 모드를 바꾸면 점수와 생존 상태가 초기화됩니다. 바꿀까요?')) socket.emit('dodge:mode', b.dataset.mode);
   }));
-  document.querySelectorAll('#dodge-panel .dev').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:event', b.dataset.ev)));
+  document.querySelectorAll('.dev').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:event', b.dataset.ev)));
   document.querySelectorAll('#dodge-panel .controls.adj button').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:adjust', { team: b.dataset.team, delta: Number(b.dataset.delta) })));
   document.querySelectorAll('#dodge-panel .controls.size button').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:size', { team: b.dataset.team, delta: Number(b.dataset.delta) })));
   $('btn-score-reset').addEventListener('click', () => {
