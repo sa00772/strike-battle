@@ -338,11 +338,7 @@ function attach(io, socket, auth) {
     if (!EVENT_ID_RE.test(id)) return fail('bad-event');
 
     if (p.role === 'admin') {
-      if (auth.ADMIN_PASSWORD) {
-        if (!p.password) return fail('password-required');
-        if (!auth.safeEqual(p.password, auth.ADMIN_PASSWORD)) { auth.recordFail(ip); return fail('bad-password'); }
-        auth.clearFail(ip);
-      }
+      if (auth.membersEnabled && !auth.memberOf(socket)) return fail('login-required');   // 회원 로그인 필요
       let ev = events.get(id);
       if (!ev) {
         if (!KINDS.includes(p.kind)) return fail('bad-kind');

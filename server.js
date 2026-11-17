@@ -35,11 +35,10 @@ const ROOM_ID_RE = /^[A-Z0-9]{4,12}$/;
 const EMPTY_ROOM_TTL_MS = 30 * 60 * 1000;                       // 접속자가 없는 방은 30분 뒤 삭제
 
 /* ------------------------- 접근 제어 (코드 방식) -------------------------
- *  ADMIN_PASSWORD : PC 점수판에 들어갈 때 필요한 관리자 비밀번호
+ *  점수판·경기 운영 화면은 회원 로그인(쿠키)이 필요합니다. (관리자 비밀번호는 더 이상 쓰지 않음)
  *  ACCESS_CODE    : 모바일 패드에 들어갈 때 필요한 참가 코드
  *  둘 다 비워 두면 해당 보호는 꺼집니다(누구나 접속 가능).
  */
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ACCESS_CODE = process.env.ACCESS_CODE || '';
 
 function safeEqual(a, b) {
@@ -398,11 +397,11 @@ setInterval(() => {
 io.on('connection', (socket) => {
   // 태권도 경기(공인품새 / 자유품새) 이벤트 처리
   tkd.attach(io, socket, {
-    ADMIN_PASSWORD, ACCESS_CODE, safeEqual, ipOf, isLocked, recordFail,
+    memberOf: (sock) => members.memberFromCookieHeader(sock.handshake.headers.cookie), membersEnabled: members.enabled, ACCESS_CODE, safeEqual, ipOf, isLocked, recordFail,
     clearFail: (ip) => failures.delete(ip),
   });
 
-  // 역할 등록 + 인증: 점수판(관리자 비밀번호) 또는 팀 패드(참가 코드)
+  // 역할 등록 + 인증: 점수판(회원 로그인) 또는 팀 패드(참가 코드)
   socket.on('join', (payload = {}) => {
     for (const r of socket.rooms) if (r !== socket.id) socket.leave(r);
     socket.data.role = null;
@@ -418,14 +417,10 @@ io.on('connection', (socket) => {
 
     let room;
     if (payload.role === 'scoreboard') {
-      if (ADMIN_PASSWORD) {
-        if (!payload.password) return reject('password-required');
-        if (!safeEqual(payload.password, ADMIN_PASSWORD)) { recordFail(ip); return reject('bad-password'); }
-        failures.delete(ip);
-      }
-      room = getOrCreateRoom(roomId);                 // 점수판만 방을 만들 수 있음
       const owner = members.memberFromCookieHeader(socket.handshake.headers.cookie);
-      if (owner) room.ownerId = owner.id;             // 로그인한 회원이 연 방이면 경기 기록을 그 회원 DB에 저장
+      if (members.enabled && !owner) return reject('login-required');   // 회원 가입·로그인한 사람만 점수판을 열 수 있음
+      room = getOrCreateRoom(roomId);                 // 점수판만 방을 만들 수 있음
+      if (owner) room.ownerId = owner.id;             // 회원이 연 방이면 경기 기록을 그 회원 DB에 저장
       if (GAME_TYPES.includes(payload.game) && room.gameType !== payload.game) {
         room.gameType = payload.game;                 // 점수판이 연 게임 종류로 방을 설정
         room.neon = newNeon();
@@ -766,7 +761,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`  PC 점수판        : ${proto}://${primary}:${PORT}/   (메뉴에서 게임을 고르면 새 경기방이 만들어집니다)`);
   console.log('  플레이 라운지    : 메인 주소(/)의 메뉴에서 게임을 선택');
   console.log('  모바일/기지 주소 : 점수판 화면의 QR 코드를 스캔 (경기방 ID 포함)');
-  console.log(`\n  관리자 비밀번호(ADMIN_PASSWORD) : ${ADMIN_PASSWORD ? '설정됨' : '⚠ 미설정 - 누구나 점수판 조작 가능'}`);
+  console.log(`\n  회원 시스템 : ${members.enabled ? '사용 중 (데이터 폴더: ' + members.DATA_DIR + ')' : '⚠ 꺼짐 - Node 22.13 이상이 필요합니다'}`);
+  if (process.env.RAILWAY_ENVIRONMENT && !process.env.RAILWAY_VOLUME_MOUNT_PATH && !process.env.DATA_DIR) console.log('  ⚠ Railway Volume 이 연결되지 않아 재배포하면 회원 데이터가 사라집니다.');
   console.log(`  참가 코드(ACCESS_CODE)         : ${ACCESS_CODE ? '설정됨' : '⚠ 미설정 - 누구나 모바일 참가 가능'}`);
   if (!USE_HTTP) {
     console.log('\n  ※ 자체 서명 인증서라서 처음 접속 시 보안 경고가 나옵니다.');

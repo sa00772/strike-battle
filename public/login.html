@@ -69,6 +69,7 @@
 </main>
 <script>
 const $ = (s) => document.querySelector(s);
+const nextUrl = () => { const n = new URLSearchParams(location.search).get('next'); return n && /^\/[^\/\\]/.test(n) ? n : '/me.html'; };
 const forms = { login: $('#f-login'), signup: $('#f-signup') };
 function show(which) {
   for (const k in forms) { forms[k].hidden = k !== which; $('#t-' + k).setAttribute('aria-selected', String(k === which)); }
@@ -111,7 +112,7 @@ async function send(form, url, body) {
       if (f) { f.setAttribute('aria-invalid', 'true'); f.focus(); }
       return;
     }
-    location.href = '/me.html';
+    location.href = nextUrl();
   } catch (_) { err.textContent = '서버에 연결할 수 없어요.'; }
   finally { btn.disabled = false; }
 }
@@ -127,7 +128,7 @@ forms.signup.onsubmit = (e) => {
   delete d.password2;
   send(forms.signup, '/api/signup', d);
 };
-fetch('/api/me').then((r) => r.json()).then((j) => { if (j.member) location.href = '/me.html'; if (j.enabled === false) $('.sub').textContent = '이 서버에서는 회원 기능을 쓸 수 없어요.'; });
+fetch('/api/me').then((r) => r.json()).then((j) => { if (j.member) location.href = nextUrl(); if (j.enabled === false) $('.sub').textContent = '이 서버에서는 회원 기능을 쓸 수 없어요.'; });
 </script>
 </body>
 </html>

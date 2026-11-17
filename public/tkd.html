@@ -170,12 +170,11 @@
 </div>
 
 <div class="overlay show" id="login">
-  <h2>관리자 로그인</h2>
-  <form id="login-form" style="display:flex;flex-direction:column;gap:12px;width:min(340px,86vw)">
-    <input id="login-pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" aria-label="관리자 비밀번호">
-    <button class="primary" type="submit">입장</button>
-    <div id="login-err" role="alert" style="color:#ff8a80;min-height:1.3em"></div>
-  </form>
+  <h2>회원 로그인이 필요해요</h2>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:14px;width:min(340px,86vw)">
+    <div id="login-err" role="alert" style="color:#ff8a80;min-height:1.3em">경기 운영은 회원만 할 수 있어요.</div>
+    <a class="primary" href="#" id="to-login" style="text-decoration:none;display:inline-block;padding:14px 28px;border-radius:12px;background:#c9a862;color:#0d0c0b;font-weight:700">로그인 / 회원가입</a>
+  </div>
 </div>
 <div class="cue-ov" id="cue-ov" aria-hidden="true"><div class="cw" id="cue-w"></div><div class="cs" id="cue-s"></div></div>
 <div class="toast" id="toast" role="alert"></div>
@@ -226,11 +225,11 @@
       renderJoinInfo();
     } else {
       if (r.reason === 'bad-password') { adminPw = ''; try { sessionStorage.removeItem('strike-admin'); } catch (_) {} }
-      $('login-err').textContent = { 'bad-password': '비밀번호가 맞지 않습니다.', 'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.' }[r.reason] || '';
-      $('login').classList.add('show'); $('login-pw').focus();
+      if (r.reason === 'rate-limited') $('login-err').textContent = '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.';
+      $('login').classList.add('show');
     }
   });
-  $('login-form').addEventListener('submit', (e) => { e.preventDefault(); adminPw = $('login-pw').value; join(); });
+  $('to-login').addEventListener('click', (e) => { e.preventDefault(); location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search); });
   socket.on('tkd:error', (e) => toast(ERR[e.code] || `오류: ${e.code}`));
   socket.on('tkd:state', (s) => { S = s; render(); });
 

@@ -13,8 +13,10 @@ const crypto = require('crypto');
 let DatabaseSync = null;
 try { ({ DatabaseSync } = require('node:sqlite')); } catch (_) { /* Node 버전이 낮으면 회원 기능만 꺼짐 */ }
 
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
+const DATA_DIR_ENV = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH;   // Railway Volume 은 마운트 경로를 자동으로 알려줌
+const DATA_DIR = DATA_DIR_ENV ? path.resolve(DATA_DIR_ENV) : path.join(__dirname, 'data');
 const SESSION_DAYS = 30;
+const MAX_DEVICES = 5;                     // 한 아이디로 동시에 로그인할 수 있는 기기 수
 const COOKIE = 'pl_session';
 
 const USERNAME_RE = /^[a-z0-9_]{4,20}$/;
@@ -108,6 +110,11 @@ function memberFromCookieHeader(header) {
 function startSession(res, memberId, secure) {
   const token = crypto.randomBytes(32).toString('hex');
   const maxAge = SESSION_DAYS * 86400;
+  main.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
+  // 기기 제한: 새 로그인이 들어오면 가장 오래된 로그인부터 풀어서 최대 MAX_DEVICES 대만 유지
+  main.prepare(`DELETE FROM sessions WHERE member_id = ? AND token_hash NOT IN (
+      SELECT token_hash FROM sessions WHERE member_id = ? ORDER BY rowid DESC LIMIT ?)`)
+    .run(memberId, memberId, MAX_DEVICES - 1);
   main.prepare('INSERT INTO sessions (token_hash, member_id, expires_at) VALUES (?, ?, ?)')
     .run(sha(token), memberId, Date.now() + maxAge * 1000);
   res.setHeader('Set-Cookie',
@@ -313,4 +320,4 @@ function saveRecord(memberId, game, title, data) {
   }
 }
 
-module.exports = { mount, memberFromCookieHeader, saveRecord, enabled: !!main, DATA_DIR };
+module.exports = { MAX_DEVICES, mount, memberFromCookieHeader, saveRecord, enabled: !!main, DATA_DIR };

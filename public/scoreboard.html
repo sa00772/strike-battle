@@ -528,17 +528,14 @@
     <summary>사범님 휴대폰을 리모컨으로 쓰기</summary>
     <div class="qr-box" id="qr-deck"></div>
     <div class="join-url" id="url-deck"></div>
-    <p>QR을 스캔하고 관리자 비밀번호를 입력하면 휴대폰에서 미션 발송과 타이머를 조작할 수 있습니다.</p>
+    <p>QR을 스캔하고 회원 로그인을 하면 휴대폰에서 미션 발송과 타이머를 조작할 수 있습니다.</p>
   </details>
 </aside>
 
 <div class="overlay" id="login" role="dialog" aria-label="관리자 로그인" style="cursor:default;z-index:20">
-  <div class="o-title">관리자 로그인</div>
-  <form class="login-form" id="login-form">
-    <input id="login-pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password" aria-label="관리자 비밀번호">
-    <button class="primary" type="submit">입장</button>
-    <div class="err" id="login-err" role="alert"></div>
-  </form>
+  <div class="o-title">회원 로그인이 필요해요</div>
+  <div class="login-form" style="align-items:center"><div class="err" id="login-err" role="alert" style="color:inherit;opacity:.8">점수판은 회원만 열 수 있어요.</div>
+    <a class="primary" href="#" id="to-login" style="text-decoration:none;display:inline-block;padding:14px 28px;border-radius:12px;background:#c9a862;color:#0d0c0b;font-weight:700">로그인 / 회원가입</a></div>
 </div>
 
 <div class="overlay" id="overlay" role="dialog" aria-live="polite">
@@ -879,16 +876,11 @@
     } else {
       authed = false;
       if (r.reason === 'bad-password') { adminPw = ''; try { sessionStorage.removeItem('strike-admin'); } catch (_) {} }
-      $('login-err').textContent = LOGIN_ERR[r.reason] || '';
+      if (r.reason === 'rate-limited') $('login-err').textContent = LOGIN_ERR[r.reason];
       $('login').classList.add('show');
-      $('login-pw').focus();
     }
   });
-  $('login-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    adminPw = $('login-pw').value;
-    socket.emit('join', { role: 'scoreboard', password: adminPw, room: roomId, game });
-  });
+  $('to-login').addEventListener('click', (e) => { e.preventDefault(); location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search); });
   socket.on('game:state', (s) => { state = s; renderTimer(); renderOverlay(); });
   socket.on('score:update', (s) => {
     scores = { blue: s.blue || 0, red: s.red || 0, violet: s.violet || 0, amber: s.amber || 0 };
