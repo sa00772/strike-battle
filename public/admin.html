@@ -21,6 +21,16 @@
  .acts{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
  .tmp{background:var(--ink-2);border:1px solid var(--brass);border-radius:8px;padding:10px 12px;margin-top:6px;font-size:.92rem}
  .tmp code{font-size:1.1rem;color:var(--brass);letter-spacing:.06em}
+ .st-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+ .st-top .chip{border:1px solid var(--line);background:none;color:var(--muted);border-radius:99px;padding:5px 14px;font-size:.85rem;cursor:pointer}
+ .st-top .chip[aria-pressed=true]{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+ .st-row{display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;font-size:.9rem;margin:6px 0}
+ .st-row .bar2{height:12px;border-radius:6px;background:rgba(241,235,221,.08);overflow:hidden}
+ .st-row .bar2 i{display:block;height:100%;background:var(--brass);border-radius:6px}
+ .st-row b{text-align:right;font-variant-numeric:tabular-nums}
+ .st-row.zero{opacity:.45}
+ .days{display:flex;align-items:flex-end;gap:2px;height:60px;margin-top:14px}
+ .days i{flex:1;background:var(--brass-dim);border-radius:2px 2px 0 0;min-height:2px}
 </style>
 </head>
 <body>
@@ -33,6 +43,17 @@
     <p class="hint" style="margin-bottom:12px">회원 정보와 모든 회원의 선수 명단·경기 기록을 하루에 한 번 자동으로 백업해요. 최근 <span id="keep">10</span>개만 서버에 보관해요. 서버가 잘못되어도 데이터를 지킬 수 있게, <b>가끔 내 컴퓨터로 내려받아 두세요.</b></p>
     <div class="acts" style="margin:0 0 12px"><button class="btn sm" id="b-now">지금 백업하고 내려받기</button></div>
     <ul class="list" id="b-list"></ul>
+  </section>
+  <section class="box" id="stats">
+    <h2>이용 통계</h2>
+    <p class="hint" style="margin-bottom:12px">어떤 화면을 몇 번 열었는지만 세어요. 누가 열었는지는 저장하지 않아요. 사이트를 연 횟수이고, 실제로 게임을 끝까지 한 횟수와는 달라요.</p>
+    <div class="st-top" id="st-top">
+      <button class="chip" data-d="7" aria-pressed="false">7일</button><button class="chip" data-d="30" aria-pressed="true">30일</button><button class="chip" data-d="all" aria-pressed="false">전체</button>
+      <span class="cnt" id="st-mem"></span>
+    </div>
+    <div id="st-list"></div>
+    <div class="days" id="st-days" aria-label="날짜별 이용 횟수"></div>
+    <p class="hint" id="st-note" style="margin-top:6px"></p>
   </section>
   <div class="bar"><input id="q" placeholder="이름 · 아이디 · 소속 · 전화번호 검색" aria-label="회원 검색"><span class="cnt" id="cnt"></span></div>
   <div id="list"></div>
@@ -106,8 +127,21 @@ $('#b-list').onclick = async (e) => {
   const { member: m } = await api('/api/me');
   if (!m) { location.href = '/login.html?next=/admin.html'; return; }
   if (m.role !== 'master') { location.href = '/me.html'; return; }
-  $('#app').hidden = false; load(); loadBackups();
+  $('#app').hidden = false; load(); loadBackups(); loadStats().catch(() => {});
 })();
+
+/* 이용 통계 */
+let stDays = '30';
+async function loadStats() {
+  const j = await api('/api/admin/stats?days=' + stDays);
+  const top = Math.max(1, ...j.items.map((x) => x.n));
+  $('#st-list').innerHTML = j.items.map((x) => `<div class="st-row ${x.n ? '' : 'zero'}"><span>${esc(x.label)}</span><div class="bar2"><i style="width:${Math.round(x.n / top * 100)}%"></i></div><b>${x.n}</b></div>`).join('');
+  const dm = Math.max(1, ...j.daily.map((d) => d.n));
+  $('#st-days').innerHTML = j.daily.map((d) => `<i style="height:${Math.max(4, Math.round(d.n / dm * 100))}%" title="${d.day} · ${d.n}회"></i>`).join('');
+  $('#st-note').textContent = j.daily.length ? `막대는 날짜별 이용 횟수(홈페이지 제외)예요. 집계는 ${j.daily[0].day}부터 있어요.` : '아직 집계된 이용이 없어요.';
+  $('#st-mem').textContent = `회원 ${j.members.total}명 · 이 기간 새 가입 ${j.members.joined}명`;
+}
+document.querySelectorAll('#st-top .chip').forEach((b) => { b.onclick = () => { stDays = b.dataset.d; document.querySelectorAll('#st-top .chip').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); loadStats().catch(() => {}); }; });
 </script>
 </body>
 </html>

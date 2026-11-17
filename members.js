@@ -40,6 +40,12 @@ function init() {
       phone TEXT NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS usage (
+      day TEXT NOT NULL,
+      key TEXT NOT NULL,
+      n INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, key)
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       member_id INTEGER NOT NULL,
@@ -253,6 +259,22 @@ function autoBackup() {
 }
 if (main) { setTimeout(autoBackup, 60 * 1000).unref(); setInterval(autoBackup, 60 * 60 * 1000).unref(); }   // 시작 1분 뒤 확인, 이후 1시간마다 확인
 
+
+/* ------------------------------ 이용 통계 (개인 식별 없이 기능별 횟수만 집계) ------------------------------ */
+const TRACK_LABELS = {
+  'home': '홈페이지',
+  'game:strike': '타격 대결', 'game:dodge': '피구', 'game:neon': '반응속도 게임', 'game:flip': '디지털 판 뒤집기',
+  'react': '색깔·방향 반응 훈련', 'bomb': '폭탄 돌리기',
+  'tkd:recognized': '공인품새 대전', 'tkd:freestyle': '자유품새 대전',
+  'deck': '돌발 미션 덱', 'roulette': '미션 뽑기',
+  'tool:timer': '멀티 인터벌 타이머', 'tool:metro': '메트로놈', 'tool:dice': '주사위', 'tool:teams': '팀 나누기',
+};
+const kstDay = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
+function track(key) {
+  if (!main || !Object.prototype.hasOwnProperty.call(TRACK_LABELS, key)) return;
+  try { main.prepare('INSERT INTO usage (day, key, n) VALUES (?,?,1) ON CONFLICT(day, key) DO UPDATE SET n = n + 1').run(kstDay(), key); } catch (_) {}
+}
+
 /* ------------------------------ 라우터 ------------------------------ */
 function mount(app, express) {
   const json = express.json({ limit: '20kb' });
@@ -373,6 +395,18 @@ function mount(app, express) {
     res.json({ ok: true });
   });
 
+
+  // 이용 횟수 집계용 신호 (로그인 불필요, 허용된 기능 이름만 받고 IP당 분당 120회까지)
+  const tHits = new Map();
+  app.post('/api/track', json, (req, res) => {
+    const ip = (String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '';
+    const now = Date.now(), h = tHits.get(ip) || { n: 0, t: now };
+    if (now - h.t > 60000) { h.n = 0; h.t = now; }
+    h.n += 1; tHits.set(ip, h);
+    if (h.n <= 120) track(String((req.body || {}).k || ''));
+    res.status(204).end();
+  });
+
   /* ---------------------- 마스터 전용: 회원 관리 ---------------------- */
   const masterOnly = (req, res, next) => {
     if (req.member.role !== 'master') return res.status(403).json({ error: '마스터 계정만 사용할 수 있어요.' });
@@ -400,6 +434,19 @@ function mount(app, express) {
     if (!BACKUP_RE.test(name)) return res.status(404).json({ error: '백업 파일을 찾을 수 없어요.' });
     try { fs.unlinkSync(path.join(BACKUP_DIR, name)); } catch (_) {}
     res.json({ ok: true });
+  });
+  app.get('/api/admin/stats', off, auth, masterOnly, (req, res) => {
+    const days = req.query.days === 'all' ? 3650 : Math.min(365, Math.max(1, parseInt(req.query.days, 10) || 30));
+    const since = kstDay(Date.now() - (days - 1) * 86400e3);
+    const sums = Object.fromEntries(main.prepare('SELECT key, SUM(n) AS n FROM usage WHERE day >= ? GROUP BY key').all(since).map((r) => [r.key, r.n]));
+    const daily = main.prepare('SELECT day, SUM(n) AS n FROM usage WHERE day >= ? AND key != ? GROUP BY day ORDER BY day').all(since, 'home');
+    const sinceMs = Date.now() - days * 86400e3;
+    res.json({
+      days, since,
+      items: Object.entries(TRACK_LABELS).map(([key, label]) => ({ key, label, n: sums[key] || 0 })).sort((a, b) => b.n - a.n),
+      daily,
+      members: { total: main.prepare('SELECT COUNT(*) AS c FROM members').get().c, joined: main.prepare('SELECT COUNT(*) AS c FROM members WHERE created_at >= ?').get(sinceMs).c },
+    });
   });
   app.get('/api/admin/members', off, auth, masterOnly, (_req, res) => {
     const rows = main.prepare(`SELECT m.id, m.username, m.name, m.org_type, m.org, m.phone, m.created_at, m.role, m.disabled,
@@ -479,4 +526,4 @@ function saveRecord(memberId, game, title, data) {
 
 ensureMaster();
 
-module.exports = { MAX_DEVICES, mount, memberFromCookieHeader, saveRecord, enabled: !!main, DATA_DIR };
+module.exports = { MAX_DEVICES, track, mount, memberFromCookieHeader, saveRecord, enabled: !!main, DATA_DIR };

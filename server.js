@@ -134,6 +134,17 @@ app.use((_req, res, next) => {                        // 기본 보안 헤더
   next();
 });
 members.mount(app, express);
+app.use((req, _res, next) => {                        // 이용 통계: 어떤 화면을 열었는지 개인 식별 없이 횟수만 센다
+  if (req.method === 'GET') {
+    const p = req.path, q = req.query || {};
+    const key = (p === '/' || p === '/index.html') ? 'home'
+      : p === '/scoreboard.html' && GAME_TYPES.includes(q.game) ? 'game:' + q.game
+      : p === '/tkd.html' && (q.kind === 'recognized' || q.kind === 'freestyle') ? 'tkd:' + q.kind
+      : p === '/roulette.html' ? 'roulette' : p === '/deck.html' ? 'deck' : p === '/bomb.html' ? 'bomb' : null;
+    if (key) members.track(key);
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public'), {   // 홈 화면 바로가기·사파리가 옛 화면을 붙들고 있지 않도록 항상 재확인
   etag: true,
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),

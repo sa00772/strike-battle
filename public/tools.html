@@ -234,6 +234,7 @@ function showTab(which) {
   TABS.forEach((t) => { $('#p-' + t).hidden = t !== which; { const b = $('#tab-' + t); if (b) b.setAttribute('aria-selected', String(t === which)); } });
   if (which !== 'react' && window.rxStop) window.rxStop();
   history.replaceState(null, '', '#' + which);
+  try { fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k: which === 'react' ? 'react' : 'tool:' + which }), keepalive: true }).catch(() => {}); } catch (_) {}
   const sel = $('#tab-' + which); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 TABS.forEach((t) => { const b = $('#tab-' + t); if (b) b.onclick = () => showTab(t); });
