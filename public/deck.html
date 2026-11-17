@@ -27,13 +27,13 @@
   .gate input:focus{outline:none;border-color:#ff922b;box-shadow:0 0 0 3px rgba(255,146,43,.25)}
   .gate button{font:inherit;font-size:1.1rem;font-weight:900;padding:.9em;border:0;border-radius:16px;background:var(--accent);color:#fff;box-shadow:0 4px 0 #b8430a;cursor:pointer}
   body.need-room #pick{display:flex} body.need-login:not(.need-room) #login{display:flex}
-  body.need-room .main,body.need-login .main{display:none}
+  body.need-room .main,body.need-login .main,body.connecting .main{display:none}
   .err{color:#d9480f;min-height:1.3em;font-weight:700}
   .main{display:flex;flex-direction:column;gap:16px}
   .hint{color:var(--muted);font-size:.9rem;line-height:1.6}
 </style>
 </head>
-<body class="need-login">
+<body class="connecting">
 <div class="wrap">
   <header><h1>🚨 미션 덱</h1><span class="room" id="room"></span></header>
 
@@ -80,8 +80,8 @@
   const ERR = { 'rate-limited': '시도가 너무 많습니다. 1분 뒤에 다시 시도하세요.', 'bad-room': '경기방 주소가 올바르지 않습니다. 점수판의 QR을 다시 스캔하세요.' };
   socket.on('connect', () => { if (room) join(); });
   socket.on('join:result', (r) => {
-    if (r.ok) { document.body.classList.remove('need-login'); try { sessionStorage.setItem('strike-admin', pw); } catch (_) {} }
-    else { document.body.classList.add('need-login'); $('err').textContent = ERR[r.reason] || ''; }
+    if (r.ok) { document.body.classList.remove('need-login', 'connecting'); try { sessionStorage.setItem('strike-admin', pw); } catch (_) {} }
+    else { document.body.classList.remove('connecting'); document.body.classList.add('need-login'); $('err').textContent = ERR[r.reason] || ''; }
   });
   $('login').addEventListener('submit', (e) => { e.preventDefault(); location.href = '/login.html?next=' + encodeURIComponent(location.pathname + location.search); });
   Deck.mount($('deck'), socket);
