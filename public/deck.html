@@ -72,7 +72,7 @@
     const v = $('room-in').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (v.length >= 4) location.search = `?room=${v}`;
   });
-  const socket = io();
+  const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   let pw = '';
   try { pw = sessionStorage.getItem('strike-admin') || ''; } catch (_) {}
   const join = () => socket.emit('join', { role: 'scoreboard', password: pw, room });

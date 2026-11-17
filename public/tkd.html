@@ -203,7 +203,7 @@
   document.title = `${KIND_KO[kind]} - 플레이 라운지`;
   if (kind === 'freestyle') $('pool-wrap').hidden = true;
 
-  const socket = io();
+  const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   let S = null, cfg = null, adminPw = '', accessCode = null;
   try { adminPw = sessionStorage.getItem('strike-admin') || ''; } catch (_) {}
 

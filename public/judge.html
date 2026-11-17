@@ -107,7 +107,7 @@
   let J = null, formSeq = null, vals = {}, confirming = false, view = 'login', lobby = null, lastErr = '';
 
   if (!eventId) { app.innerHTML = '<div class="center"><div class="big">대회 코드가 없습니다</div>관리자 화면의 QR을 다시 스캔해 주세요.</div>'; return; }
-  const socket = io();
+  const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   const enter = () => socket.emit('tkd:join', { role: 'judge', event: eventId, code, seat: mySeat || undefined, token });
   socket.on('connect', () => { $('#conn').style.display = 'none'; enter(); });
   socket.on('disconnect', () => { $('#conn').style.display = 'block'; });

@@ -605,7 +605,7 @@
     if (game === 'dodge') { document.body.classList.add('dodge'); $('dodge-panel').hidden = false; }
   })();
 
-  const socket = io();
+  const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   Mission.attach(socket, 'screen');
   Deck.mount($('deck-body'), socket);
   const deckToggle = (open) => {

@@ -119,7 +119,7 @@
     else st.textContent = game.remainingSec < game.totalSec ? '일시정지' : '대기 중';
   }
 
-  const socket = io();
+  const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   if (window.Mission) Mission.attach(socket, 'phone');
   let accessCode = '';
   try { accessCode = localStorage.getItem('strike-code') || ''; } catch (_) {}

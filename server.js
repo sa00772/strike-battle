@@ -26,7 +26,7 @@ const DEFAULT_ROUND_SEC = Number(process.env.ROUND_SEC) || 180; // 라운드 기
 const DEFAULT_REST_SEC = Number(process.env.REST_SEC) || 60;    // 휴식 기본 1분
 const MIN_DURATION_SEC = 5, MAX_DURATION_SEC = 5999;                // 원하는 시간 직접 설정 (5초 ~ 99분 59초)
 const ALLOWED_DURATIONS = [180, 90, 60, 30];                        // 선택 가능한 시간: 3분 / 1분 / 30초
-const HIT_MIN_INTERVAL_MS = 250;                                // 서버측 연타 방지
+const HIT_MIN_INTERVAL_MS = 100;                                // 서버측 중복 신호 방지 (네트워크 지연으로 신호가 붙어 도착해도 놓치지 않게 짧게)
 const TEAMS = ['blue', 'red'];                                   // 2팀 대결 게임(판 뒤집기·피구)
 const ALL_TEAMS = ['blue', 'red', 'violet', 'amber'];            // 타격 대결·반응속도: 최대 4팀
 const DEFAULT_TEAM_NAMES = { blue: '1팀', red: '2팀', violet: '3팀', amber: '4팀' };

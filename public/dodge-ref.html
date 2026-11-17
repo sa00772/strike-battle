@@ -112,7 +112,7 @@
     if (dodge.over) ov.textContent = dodge.over === 'draw' ? '무승부' : `${dodge.over === 'blue' ? '청팀' : '홍팀'} 승리!`;
   }
 
-  const socket = io();
+  const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   let code = ''; try { code = localStorage.getItem('strike-code') || ''; } catch (_) {}
   const joinNow = () => socket.emit('join', { role: 'referee', code, room });
   socket.on('connect', () => { if (room) joinNow(); });
