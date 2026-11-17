@@ -180,8 +180,8 @@
   .game-links { font-size: .85rem; display: flex; gap: 10px; justify-content: center; }
   .game-links a { color: var(--muted); text-decoration: none; padding: 2px 8px; border-radius: 6px; border: 1px solid #3a4152; }
   .game-links a.on { color: #11141b; background: #fff; border-color: #fff; font-weight: 700; }
-  .flag-chip { font-size: clamp(.9rem, 1.2vw, 1.4rem); font-weight: 800; padding: .3em .9em; border-radius: 999px; background: rgba(0,0,0,.3); margin-bottom: 1vh; }
-  .flag-chip.captured { background: #fff; color: #11141b; animation: blink 1s steps(2, start) infinite; }
+  .status-chip { font-size: clamp(.9rem, 1.2vw, 1.4rem); font-weight: 800; padding: .3em .9em; border-radius: 999px; background: rgba(0,0,0,.3); margin-bottom: 1vh; }
+  .status-chip.frozen { background: #bfe8ff; color: #0b3a5a; }
   .join-title { font-size: .95rem; font-weight: 700; opacity: .9; }
   button.preset.active, button.cdbtn.active { background: #fff; color: #11141b; }
   .cap { font-size: .8rem; color: var(--muted); margin-bottom: -1.4vh; }
@@ -273,7 +273,7 @@
   select option { color: #111; }
   .game-links a { border: 1px solid rgba(255,255,255,.24); border-radius: 999px; }
   .game-links a.on { background: rgba(255,255,255,.88); color: #2a2f45; border-color: transparent; }
-  .flag-chip { background: rgba(255,255,255,.18); }
+  .status-chip { background: rgba(255,255,255,.18); }
 
   .signal { background: rgba(255,255,255,.07); border: 1px solid var(--glass-line); border-radius: 24px; }
   .signal.go { border-color: rgba(255,255,255,.7); }
@@ -309,9 +309,25 @@
   .meta { font-size: clamp(.72rem, 1.6vh, .85rem); gap: 4px; }
   .code-box b { font-size: clamp(1.1rem, 2.8vh, 1.5rem); }
   @media (max-width: 900px) { .score { font-size: 22vw; } .qr-box { width: 150px; height: 150px; } }
+
+  /* 피구 */
+  #dodge-panel { display: flex; flex-direction: column; gap: 1.2vh; width: 100%; } #dodge-panel[hidden] { display: none; }
+  #dodge-panel .cap { margin-bottom: 0; }
+  #dodge-panel .controls.adj { grid-template-columns: 1fr 1fr 6px 1fr 1fr; }
+  button.dmode.active { background: rgba(255,255,255,.88); color: #2a2f45; }
+  button.dev { background: rgba(255,255,255,.16); } button.dev[data-ev="revive"] { background: rgba(120,225,170,.42); } button.dev[data-ev="freeze"] { background: rgba(130,200,255,.42); } button.dev[data-ev="thaw"] { background: rgba(255,200,120,.42); }
+  button.adj-b { background: rgba(var(--pastel-blue),.35); } button.adj-r { background: rgba(var(--pastel-red),.35); }
+  .evt { position: fixed; inset: 0; z-index: 15; display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .evt.show { display: flex; animation: evtin .3s ease-out; } .evt .eb { font-size: clamp(4rem, 16vw, 16rem); font-weight: 900; text-shadow: 0 6px 40px rgba(0,0,0,.35); } .evt .es { font-size: clamp(1.2rem, 3vw, 3rem); font-weight: 700; }
+  .evt.revive { background: rgba(70,200,130,.55); } .evt.freeze { background: rgba(90,170,235,.6); } .evt.thaw { background: rgba(255,170,60,.55); }
+  @keyframes evtin { from { transform: scale(1.1); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .frozen-banner { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 14; background: #bfe8ff; color: #0b3a5a; font-weight: 900; padding: .35em 1.2em; border-radius: 999px; box-shadow: 0 4px 18px rgba(0,0,0,.3); display: none; }
+  body.is-frozen .frozen-banner { display: block; }
 </style>
 </head>
 <body>
+<div class="evt" id="evt" role="alert"><div class="eb" id="evt-b"></div><div class="es" id="evt-s"></div></div>
+<div class="frozen-banner" id="frozen-banner">❄ 얼음 상태 — 땡을 누르면 해제</div>
 <div class="scorebar" id="scorebar" aria-label="타일 점유 현황">
   <div class="sb-blue" id="sb-blue">청 0</div>
   <div class="sb-mid" id="sb-mid">남은 칸 81</div>
@@ -324,7 +340,7 @@
     <div class="team-name">청팀</div>
     <div class="team-sub">Blue Score</div>
     <div class="score" id="score-blue">0</div>
-    <div class="flag-chip" id="flag-blue" hidden></div>
+    <div class="status-chip" id="dchip-blue" hidden></div>
     <div class="join">
       <div class="join-title" id="jt-blue"></div>
       <div class="qr-box" id="qr-blue"></div>
@@ -360,11 +376,26 @@
       <button class="preset" data-sec="60">1분</button>
       <button class="preset" data-sec="30">30초</button>
     </div>
-    <div class="cap" id="cd-cap" hidden>깃발 탈취 후 쿨타임</div>
-    <div class="controls" id="cooldowns" hidden role="group" aria-label="깃발 탈취 쿨타임">
-      <button class="cdbtn" data-sec="3">3초</button>
-      <button class="cdbtn" data-sec="5">5초</button>
-      <button class="cdbtn" data-sec="10">10초</button>
+    <div id="dodge-panel" hidden>
+      <div class="cap">피구 모드</div>
+      <div class="controls sub" role="group" aria-label="피구 모드">
+        <button class="dmode" data-mode="survival">생존 피구</button>
+        <button class="dmode" data-mode="score">점수 피구</button>
+      </div>
+      <div class="cap">피구 이벤트</div>
+      <div class="controls" role="group" aria-label="피구 이벤트">
+        <button class="dev" data-ev="revive">🔄 전체 부활</button>
+        <button class="dev" data-ev="freeze">❄ 얼음!</button>
+        <button class="dev" data-ev="thaw">🔔 땡!</button>
+      </div>
+      <div class="cap" id="adj-cap">인원 보정 (아웃 −1 / 부활 +1)</div>
+      <div class="controls adj" role="group" aria-label="인원 또는 점수 보정">
+        <button class="adj-b" data-team="blue" data-delta="-1">청 −1</button>
+        <button class="adj-b" data-team="blue" data-delta="1">청 +1</button>
+        <span></span>
+        <button class="adj-r" data-team="red" data-delta="-1">홍 −1</button>
+        <button class="adj-r" data-team="red" data-delta="1">홍 +1</button>
+      </div>
     </div>
     <button class="small" id="btn-score-reset" style="width:100%">점수 0점으로 초기화</button>
 
@@ -372,7 +403,7 @@
       <div><span class="dot" id="conn-dot"></span><span id="conn-text">서버 연결 중</span></div>
       <div class="game-links" aria-label="게임 선택">
         <a href="/scoreboard.html?game=strike" id="gl-strike" target="_blank" rel="noopener">타격 대결</a>
-        <a href="/scoreboard.html?game=flag" id="gl-flag" target="_blank" rel="noopener">사이버 쟁탈전</a>
+        <a href="/scoreboard.html?game=dodge" id="gl-dodge" target="_blank" rel="noopener">피구</a>
         <a href="/scoreboard.html?game=neon" id="gl-neon" target="_blank" rel="noopener">반응속도</a>
         <a href="/scoreboard.html?game=flip" id="gl-flip" target="_blank" rel="noopener">판 뒤집기</a>
       </div>
@@ -391,7 +422,7 @@
     <div class="team-name">홍팀</div>
     <div class="team-sub">Red Score</div>
     <div class="score" id="score-red">0</div>
-    <div class="flag-chip" id="flag-red" hidden></div>
+    <div class="status-chip" id="dchip-red" hidden></div>
     <div class="join">
       <div class="join-title" id="jt-red"></div>
       <div class="qr-box" id="qr-red"></div>
@@ -455,12 +486,12 @@
   }
   $('room-val').textContent = roomId;
 
-  // 게임 종류: ?game=flag 이면 사이버 쟁탈전, 그 외에는 타격 대결
-  const game = ['flag', 'neon', 'flip'].includes(urlParams.get('game')) ? urlParams.get('game') : 'strike';
+  // 게임 종류: ?game=dodge 이면 피구, 그 외에는 타격 대결
+  const game = ['dodge', 'neon', 'flip'].includes(urlParams.get('game')) ? urlParams.get('game') : 'strike';
   const TEAM_KO = { blue: '청팀', red: '홍팀' };
   (function applyGameUI() {
     $('gl-' + game).classList.add('on');
-    document.title = { flag: '사이버 쟁탈전', neon: '반응속도 게임', flip: '디지털 판 뒤집기', strike: '타격 대결' }[game] + ' - 플레이 라운지';
+    document.title = { dodge: '피구', neon: '반응속도 게임', flip: '디지털 판 뒤집기', strike: '타격 대결' }[game] + ' - 플레이 라운지';
     if (game === 'neon') document.body.classList.add('neon');
     if (game === 'flip') {
       document.body.classList.add('flip');
@@ -469,14 +500,10 @@
     }
     $('new-room').href = `/scoreboard.html?game=${game}`;
     ['blue', 'red'].forEach((t) => {
-      $('jt-' + t).textContent = game === 'flag' ? `${TEAM_KO[t]} 기지 기기 연결 (QR)` : `${TEAM_KO[t]} 선수 입장 (QR)`;
-      if (game === 'flag') {
-        $('flag-' + t).hidden = false;
-        document.querySelector(`#panel-${t} .team-sub`).textContent = t === 'blue' ? 'Blue Base' : 'Red Base';
-        document.querySelector(`#panel-${t} .jl`).textContent = '기지 연결';
-      }
+      $('jt-' + t).textContent = `${TEAM_KO[t]} 선수 입장 (QR)`;
+      if (game === 'dodge') $('dchip-' + t).hidden = false;
     });
-    if (game === 'flag') { $('cooldowns').hidden = false; $('cd-cap').hidden = false; }
+    if (game === 'dodge') { document.body.classList.add('dodge'); $('dodge-panel').hidden = false; }
   })();
 
   const socket = io();
@@ -518,7 +545,7 @@
     const dq = $('qr-deck'); dq.innerHTML = '';
     if (typeof QRCode !== 'undefined') new QRCode(dq, { text: deckUrl, width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M });
     [['blue', '#1747c9'], ['red', '#c4281b']].forEach(([team, color]) => {
-      const url = `${origin}/${{ flag: 'base', neon: 'neon-pad', flip: 'flip-pad', strike: 'mobile' }[game]}.html?team=${team}&room=${roomId}`;
+      const url = `${origin}/${{ dodge: 'dodge-pad', neon: 'neon-pad', flip: 'flip-pad', strike: 'mobile' }[game]}.html?team=${team}&room=${roomId}`;
       const box = $(`qr-${team}`);
       box.innerHTML = '';
       $(`url-${team}`).textContent = url;
@@ -602,20 +629,42 @@
     fctx.clearRect(0, 0, fx.width, fx.height);
   }
 
-  /* ---------------------------- 깃발 상태 (쟁탈전) ---------------------------- */
-  const flagLock = { blue: 0, red: 0 };
-  let cooldownSec = 5;
-  function renderFlags() {
-    if (game !== 'flag') return;
+  /* ---------------------------- 피구 ---------------------------- */
+  let dodge = null, dodgeOverDismissed = null, evtTimer = null;
+  const survival = () => game === 'dodge' && (!dodge || dodge.mode === 'survival');
+  function renderDodge() {
+    if (game !== 'dodge' || !dodge) return;
+    document.body.classList.toggle('is-frozen', !!dodge.frozen);
+    const sv = dodge.mode === 'survival';
     ['blue', 'red'].forEach((t) => {
-      const remain = Math.max(0, Math.ceil((flagLock[t] - Date.now()) / 1000));
-      const chip = $('flag-' + t);
-      chip.classList.toggle('captured', remain > 0);
-      chip.textContent = remain > 0 ? `🚩 깃발 탈취당함 · ${remain}초` : '🚩 깃발 사수 중';
+      const tm = dodge.teams[t];
+      document.querySelector(`#panel-${t} .team-sub`).textContent = sv ? 'Alive' : 'Score';
+      const chip = $('dchip-' + t);
+      chip.classList.toggle('frozen', !!dodge.frozen);
+      chip.textContent = dodge.frozen ? '❄ 얼음!' : sv ? `생존 ${tm.alive} / 전체 ${tm.total}명` : `선수 ${tm.total}명`;
+      $(`score-${t}`).textContent = sv ? tm.alive : dodge.scores[t];
     });
-    document.querySelectorAll('#cooldowns .cdbtn').forEach((b) => b.classList.toggle('active', Number(b.dataset.sec) === cooldownSec));
+    document.querySelectorAll('#dodge-panel .dmode').forEach((b) => b.classList.toggle('active', b.dataset.mode === dodge.mode));
+    $('adj-cap').textContent = sv ? '인원 보정 (아웃 −1 / 부활 +1)' : '점수 보정 (−1 / +1)';
+    // 한 팀이 전멸해 경기가 끝난 경우 승리 화면
+    if (dodge.over && dodgeOverDismissed !== dodge.over) showDodgeOver(dodge.over);
+    if (!dodge.over) { dodgeOverDismissed = null; if (!(state && state.finished)) { $('overlay').classList.remove('show'); stopFx(); } }
   }
-  setInterval(renderFlags, 250);
+  function showDodgeOver(over) {
+    const res = $('o-result'); res.className = 'o-result';
+    $('o-title').textContent = '경기 종료';
+    if (over === 'draw') res.textContent = '무승부'; else { res.textContent = over === 'blue' ? '청팀 승리' : '홍팀 승리'; res.classList.add(over); }
+    $('o-score').textContent = `생존  청 ${dodge.teams.blue.alive}  :  ${dodge.teams.red.alive} 홍`;
+    $('o-hint').textContent = '상대 팀이 전멸했습니다 (화면을 누르면 닫힘 · 초기화하면 새 경기)';
+    $('overlay').classList.add('show'); startFx();
+  }
+  const EVT_UI = { revive: ['전체 부활!', '모두 다시 살아났어요'], freeze: ['❄ 얼음!', '그대로 멈춰요'], thaw: ['땡!', '다시 움직여요'] };
+  function showEvent(type) {
+    const d = EVT_UI[type]; if (!d) return;
+    const el = $('evt'); el.className = `evt show ${type}`; $('evt-b').textContent = d[0]; $('evt-s').textContent = d[1];
+    if (type === 'revive') beep(3); else if (type === 'freeze') beep(1); else beep(2);
+    clearTimeout(evtTimer); evtTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
 
   /* ---------------------------- 렌더링 ---------------------------- */
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -651,17 +700,17 @@
   function renderOverlay() {
     const ov = $('overlay');
     const key = state && state.finished ? `${state.mode}` : null;
-    if (!key) { dismissedFor = null; ov.classList.remove('show'); stopFx(); return; }
+    if (!key) { dismissedFor = null; if (dodge && dodge.over && dodgeOverDismissed !== dodge.over) return; ov.classList.remove('show'); stopFx(); return; }
     if (dismissedFor === key) return;
 
     const res = $('o-result');
     res.className = 'o-result';
     if (state.mode === 'round') {
-      const { blue, red } = scores;
+      const { blue, red } = (survival() && dodge) ? { blue: dodge.teams.blue.alive, red: dodge.teams.red.alive } : scores;
       $('o-title').textContent = '라운드 종료';
       if (blue === red) { res.textContent = '무승부'; }
       else { const w = blue > red ? 'blue' : 'red'; res.textContent = w === 'blue' ? '청팀 승리' : '홍팀 승리'; res.classList.add(w); }
-      $('o-score').textContent = `청 ${blue}  :  ${red} 홍`;
+      $('o-score').textContent = `${survival() && dodge ? '생존  ' : ''}청 ${blue}  :  ${red} 홍`;
       $('o-hint').textContent = '시작 버튼을 누르면 휴식 시간이 시작됩니다 (화면을 누르면 닫힘)';
     } else {
       $('o-title').textContent = '휴식 종료';
@@ -674,13 +723,15 @@
   }
   $('overlay').addEventListener('click', () => {
     dismissedFor = state && state.finished ? state.mode : null;
+    if (dodge && dodge.over) dodgeOverDismissed = dodge.over;
     $('overlay').classList.remove('show');
     stopFx();
   });
 
   function setScore(team, value, hit) {
     const el = $(`score-${team}`);
-    el.textContent = value;
+    if (!survival()) el.textContent = value;
+    else if (game !== 'dodge') el.textContent = value;
     if (hit) {
       el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
       const panel = $(`panel-${team}`);
@@ -774,24 +825,10 @@
     $('sb-red').style.width = pct(f.red); $('sb-red').textContent = `홍 ${f.red}`;
     $('sb-mid').textContent = `남은 칸 ${f.total - f.blue - f.red}`;
   });
-  socket.on('flag:update', (f) => {
-    flagLock.blue = Date.now() + f.blue;
-    flagLock.red = Date.now() + f.red;
-    cooldownSec = f.cooldownSec;
-    renderFlags();
-  });
-
-  /* QR은 입장 전에만 표시: 해당 팀에 1대 이상 접속하면 숨김 ('QR 다시 보기'로 임시 표시) */
-  const qrForce = { blue: false, red: false }, lastCount = { blue: -1, red: -1 };
-  function applyJoinView(team, count) {
-    if (lastCount[team] !== count) { lastCount[team] = count; qrForce[team] = false; }
-    const hide = count >= 1 && !qrForce[team];
-    [`jt-${team}`, `qr-${team}`, `url-${team}`].forEach((id) => { $(id).style.display = hide ? 'none' : ''; });
-    $(`qrshow-${team}`).hidden = !(count >= 1 && hide);
-  }
-  ['blue', 'red'].forEach((t) => $(`qrshow-${t}`).addEventListener('click', () => { qrForce[t] = true; applyJoinView(t, lastCount[t]); }));
+  socket.on('dodge:state', (d) => { dodge = d; renderDodge(); });
+  socket.on('dodge:event', (e) => showEvent(e.type));
   socket.on('team:count', (c) => {
-    const n = game === 'flag' ? (c.bases || { blue: 0, red: 0 }) : c;
+    const n = c;
     $('count-blue').textContent = n.blue;
     $('count-red').textContent = n.red;
     applyJoinView('blue', n.blue); applyJoinView('red', n.red);
@@ -812,9 +849,12 @@
       if (state) socket.emit('timer:setDuration', { mode: state.mode, sec: Number(b.dataset.sec) });
     });
   });
-  document.querySelectorAll('#cooldowns .cdbtn').forEach((b) => {
-    b.addEventListener('click', () => socket.emit('flag:setCooldown', Number(b.dataset.sec)));
-  });
+  document.querySelectorAll('#dodge-panel .dmode').forEach((b) => b.addEventListener('click', () => {
+    if (dodge && dodge.mode === b.dataset.mode) return;
+    if (confirm('피구 모드를 바꾸면 점수와 생존 상태가 초기화됩니다. 바꿀까요?')) socket.emit('dodge:mode', b.dataset.mode);
+  }));
+  document.querySelectorAll('#dodge-panel .dev').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:event', b.dataset.ev)));
+  document.querySelectorAll('#dodge-panel .adj button').forEach((b) => b.addEventListener('click', () => socket.emit('dodge:adjust', { team: b.dataset.team, delta: Number(b.dataset.delta) })));
   $('btn-score-reset').addEventListener('click', () => {
     if (confirm('양 팀 점수를 0점으로 초기화할까요?')) socket.emit('score:reset');
   });
