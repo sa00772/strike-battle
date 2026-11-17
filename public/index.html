@@ -97,7 +97,7 @@
   .row[data-open] { cursor: pointer; }
   .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
   .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; }
-  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.mission { --seal: #a52a2a; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
+  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
     border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(37,36,43,.18), inset 0 0 0 3px rgba(0,0,0,.12), inset 0 0 0 4px rgba(255,255,255,.4); transition: transform .3s; }
   .row[data-open]:hover .seal { transform: rotate(0deg) scale(1.04); }
@@ -224,6 +224,14 @@
         <details class="info"><summary>설명 보기</summary><p class="sub">문구를 입력해 보내면 경기가 잠시 멈추고, 대화면과 모든 휴대폰에 미션이 크게 나타납니다. 시간이 끝나면 경기가 자동으로 다시 시작됩니다. 경기방 코드를 입력해 연결하세요.</p></details>
       </div>
       <a class="act" href="/deck.html">미션 덱 열기</a>
+    </article>
+    <article class="row mission2" id="roulette-row">
+      <div class="seal" aria-hidden="true"></div>
+      <div class="main">
+        <h3>미션 뽑기<span class="tag">룰렛으로 랜덤 미션</span></h3>
+        <details class="info"><summary>설명 보기</summary><p class="sub">미션 내용을 직접 적고 룰렛을 돌리면, 걸린 미션을 아이들이 함께 수행합니다. 한 번 나온 미션을 다음 판에서 빼는 설정도 있어요.</p></details>
+      </div>
+      <a class="act" href="/roulette.html">미션 뽑기 열기</a>
     </article>
   </div>
 </section>

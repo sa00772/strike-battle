@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>미션 뽑기 · 플레이 라운지</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;900&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root{color-scheme:dark;--ink:#0d0c0b;--ink-2:#171513;--paper:#f1ebdd;--muted:#a8a090;--brass:#c9a862;--line:rgba(241,235,221,.14);
+    --serif:"Noto Serif KR","Nanum Myeongjo","Batang",serif;--sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  body{background:var(--ink);color:var(--paper);font-family:var(--sans);min-height:100vh;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;color:inherit;cursor:pointer}
+  button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .top{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line)}
+  .top .logo{font-family:var(--serif);font-weight:900;letter-spacing:.04em}
+  .top .back{color:var(--muted);font-size:.86rem}
+  .layout{max-width:1040px;margin:0 auto;padding:28px 20px 70px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
+  h1{font-family:var(--serif);font-weight:900;font-size:1.6rem;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:.92rem;margin-bottom:20px}
+
+  .stage{position:relative;width:min(100%,560px);margin:0 auto}
+  canvas{display:block;width:100%;height:auto;aspect-ratio:1;touch-action:manipulation}
+  .pointer{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:16px solid transparent;border-right:16px solid transparent;border-top:34px solid var(--brass);filter:drop-shadow(0 3px 4px rgba(0,0,0,.6));z-index:2}
+  .hub{position:absolute;left:50%;top:50%;width:21%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;background:var(--brass);color:var(--ink);font:900 clamp(1rem,3.6vw,1.5rem) var(--serif);box-shadow:0 0 0 6px rgba(13,12,11,.55),0 6px 20px rgba(0,0,0,.5);z-index:2}
+  .hub:disabled{opacity:.7;cursor:wait}
+  .empty-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);padding:20%;font-size:1rem;pointer-events:none}
+
+  .panel{border:1px solid var(--line);border-radius:14px;padding:18px;background:rgba(23,21,19,.6)}
+  .panel h2{font-family:var(--serif);font-size:1.1rem;margin-bottom:12px}
+  .add{display:flex;gap:8px;margin-bottom:12px}
+  .add input{flex:1;min-width:0;background:var(--ink-2);border:1px solid var(--line);color:var(--paper);font:1rem var(--sans);padding:11px 12px;border-radius:10px;outline:none}
+  .add input:focus{border-color:var(--brass)}
+  .btn{border:1px solid var(--line);background:none;border-radius:999px;padding:9px 16px;font-weight:600;font-size:.9rem}
+  .btn.main{background:var(--brass);border-color:var(--brass);color:var(--ink)}
+  .btn.sm{padding:6px 12px;font-size:.8rem}
+  ul.list{list-style:none;display:grid;gap:6px;max-height:340px;overflow:auto;margin-bottom:12px}
+  ul.list li{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:.93rem}
+  ul.list li i{width:12px;height:12px;border-radius:50%;flex:none}
+  ul.list li span{flex:1;min-width:0;word-break:keep-all;overflow-wrap:anywhere}
+  ul.list li.used span{text-decoration:line-through;color:var(--muted)}
+  ul.list li button{border:0;background:none;color:var(--muted);font-size:1.1rem;padding:2px 6px}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .opt{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.86rem;margin-top:6px}
+  .count{color:var(--muted);font-size:.82rem;margin-bottom:8px}
+
+  /* 결과 */
+  .result{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:rgba(13,12,11,.88);backdrop-filter:blur(6px)}
+  .card{width:min(680px,100%);text-align:center;border-radius:22px;padding:clamp(24px,5vw,48px);background:#fdf6e6;color:#2a1d12;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .card .k{font-weight:800;color:#b4432e;letter-spacing:.06em;margin-bottom:10px;font-size:1.05rem}
+  .card .m{font-family:var(--serif);font-weight:900;font-size:clamp(2rem,7.5vw,4rem);line-height:1.3;word-break:keep-all;overflow-wrap:anywhere;margin-bottom:26px}
+  .card .acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .card .btn{border-color:#c8b48f;color:#2a1d12;font-size:1.02rem;padding:12px 22px}
+  .card .btn.main{background:#b4432e;border-color:#b4432e;color:#fff}
+  @media(max-width:860px){.layout{grid-template-columns:1fr;gap:24px}ul.list{max-height:260px}}
+  @media(prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+</head>
+<body>
+<header class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" href="/#mission">홈으로</a></header>
+<div class="layout">
+  <section>
+    <h1>미션 뽑기</h1>
+    <p class="sub">미션을 적고 룰렛을 돌려 보세요. 나온 미션을 모두 함께 해요!</p>
+    <div class="stage">
+      <div class="pointer" aria-hidden="true"></div>
+      <canvas id="wheel" width="1000" height="1000" role="img" aria-label="미션 룰렛"></canvas>
+      <button class="hub" id="spin" aria-label="룰렛 돌리기">돌려!</button>
+      <div class="empty-msg" id="empty">오른쪽에서 미션을<br>2개 이상 적어 주세요</div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <h2>미션 목록</h2>
+    <form class="add" id="add">
+      <input id="txt" maxlength="40" placeholder="예: 팔벌려뛰기 10번" autocomplete="off" aria-label="미션 내용">
+      <button class="btn main">추가</button>
+    </form>
+    <div class="count" id="count"></div>
+    <ul class="list" id="list"></ul>
+    <div class="tools">
+      <button class="btn sm" id="sample">예시 미션 넣기</button>
+      <button class="btn sm" id="reset-used">뽑힌 표시 지우기</button>
+      <button class="btn sm" id="clear">전체 지우기</button>
+    </div>
+    <label class="opt"><input type="checkbox" id="no-repeat"> 한 번 나온 미션은 다음에 빼기</label>
+    <label class="opt"><input type="checkbox" id="sound" checked> 돌아가는 소리</label>
+  </aside>
+</div>
+
+<div class="result" id="result" hidden role="dialog" aria-modal="true" aria-label="뽑힌 미션">
+  <div class="card">
+    <div class="k">오늘의 미션!</div>
+    <div class="m" id="r-text"></div>
+    <div class="acts"><button class="btn" id="r-close">닫기</button><button class="btn main" id="r-again">다시 돌리기</button></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const MAX = 20, COLORS = ['#d9573f', '#e8a23b', '#4e9b7c', '#4a7fb5', '#8e6bb8', '#d4708f', '#6aa84f', '#c9824a'];
+const SAMPLES = ['팔벌려뛰기 10번', '친구와 하이파이브', '30초 동안 제자리 달리기', '큰 소리로 "파이팅!" 외치기', '한 발로 10초 서 있기', '옆 친구 칭찬하기', '스쿼트 10번', '가장 멋진 포즈 취하기'];
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (_) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} } };
+var items = store.get('pl-roulette', []).slice(0, MAX);   // [{t, used}]
+let opts = Object.assign({ noRepeat: false, sound: true }, store.get('pl-roulette-opt', {}));
+var angle = 0, spinning = false, curWinner = -1;
+const save = () => { store.set('pl-roulette', items); store.set('pl-roulette-opt', opts); };
+const col = (i) => COLORS[i % COLORS.length];
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pool = () => items.map((m, i) => i).filter((i) => !(opts.noRepeat && items[i].used));
+
+/* ---------- 룰렛 그리기 ---------- */
+const cv = $('#wheel'), ctx = cv.getContext('2d');
+function draw() {
+  const W = cv.width, R = W / 2 - 14, n = items.length;
+  ctx.clearRect(0, 0, W, W);
+  ctx.save(); ctx.translate(W / 2, W / 2);
+  // 바깥 테두리
+  ctx.beginPath(); ctx.arc(0, 0, R + 10, 0, Math.PI * 2); ctx.fillStyle = '#c9a862'; ctx.fill();
+  if (n < 2) {
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fillStyle = '#26221d'; ctx.fill(); ctx.restore(); return;
+  }
+  const seg = (Math.PI * 2) / n;
+  ctx.rotate(angle);
+  for (let i = 0; i < n; i++) {
+    const a0 = i * seg - Math.PI / 2, a1 = a0 + seg;
+    const off = opts.noRepeat && items[i].used;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a0, a1); ctx.closePath();
+    ctx.fillStyle = off ? '#4a443b' : col(i); ctx.fill();
+    ctx.strokeStyle = 'rgba(253,246,230,.85)'; ctx.lineWidth = 4; ctx.stroke();
+    // 글자
+    ctx.save(); ctx.rotate(a0 + seg / 2); ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    let fs = n <= 6 ? 58 : n <= 10 ? 48 : n <= 14 ? 40 : 34;
+    const font = (f) => `700 ${f}px "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif`;
+    ctx.fillStyle = off ? '#9a9183' : '#fff'; ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 6;
+    let t = items[i].t; const maxW = R * 0.7;
+    ctx.font = font(fs);
+    while (ctx.measureText(t).width > maxW && fs > 28) { fs -= 2; ctx.font = font(fs); }     // 길면 글자 크기를 줄여서 맞춤
+    if (ctx.measureText(t).width > maxW) {
+      while (ctx.measureText(t + '…').width > maxW && t.length > 1) t = t.slice(0, -1);
+      t = t + '…';
+    }
+    ctx.fillText(t, R - 34, 0); ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* ---------- 목록 ---------- */
+function renderList() {
+  $('#list').innerHTML = items.map((m, i) =>
+    `<li class="${m.used ? 'used' : ''}"><i style="background:${col(i)}"></i><span>${esc(m.t)}</span><button data-del="${i}" aria-label="삭제">×</button></li>`).join('');
+  $('#count').textContent = items.length ? `${items.length} / ${MAX}개` : '아직 미션이 없어요';
+  const ok = items.length >= 2 && pool().length >= 1;
+  const allDone = items.length >= 2 && pool().length === 0;
+  $('#empty').hidden = items.length >= 2 && !allDone;
+  $('#empty').innerHTML = allDone ? '모든 미션이 나왔어요!<br>"뽑힌 표시 지우기"를 눌러 다시 시작해요' : '오른쪽에서 미션을<br>2개 이상 적어 주세요';
+  $('#spin').disabled = spinning || !ok;
+  $('#no-repeat').checked = opts.noRepeat; $('#sound').checked = opts.sound;
+  draw(); save();
+}
+$('#add').onsubmit = (e) => {
+  e.preventDefault();
+  const t = $('#txt').value.trim().slice(0, 40); if (!t) return;
+  if (items.length >= MAX) return alert(`미션은 ${MAX}개까지 넣을 수 있어요.`);
+  items.push({ t, used: false }); $('#txt').value = ''; renderList(); $('#txt').focus();
+};
+$('#list').onclick = (e) => { const i = e.target.dataset.del; if (i != null && !spinning) { items.splice(+i, 1); renderList(); } };
+$('#sample').onclick = () => { if (spinning) return; items = SAMPLES.map((t) => ({ t, used: false })); renderList(); };
+$('#clear').onclick = () => { if (!spinning && items.length && confirm('미션을 모두 지울까요?')) { items = []; renderList(); } };
+$('#reset-used').onclick = () => { items.forEach((m) => (m.used = false)); renderList(); };
+$('#no-repeat').onchange = (e) => { opts.noRepeat = e.target.checked; renderList(); };
+$('#sound').onchange = (e) => { opts.sound = e.target.checked; save(); };
+
+/* ---------- 소리 ---------- */
+let ac = null;
+function audio() { if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (C) ac = new C(); } if (ac && ac.state === 'suspended') ac.resume(); return ac; }
+function click(freq = 900, dur = 0.04, vol = 0.25) {
+  const a = audio(); if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+  o.type = 'triangle'; o.frequency.value = freq; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+
+/* ---------- 돌리기 ---------- */
+function spin() {
+  if (spinning) return;
+  const choices = pool(); if (items.length < 2 || !choices.length) return;
+  audio(); spinning = true; $('#spin').disabled = true;
+  const n = items.length, seg = (Math.PI * 2) / n;
+  const win = choices[Math.floor(Math.random() * choices.length)];
+  // 포인터(위쪽)가 win 조각 안쪽 어딘가에 멈추도록 목표 각도 계산
+  const within = (Math.random() * 0.7 + 0.15) * seg;
+  const target = -(win * seg + within);                         // angle ≡ target (mod 2π)
+  const cur = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  let delta = ((target - cur) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  delta += Math.PI * 2 * (5 + Math.floor(Math.random() * 3));   // 5~7바퀴
+  const start = angle, dur = 5200, t0 = performance.now();
+  let lastSeg = Math.floor((((-start) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / seg);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const D = reduce ? 800 : dur;
+  (function frame(now) {
+    const p = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - p, 4);
+    angle = start + delta * e; draw();
+    const s = Math.floor((((-angle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / seg);
+    if (s !== lastSeg) { lastSeg = s; if (opts.sound) click(700 + 300 * (1 - p)); }
+    if (p < 1) return requestAnimationFrame(frame);
+    spinning = false; items[win].used = true; renderList(); show(win);
+  })(t0);
+}
+function show(i) {
+  curWinner = i; $('#r-text').textContent = items[i].t; $('#result').hidden = false;
+  if (opts.sound) { click(1175, 0.18, 0.35); setTimeout(() => click(1568, 0.4, 0.35), 160); }
+  $('#r-again').focus();
+}
+const closeResult = () => { $('#result').hidden = true; };
+$('#spin').onclick = spin;
+$('#r-close').onclick = closeResult;
+$('#r-again').onclick = () => { closeResult(); setTimeout(spin, 150); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeResult(); });
+renderList();
+</script>
+</body>
+</html>
