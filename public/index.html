@@ -196,6 +196,20 @@
   @media (max-width: 420px) { .w-acts { grid-template-columns: 1fr 1fr; } .w-btn { padding: 12px 6px; } }
   @media (max-height: 720px) { .w-card h2 { font-size: 1.45rem; margin: 10px 0 6px; } .w-need { margin: 16px 0 12px; } .w-list { gap: 9px; margin-bottom: 8px; } .w-lead { font-size: .88rem; } }
   @media (prefers-reduced-motion: reduce) { .welcome, .w-card { transition: none; } }
+
+  /* 목록 크기 줄이기: 카테고리 안 메뉴를 한 화면에 더 많이 보이게 */
+  .row { grid-template-columns: 50px 1fr auto; gap: 6px 18px; padding: 15px 10px; }
+  .seal { width: 42px; height: 42px; font-size: 1.3rem; border-radius: 3px; box-shadow: 0 4px 9px rgba(37,36,43,.18), inset 0 0 0 2px rgba(0,0,0,.12), inset 0 0 0 3px rgba(255,255,255,.4); }
+  .row h3 { font-size: clamp(1.02rem, 2vw, 1.25rem); }
+  .row .tag { font-size: .72rem; margin-left: .55em; }
+  .row .sub { font-size: .86rem; line-height: 1.6; margin-top: .25em; }
+  .row .act { font-size: .84rem; }
+  .room-head h2 { font-size: clamp(1.35rem, 3vw, 1.9rem); }
+  .room-head { padding-bottom: 12px; }
+  @media (max-width: 680px) {
+    .row { grid-template-columns: 42px 1fr; padding: 13px 4px; gap: 4px 12px; }
+    .seal { width: 36px; height: 36px; font-size: 1.1rem; }
+  }
 </style>
 </head>
 <body>
