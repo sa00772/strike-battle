@@ -332,7 +332,7 @@
     const box = document.getElementById('notice'); if (!box) return;
     fetch('/notices.json', { cache: 'no-cache' }).then((r) => r.json()).then((list) => {
       if (!Array.isArray(list) || !list.length) return;
-      list = list.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8);
+      list = list.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 30);
       const fmt = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ''); return m ? `${Number(m[2])}.${Number(m[3])}` : ''; };
       const li = (n) => { const el = document.createElement('li'); const t = document.createElement('time'); t.textContent = fmt(n.date); const sp = document.createElement('span'); sp.textContent = n.text; el.append(t, sp); return el; };
       const head = box.querySelector('.n-latest'); head.replaceChildren(li(list[0]).firstChild, li(list[0]).lastChild);
