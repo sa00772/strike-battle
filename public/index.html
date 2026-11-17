@@ -54,6 +54,9 @@
   .tile .tag { font-size: .75rem; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
   .tile h2 { font-size: clamp(1.35rem, 2.8vw, 1.9rem); font-weight: 800; letter-spacing: 0; line-height: 1.1; margin: .2em 0 .25em; }
   .tile p.sub { font-size: clamp(.85rem, 1.2vw, 1rem); color: var(--muted); max-width: 360px; line-height: 1.45; }
+  .tile[data-open] { cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
+  .tile[data-open]:hover { transform: translateY(-3px); }
+  @media (prefers-reduced-motion: reduce) { .tile[data-open] { transition: none; } .tile[data-open]:hover { transform: none; } }
   .tile .links { margin-top: .7em; font-size: .95rem; }
   .art { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; margin-top: 12px; min-height: 130px; }
   .tile.dark { background: #000; color: #f5f5f7; box-shadow: inset 0 0 0 1px #2a2a2d; } .tile.dark p.sub { color: #a1a1a6; }
@@ -245,6 +248,18 @@
       if (p < 0.38) el.className = 'b'; else if (p > 0.66) el.className = 'r';
       box.appendChild(el);
     }
+  })();
+
+  // 타일의 그림·빈 곳을 눌러도 해당 게임이 바로 열림 (설명 버튼·링크는 원래 동작 유지)
+  (function () {
+    document.querySelectorAll('.tile').forEach((tile) => {
+      const a = tile.querySelector('.links a[href^="/"]'); if (!a) return;
+      tile.dataset.open = '1';
+      tile.addEventListener('click', (e) => {
+        if (e.target.closest('summary, details, a, button')) return;
+        location.href = a.getAttribute('href');
+      });
+    });
   })();
 </script>
 </body>
