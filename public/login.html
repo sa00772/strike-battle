@@ -63,9 +63,15 @@
       <span class="hint">8자 이상, 영문과 숫자를 함께 넣어 주세요</span></label>
     <label>비밀번호 확인<input name="password2" type="password" autocomplete="new-password" maxlength="64" required></label>
     <label>전화번호<input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="13" placeholder="010-1234-5678" required></label>
+    <div class="agree">
+      <label class="chk"><input type="checkbox" id="ag-adult"> <span>(필수) 만 19세 이상 성인(관장·교사)입니다.</span></label>
+      <label class="chk"><input type="checkbox" id="ag-terms"> <span>(필수) <a href="/terms.html" target="_blank" rel="noopener">이용약관</a>에 동의합니다. 베타 서비스라 데이터가 사라질 수 있어요.</span></label>
+      <label class="chk"><input type="checkbox" id="ag-priv"> <span>(필수) <a href="/privacy.html" target="_blank" rel="noopener">개인정보 수집·이용</a>에 동의합니다. (이름, 소속, 아이디, 비밀번호, 전화번호)</span></label>
+    </div>
     <p class="err" role="alert"></p>
     <button class="btn">가입하고 시작하기</button>
   </form>
+  <p class="hint" style="text-align:center;margin-top:26px"><a href="/terms.html">이용약관</a> · <a href="/privacy.html">개인정보처리방침</a></p>
 </main>
 <script>
 const $ = (s) => document.querySelector(s);
@@ -125,6 +131,11 @@ forms.signup.onsubmit = (e) => {
     forms.signup.querySelector('[name=password2]').setAttribute('aria-invalid', 'true');
     return;
   }
+  if (!($('#ag-adult').checked && $('#ag-terms').checked && $('#ag-priv').checked)) {
+    forms.signup.querySelector('.err').textContent = '필수 항목 세 가지에 모두 동의해야 가입할 수 있어요.';
+    return;
+  }
+  d.agree = true;
   delete d.password2;
   send(forms.signup, '/api/signup', d);
 };

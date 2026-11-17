@@ -49,6 +49,7 @@ function init() {
   // 이전 버전 DB 호환: 역할(role) / 이용 정지(disabled) 열 추가
   const cols = main.prepare('PRAGMA table_info(members)').all().map((c) => c.name);
   if (!cols.includes('role')) main.exec("ALTER TABLE members ADD COLUMN role TEXT NOT NULL DEFAULT 'member'");
+  if (!cols.includes('consent_at')) main.exec('ALTER TABLE members ADD COLUMN consent_at INTEGER');
   if (!cols.includes('disabled')) main.exec('ALTER TABLE members ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
   return main;
 }
@@ -142,6 +143,7 @@ function validateSignup(b) {
   const username = clean(b.username, 20).toLowerCase();
   const password = String(b.password || '');
   const phone = clean(b.phone, 13).replace(/\s/g, '');
+  if (b.agree !== true) return { error: '이용약관과 개인정보 수집·이용에 동의해야 가입할 수 있어요.', field: 'agree' };
   if (name.length < 2) return { error: '이름을 2자 이상 입력해 주세요.', field: 'name' };
   if (!org) return { error: '소속(도장 또는 학교)을 입력해 주세요.', field: 'org' };
   if (!USERNAME_RE.test(username)) return { error: '아이디는 영문 소문자·숫자·밑줄(_) 4~20자로 입력해 주세요.', field: 'username' };
@@ -289,8 +291,8 @@ function mount(app, express) {
     }
     const salt = crypto.randomBytes(16).toString('hex');
     const r = main.prepare(
-      'INSERT INTO members (username, salt, pw_hash, name, org_type, org, phone, created_at) VALUES (?,?,?,?,?,?,?,?)'
-    ).run(d.username, salt, hashPw(d.password, salt), d.name, d.orgType, d.org, d.phone, Date.now());
+      'INSERT INTO members (username, salt, pw_hash, name, org_type, org, phone, created_at, consent_at) VALUES (?,?,?,?,?,?,?,?,?)'
+    ).run(d.username, salt, hashPw(d.password, salt), d.name, d.orgType, d.org, d.phone, Date.now(), Date.now());
     const id = Number(r.lastInsertRowid);
     memberDb(id);                                   // 개인 DB 파일 생성
     startSession(res, id, isSecure(req));
