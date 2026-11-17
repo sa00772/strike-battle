@@ -126,7 +126,7 @@
   .row { --seal: #b4432e; position: relative; display: grid; grid-template-columns: 72px 1fr auto; gap: 8px 28px; align-items: center; padding: 28px 12px; border-bottom: 1px solid var(--line); scroll-margin-top: 70px; transition: background .25s; }
   .row[data-open] { cursor: pointer; }
   .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
-  .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; } .row.play5 { --seal: #b5532e; }
+  .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; } .row.play5 { --seal: #b5532e; } .row.play6 { --seal: #8a2f2f; }
   .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.tool4 { --seal: #4f8a5b; } .row.tool5 { --seal: #b5532e; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
     border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(37,36,43,.18), inset 0 0 0 3px rgba(0,0,0,.12), inset 0 0 0 4px rgba(255,255,255,.4); transition: transform .3s; }
@@ -293,6 +293,14 @@
         <details class="info"><summary>설명 보기</summary><p class="sub">화면에 색이나 화살표가 뜨면 그에 맞는 동작(앞차기, 돌려차기 등)을 하는 훈련입니다. 동작을 직접 지정하게 하면 도장과 학교마다 쓸 수 있습니다.</p></details>
       </div>
       <a class="act" href="/tools.html#react">반응 훈련 열기</a>
+    </article>
+    <article class="row play6" id="bomb-row">
+      <div class="seal" aria-hidden="true"></div>
+      <div class="main">
+        <h3>폭탄 돌리기<span class="tag">폰 없이 소리만</span></h3>
+        <details class="info"><summary>설명 보기</summary><p class="sub">시작하면 똑딱 소리가 점점 빨라지다가 언제 터질지 모르는 순간에 펑! 하고 터집니다. 공이나 인형을 옆 사람에게 돌리다가 터질 때 들고 있던 사람이 걸려요. 휴대폰 접속 없이 한 대로 즐깁니다.</p></details>
+      </div>
+      <a class="act" href="/bomb.html">폭탄 열기</a>
     </article>
 
   </div>
