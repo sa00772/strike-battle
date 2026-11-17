@@ -105,6 +105,20 @@
     text-shadow:0 0 .12em var(--cc,#fff), 0 .03em 0 rgba(0,0,0,.6), 0 0 .6em rgba(0,0,0,.7); transform:scale(.92); transition:transform .35s cubic-bezier(.2,1.4,.4,1); }
   .cue-ov.show .cw { transform:scale(1); }
   .cue-ov .cs { position:relative; z-index:1; font-size:clamp(1rem,3vw,2.2rem); letter-spacing:.35em; color:rgba(245,240,230,.75); text-transform:uppercase; }
+  .music-box { margin-top:12px; border:1px solid var(--line,rgba(255,255,255,.15)); border-radius:12px; padding:12px; }
+  .music-box h3 { font-size:.95rem; margin-bottom:8px; }
+  .m-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid rgba(255,255,255,.08); font-size:.9rem; flex-wrap:wrap; }
+  .m-row:first-of-type { border-top:0; }
+  .m-row .who { flex:1 1 130px; min-width:0; overflow-wrap:anywhere; }
+  .m-row .fn { flex:2 1 150px; min-width:0; color:#9fb0c8; font-size:.82rem; overflow-wrap:anywhere; }
+  .m-row button, .m-row label.pick { font-size:.8rem; padding:5px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.25); background:none; color:inherit; cursor:pointer; }
+  .m-row input[type=file] { display:none; }
+  #music-bar { margin-top:10px; padding:10px 12px; border:1px solid rgba(255,255,255,.18); border-radius:12px; display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; font-size:.9rem; }
+  #music-bar .m-title { flex:1 1 100%; } #music-bar .m-title b { color:#ffd27a; }
+  #music-bar button { padding:6px 12px; border-radius:8px; }
+  #music-bar label { display:flex; align-items:center; gap:6px; }
+  #music-bar input[type=range] { width:110px; }
+  body.present #music-bar { display:none !important; }
   body.present .ctl { display:none !important; }
   @media (max-width:700px) { .sides.two { grid-template-columns:1fr; } }
 </style>
@@ -126,6 +140,11 @@
         <label class="f">참가 선수 (한 줄에 한 명, "이름 / 소속" 형식)
           <textarea id="entrants" placeholder="홍길동 / 한빛도장&#10;김철수 / 청룡도장&#10;이영희"></textarea>
         </label>
+        <div class="music-box" id="music-setup" hidden>
+          <h3>🎵 선수별 음원 (선택)</h3>
+          <div class="muted" style="font-size:.8rem;margin-bottom:6px">선수 이름 옆에서 음악 파일을 넣어 두면 경기 화면에서 재생할 수 있어요. 파일은 이 컴퓨터의 브라우저에만 저장돼요. (mp3 · m4a · wav · ogg, 30MB 이하)</div>
+          <div id="music-list"></div>
+        </div>
       </div>
       <div>
         <label class="f">심판 수 (1~5명)
@@ -152,6 +171,12 @@
       <div class="cues ctl">
         <div class="cue-row" id="cue-row"></div>
         <div class="opts"><label><input type="checkbox" id="opt-sfx" checked> 효과음</label><label><input type="checkbox" id="opt-voice" checked> 음성 안내</label><span id="cue-now" class="muted"></span></div>
+        <div id="music-bar" hidden>
+          <div class="m-title" id="m-title"></div>
+          <button id="m-play">▶ 재생</button><button id="m-stop">■ 정지</button>
+          <label>음량 <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="음악 음량"></label>
+          <label><input type="checkbox" id="m-auto" checked> 연기 시간을 시작하면 같이 재생</label>
+        </div>
       </div>
       <div class="timer" id="timer">
         <div class="tl">연기 시간</div>
@@ -335,9 +360,9 @@
   try { const sv = JSON.parse(localStorage.getItem('tkd-lim-' + kind) || 'null'); if (sv && sv.max > 0) lim = sv; } catch (_) {}
   let tAcc = 0, tT0 = 0, tRun = false;
   const tNow = () => (tAcc + (tRun ? Date.now() - tT0 : 0)) / 1000;
-  const timerStart = () => { if (!tRun) { tT0 = Date.now(); tRun = true; } };
-  const timerStop = () => { if (tRun) { tAcc += Date.now() - tT0; tRun = false; } };
-  const timerReset = () => { tAcc = 0; tRun = false; };
+  const timerStart = () => { if (!tRun) { tT0 = Date.now(); tRun = true; musicOnTimer('start'); } };
+  const timerStop = () => { if (tRun) { tAcc += Date.now() - tT0; tRun = false; musicOnTimer('stop'); } };
+  const timerReset = () => { tAcc = 0; tRun = false; musicOnTimer('reset'); };
   function drawTimer() {
     const sec = tNow(), box = $('timer');
     $('t-val').textContent = sec.toFixed(1);
@@ -387,6 +412,99 @@
     return ' ' + c.poomsaeList.map((n, i) => `<span class="pchip ${c.passCount > 1 && i === c.pass && c.status !== 'done' ? 'now' : ''} ${i < c.pass && c.status !== 'done' ? 'done' : ''}">${i >= (c.regularCount || c.passCount) ? '동점 ' : c.passCount > 1 ? (i + 1) + '. ' : ''}${esc(n)}</span>`).join('');
   }
 
+  /* ------------ 선수별 음원 (자유품새 전용, 이 브라우저에 저장) ------------ */
+  const MUSIC_MAX = 30 * 1024 * 1024;
+  const mKey = (name, team) => `${String(name || '').trim()}|${String(team || '').trim()}`;
+  const musicDB = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error('no-idb'));
+      const rq = indexedDB.open('pl-tkd-music', 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore('tracks');
+      rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+    }));
+    const tx = (mode, fn) => open().then((db) => new Promise((res, rej) => { const t = db.transaction('tracks', mode); const r = fn(t.objectStore('tracks')); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); }));
+    return { get: (k) => tx('readonly', (st) => st.get(k)), put: (k, v) => tx('readwrite', (st) => st.put(v, k)), del: (k) => tx('readwrite', (st) => st.delete(k)), keys: () => tx('readonly', (st) => st.getAllKeys()) };
+  })();
+  const au = new Audio(); au.preload = 'auto';
+  let auUrl = null, auKey = null, haveKeys = new Set(), playingKey = null;
+  const trackCache = new Map();
+  async function loadTrack(key) {
+    if (trackCache.has(key)) return trackCache.get(key);
+    const t = await musicDB.get(key).catch(() => null); if (t) trackCache.set(key, t); return t || null;
+  }
+  async function prepare(key) {                       // 해당 선수 음원을 재생기에 준비
+    if (auKey === key) return true;
+    const t = await loadTrack(key); if (!t) return false;
+    au.pause(); if (auUrl) URL.revokeObjectURL(auUrl);
+    auUrl = URL.createObjectURL(t.blob); au.src = auUrl; auKey = key; return true;
+  }
+  const mStop = () => { au.pause(); try { au.currentTime = 0; } catch (_) {} playingKey = null; };
+  async function mPlay(key) { if (await prepare(key)) { au.volume = Number($('m-vol').value) / 100; playingKey = key; await au.play().catch(() => toast('재생하지 못했어요. 화면을 한 번 누른 뒤 다시 눌러 주세요.')); } else toast('이 선수의 음원이 없어요.'); }
+  const parseEntrants = () => $('entrants').value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).map((l) => { const [n, ...t] = l.split('/'); return { name: n.trim(), team: t.join('/').trim() }; });
+  async function renderMusicSetup() {
+    if (kind !== 'freestyle') return;
+    $('music-setup').hidden = false;
+    try { haveKeys = new Set(await musicDB.keys()); } catch (_) { haveKeys = new Set(); }
+    const rows = parseEntrants();
+    const el = $('music-list');
+    if (!rows.length) { el.innerHTML = '<div class="muted">위에 선수를 입력하면 이곳에 표시돼요.</div>'; return; }
+    el.innerHTML = rows.map((r, i) => {
+      const k = mKey(r.name, r.team), has = haveKeys.has(k), t = trackCache.get(k);
+      return `<div class="m-row" data-k="${esc(k)}"><span class="who"><b>${esc(r.name)}</b> <span class="muted">${esc(r.team)}</span></span>
+        <span class="fn">${has ? '🎵 ' + esc((t && t.name) || '음원 등록됨') : '음원 없음'}</span>
+        <label class="pick">${has ? '바꾸기' : '파일 넣기'}<input type="file" accept="audio/*" data-i="${i}"></label>
+        ${has ? `<button data-pv="${i}">${playingKey === k && !au.paused ? '■ 정지' : '▶ 미리듣기'}</button><button data-rm="${i}">삭제</button>` : ''}</div>`;
+    }).join('');
+    for (const r of rows) { const k = mKey(r.name, r.team); if (haveKeys.has(k) && !trackCache.has(k)) loadTrack(k).then((t) => { if (t) { const f = [...el.querySelectorAll('.m-row')].find((x) => x.dataset.k === k); if (f) f.querySelector('.fn').textContent = '🎵 ' + t.name; } }); }
+    el.querySelectorAll('input[type=file]').forEach((inp) => inp.addEventListener('change', async () => {
+      const f = inp.files[0]; if (!f) return; const r = rows[Number(inp.dataset.i)];
+      if (!/^audio\//.test(f.type) && !/\.(mp3|m4a|wav|ogg|aac|flac)$/i.test(f.name)) return toast('음악 파일(mp3, m4a, wav, ogg)만 넣을 수 있어요.');
+      if (f.size > MUSIC_MAX) return toast('파일이 너무 커요. 30MB 이하로 넣어 주세요.');
+      const k = mKey(r.name, r.team);
+      try { const t = { blob: f, name: f.name, size: f.size }; await musicDB.put(k, t); trackCache.set(k, t); if (auKey === k) { auKey = null; } toast(`${r.name} 선수 음원을 저장했어요.`); }
+      catch (_) { toast('이 브라우저에서는 음원을 저장할 수 없어요. (시크릿 모드이거나 저장 공간이 부족해요)'); }
+      renderMusicSetup(); musicRefresh();
+    }));
+    el.querySelectorAll('[data-pv]').forEach((b) => b.addEventListener('click', async () => {
+      const k = mKey(rows[Number(b.dataset.pv)].name, rows[Number(b.dataset.pv)].team);
+      if (playingKey === k && !au.paused) mStop(); else await mPlay(k); renderMusicSetup();
+    }));
+    el.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', async () => {
+      const r = rows[Number(b.dataset.rm)], k = mKey(r.name, r.team);
+      if (!confirm(`${r.name} 선수의 음원을 삭제할까요?`)) return;
+      if (auKey === k) { mStop(); auKey = null; } await musicDB.del(k).catch(() => {}); trackCache.delete(k); renderMusicSetup(); musicRefresh();
+    }));
+  }
+  au.addEventListener('ended', () => { playingKey = null; musicBarState(); });
+  au.addEventListener('pause', musicBarState); au.addEventListener('play', musicBarState);
+  const curKey = () => { const c = S && S.current; if (!c || c.status === 'done' || !c.entrantId) return null; const e = S.entrants.find((x) => x.id === c.entrantId); return e ? mKey(e.name, e.team) : null; };
+  let lastCur = null;
+  async function musicRefresh() {
+    if (kind !== 'freestyle' || !S) return;
+    const k = curKey(), bar = $('music-bar');
+    if (k !== lastCur) { if (lastCur) mStop(); lastCur = k; }
+    if (S.phase === 'setup') { renderMusicSetup(); }
+    bar.hidden = !k || S.phase !== 'running';
+    if (bar.hidden) return;
+    const e = S.entrants.find((x) => x.id === S.current.entrantId);
+    const t = await loadTrack(k);
+    $('m-title').innerHTML = t ? `🎵 <b>${esc(e.name)}</b> 선수 음원: ${esc(t.name)}` : `🎵 <b>${esc(e.name)}</b> 선수는 등록된 음원이 없어요 (대회 설정에서 넣을 수 있어요)`;
+    $('m-play').disabled = !t; $('m-stop').disabled = !t; musicBarState();
+  }
+  function musicBarState() { const b = $('m-play'); if (b) b.textContent = !au.paused ? '⏸ 일시정지' : '▶ 재생'; if ($('music-setup') && !$('music-setup').hidden && S && S.phase === 'setup') { /* 미리듣기 버튼 문구는 다시 그릴 때 갱신 */ } }
+  function musicOnTimer(action) {
+    if (kind !== 'freestyle' || typeof S === 'undefined' || !S || !$('m-auto').checked) return;
+    const k = curKey(); if (!k) return;
+    if (action === 'start') mPlay(k);
+    else if (action === 'stop') au.pause();
+    else if (action === 'reset') mStop();
+  }
+  $('m-play').addEventListener('click', () => { const k = curKey(); if (!k) return; if (!au.paused) au.pause(); else if (playingKey === k && auKey === k) au.play(); else mPlay(k); });
+  $('m-stop').addEventListener('click', mStop);
+  $('m-vol').addEventListener('input', () => { au.volume = Number($('m-vol').value) / 100; });
+  $('entrants').addEventListener('input', () => { if (kind === 'freestyle') renderMusicSetup(); });
+
   /* ------------ 렌더링 ------------ */
   const nameOf = (id) => (S.entrants.find((e) => e.id === id) || {}).name || '';
   const teamOf = (id) => (S.entrants.find((e) => e.id === id) || {}).team || '';
@@ -406,6 +524,7 @@
     $('seats').innerHTML = S.seats.map((s) => `<span class="seat ${s.submitted ? 'sub' : s.connected ? 'on' : ''}">심판 ${s.seat} ${s.submitted ? '제출' : s.connected ? '접속' : '대기'}</span>`).join('');
     if (setup) renderSetup(); else { renderCurrent(); if (S.kind === 'recognized') renderBracket(); else renderStages(); }
     if (S.phase === 'finished') renderFinal();
+    musicRefresh();
   }
   function renderSetup() {
     const ae = document.activeElement;
