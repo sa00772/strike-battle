@@ -175,7 +175,7 @@
           <div class="m-title" id="m-title"></div>
           <button id="m-play">▶ 재생</button><button id="m-stop">■ 정지</button>
           <label>음량 <input type="range" id="m-vol" min="0" max="100" value="100" aria-label="음악 음량"></label>
-          <label><input type="checkbox" id="m-auto" checked> 연기 시간을 시작하면 같이 재생</label>
+          <label><input type="checkbox" id="m-auto" checked> 음악과 연기 시간을 함께 움직이기</label>
         </div>
       </div>
       <div class="timer" id="timer">
@@ -476,8 +476,11 @@
       if (auKey === k) { mStop(); auKey = null; } await musicDB.del(k).catch(() => {}); trackCache.delete(k); renderMusicSetup(); musicRefresh();
     }));
   }
-  au.addEventListener('ended', () => { playingKey = null; musicBarState(); });
-  au.addEventListener('pause', musicBarState); au.addEventListener('play', musicBarState);
+  // 음악과 연기 시간은 서로 따라 움직임: 음악 재생 → 시간 시작 / 일시정지 → 시간 정지 / 끝남 → 시간 정지
+  const linked = () => kind === 'freestyle' && $('m-auto').checked && !!S && S.phase === 'running' && !!curKey() && auKey === curKey();
+  au.addEventListener('play', () => { musicBarState(); if (linked() && !tRun) timerStart(); });
+  au.addEventListener('pause', () => { musicBarState(); if (linked() && tRun) timerStop(); });
+  au.addEventListener('ended', () => { playingKey = null; musicBarState(); if (linked() && tRun) timerStop(); });
   const curKey = () => { const c = S && S.current; if (!c || c.status === 'done' || !c.entrantId) return null; const e = S.entrants.find((x) => x.id === c.entrantId); return e ? mKey(e.name, e.team) : null; };
   let lastCur = null;
   async function musicRefresh() {
@@ -501,7 +504,7 @@
     else if (action === 'reset') mStop();
   }
   $('m-play').addEventListener('click', () => { const k = curKey(); if (!k) return; if (!au.paused) au.pause(); else if (playingKey === k && auKey === k) au.play(); else mPlay(k); });
-  $('m-stop').addEventListener('click', mStop);
+  $('m-stop').addEventListener('click', () => { const l = linked(); mStop(); if (l) timerReset(); });
   $('m-vol').addEventListener('input', () => { au.volume = Number($('m-vol').value) / 100; });
   $('entrants').addEventListener('input', () => { if (kind === 'freestyle') renderMusicSetup(); });
 
