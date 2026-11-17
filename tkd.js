@@ -41,23 +41,25 @@ const SCHEMAS = {
       { key: 'minor', group: 'a', type: 'count', label: '작은 실수 (-0.1)', max: 40, def: 0 },
       { key: 'major', group: 'a', type: 'count', label: '큰 실수 (-0.3)', max: 13, def: 0 },
       { key: 'power', group: 'p', type: 'score', label: '속도와 힘', min: 0.5, max: 2.0, def: 2.0 },
-      { key: 'rhythm', group: 'p', type: 'score', label: '리듬과 템포', min: 0.5, max: 2.0, def: 2.0 },
+      { key: 'rhythm', group: 'p', type: 'score', label: '강유/완급/리듬', min: 0.5, max: 2.0, def: 2.0 },
       { key: 'energy', group: 'p', type: 'score', label: '기의 표현', min: 0.5, max: 2.0, def: 2.0 },
     ],
   },
   freestyle: {
     labels: { a: '기술', p: '표현' },
     fields: [
-      { key: 'jumpside', group: 'a', type: 'score', label: '뛰어 옆차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'multi', group: 'a', type: 'score', label: '다단계 발차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'spin', group: 'a', type: 'score', label: '회전 발차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'consec', group: 'a', type: 'score', label: '연속 발차기', min: 0, max: 1.0, def: 0.5 },
-      { key: 'acro', group: 'a', type: 'score', label: '아크로바틱', min: 0, max: 1.0, def: 0.5 },
-      { key: 'basic', group: 'a', type: 'score', label: '기본동작', min: 0, max: 1.0, def: 0.5 },
-      { key: 'creative', group: 'p', type: 'score', label: '창의성', min: 0, max: 1.0, def: 0.5 },
-      { key: 'harmony', group: 'p', type: 'score', label: '조화', min: 0, max: 1.0, def: 0.5 },
-      { key: 'energy', group: 'p', type: 'score', label: '기의 표현', min: 0, max: 1.0, def: 0.5 },
-      { key: 'music', group: 'p', type: 'score', label: '음악·안무', min: 0, max: 1.0, def: 0.5 },
+      { key: 'jumpside', group: 'a', type: 'score', label: '뛰어 옆차기', min: 0, max: 1.0, def: 1.0 },
+      { key: 'multi', group: 'a', type: 'score', label: '다단계 발차기', min: 0, max: 1.0, def: 1.0 },
+      { key: 'spin', group: 'a', type: 'score', label: '회전 발차기', min: 0, max: 1.0, def: 1.0 },
+      { key: 'consec', group: 'a', type: 'score', label: '연속 발차기', min: 0, max: 1.0, def: 1.0 },
+      { key: 'acro', group: 'a', type: 'score', label: '아크로바틱', min: 0, max: 1.0, def: 1.0 },
+      { key: 'basic', group: 'a', type: 'score', label: '기본동작', min: 0, max: 1.0, def: 1.0 },
+      { key: 'creative', group: 'p', type: 'score', label: '창의성', min: 0, max: 1.0, def: 1.0 },
+      { key: 'harmony', group: 'p', type: 'score', label: '조화', min: 0, max: 1.0, def: 1.0 },
+      { key: 'energy', group: 'p', type: 'score', label: '기의 표현', min: 0, max: 1.0, def: 1.0 },
+      { key: 'music', group: 'p', type: 'score', label: '음악 및 안무', min: 0, max: 1.0, def: 1.0 },
+      { key: 'minor', group: 'p', type: 'count', label: '감점 -0.1', max: 40, def: 0, optional: true },
+      { key: 'major', group: 'p', type: 'count', label: '감점 -0.3', max: 13, def: 0, optional: true },
     ],
   },
 };
@@ -75,7 +77,8 @@ function validateScores(kind, input) {
   if (!input || typeof input !== 'object') return null;
   const out = {};
   for (const f of SCHEMAS[kind].fields) {
-    const v = Number(input[f.key]);
+    const raw = (input[f.key] === undefined && f.optional) ? f.def : input[f.key];
+    const v = Number(raw);
     if (!Number.isFinite(v)) return null;
     if (f.type === 'count') {
       if (!Number.isInteger(v) || v < 0 || v > f.max) return null;
@@ -95,7 +98,7 @@ function judgeTotals(kind, v) {
     return { a, p, total: r2(a + p) };
   }
   const a = r2(v.basic + v.jumpside + v.multi + v.spin + v.consec + v.acro);
-  const p = r2(v.creative + v.harmony + v.energy + v.music);
+  const p = Math.max(0, r2(v.creative + v.harmony + v.energy + v.music - 0.1 * (v.minor || 0) - 0.3 * (v.major || 0)));
   return { a, p, total: r2(a + p) };
 }
 // 심판 5명 이상이면 최고·최저 1개씩 제외한 평균, 그 미만이면 전원 평균
