@@ -75,6 +75,14 @@ function memberDb(id) {
       note TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS timings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      roster_id INTEGER,
+      name TEXT NOT NULL,
+      item TEXT NOT NULL,
+      ms INTEGER NOT NULL,
+      at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       game TEXT NOT NULL,
@@ -267,7 +275,7 @@ const TRACK_LABELS = {
   'react': '색깔·방향 반응 훈련', 'bomb': '폭탄 돌리기',
   'tkd:recognized': '공인품새 대전', 'tkd:freestyle': '자유품새 대전',
   'deck': '돌발 미션 덱', 'roulette': '미션 뽑기',
-  'tool:timer': '멀티 인터벌 타이머', 'tool:metro': '메트로놈', 'tool:dice': '주사위', 'tool:teams': '팀 나누기',
+  'tool:timer': '멀티 인터벌 타이머', 'tool:metro': '메트로놈', 'tool:dice': '주사위', 'tool:teams': '팀 나누기', 'tool:schedule': '수업 시간표', 'tool:stopwatch': '스톱워치 기록',
 };
 const kstDay = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 function track(key) {
@@ -496,6 +504,34 @@ function mount(app, express) {
   });
 
   // 경기 기록 (회원 개인 DB)
+  // 스톱워치 기록 (줄넘기·플랭크 등): 선수 명단의 이름별로 저장
+  app.get('/api/my/timings', off, auth, (req, res) => {
+    const item = String(req.query.item || '').slice(0, 20);
+    const db = memberDb(req.member.id);
+    const rows = item
+      ? db.prepare('SELECT id, roster_id, name, item, ms, at FROM timings WHERE item = ? ORDER BY id DESC LIMIT 1000').all(item)
+      : db.prepare('SELECT id, roster_id, name, item, ms, at FROM timings ORDER BY id DESC LIMIT 1000').all();
+    const items = db.prepare('SELECT item, COUNT(*) AS n FROM timings GROUP BY item ORDER BY MAX(id) DESC').all();
+    res.json({ items: rows, kinds: items });
+  });
+  app.post('/api/my/timings', off, auth, json, (req, res) => {
+    const b = req.body || {};
+    const item = clean(b.item, 20), name = clean(b.name, 20);
+    const ms = Math.round(Number(b.ms));
+    if (!item) return res.status(400).json({ error: '종목을 입력해 주세요.' });
+    if (!name) return res.status(400).json({ error: '이름을 입력해 주세요.' });
+    if (!Number.isFinite(ms) || ms < 100 || ms > 24 * 3600 * 1000) return res.status(400).json({ error: '기록 시간이 올바르지 않아요.' });
+    const db = memberDb(req.member.id);
+    if (db.prepare('SELECT COUNT(*) c FROM timings').get().c >= 20000) return res.status(400).json({ error: '기록이 너무 많아요. 오래된 기록을 지워 주세요.' });
+    const rid = Number.isInteger(b.rosterId) ? b.rosterId : null;
+    const r = db.prepare('INSERT INTO timings (roster_id, name, item, ms, at) VALUES (?,?,?,?,?)').run(rid, name, item, ms, Date.now());
+    res.json({ ok: true, id: Number(r.lastInsertRowid) });
+  });
+  app.delete('/api/my/timings/:id', off, auth, (req, res) => {
+    memberDb(req.member.id).prepare('DELETE FROM timings WHERE id = ?').run(Number(req.params.id) || 0);
+    res.json({ ok: true });
+  });
+
   app.get('/api/my/records', off, auth, (req, res) => {
     const rows = memberDb(req.member.id)
       .prepare('SELECT id, game, title, data, played_at FROM records ORDER BY id DESC LIMIT 200').all();

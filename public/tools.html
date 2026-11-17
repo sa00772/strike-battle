@@ -119,6 +119,45 @@
   .rx-stage .cue{animation:pop .15s ease both;display:flex;flex-direction:column;align-items:center;gap:10px}
   .rx-info{text-align:center;color:var(--muted);font-size:.9rem;min-height:1.4em;margin-bottom:12px}
   @media(prefers-reduced-motion:reduce){.team,.rx-stage .cue{animation:none}}
+
+  /* 수업 시간표 */
+  .sc-bar{display:flex;gap:8px;margin-bottom:10px}
+  .sc-bar select,.sc-name{flex:1;min-width:0;background:var(--ink-2);border:1px solid var(--line);border-radius:10px;color:var(--paper);font:600 1rem var(--sans);padding:10px 12px;outline:none}
+  .sc-bar button,.mini{border:1px solid var(--line);background:none;border-radius:10px;padding:0 12px;font-size:.85rem;color:var(--muted)}
+  .sc-steps{display:grid;gap:8px;margin:12px 0}
+  .sc-step{display:grid;grid-template-columns:10px 1fr 62px auto;gap:8px;align-items:center;background:var(--ink-2);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .sc-step i{width:8px;height:32px;border-radius:4px;background:var(--c)}
+  .sc-step input{min-width:0;background:none;border:0;border-bottom:1px solid var(--line);color:var(--paper);font:600 1rem var(--sans);padding:6px 2px;outline:none}
+  .sc-step input[type=number]{text-align:center;border:1px solid var(--line);border-radius:8px;padding:6px 2px}
+  .sc-step .mv{display:flex;gap:4px}
+  .sc-step .mv button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--muted);font-size:.9rem;line-height:1}
+  .sc-sum{display:flex;justify-content:space-between;color:var(--muted);font-size:.88rem;margin:4px 2px 14px}
+  .sc-run{text-align:center}
+  .sc-now{font-family:var(--serif);font-weight:900;font-size:clamp(2rem,10vw,3.4rem);line-height:1.2;word-break:keep-all}
+  .sc-time{font-weight:800;font-size:clamp(4.6rem,26vw,9rem);line-height:1.1;font-variant-numeric:tabular-nums;margin:6px 0}
+  .sc-next{color:var(--muted);min-height:1.6em;margin-bottom:12px}
+  .sc-seg{display:flex;gap:4px;height:12px;margin:14px 0 6px}
+  .sc-seg i{flex:var(--w);background:rgba(241,235,221,.12);border-radius:6px;overflow:hidden;position:relative}
+  .sc-seg i b{position:absolute;inset:0;width:var(--p,0%);background:var(--c);border-radius:6px}
+  .sc-seg i.cur{outline:1px solid var(--paper)}
+  .sc-foot{display:flex;justify-content:space-between;color:var(--muted);font-size:.88rem;margin-bottom:16px}
+  .sc-adj{display:flex;gap:8px;justify-content:center;margin-top:12px}
+  .sc-adj button{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:none;font-size:.88rem;color:var(--muted)}
+  .sc-run.over .sc-time{color:#ff8a70}
+  /* 스톱워치 */
+  .sw-time{font-weight:800;font-size:clamp(3.6rem,20vw,6.6rem);line-height:1.1;text-align:center;font-variant-numeric:tabular-nums;margin:10px 0 16px}
+  .sw-time small{font-size:.45em;opacity:.7}
+  .sw-sel{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .sw-sel select,.sw-sel input{min-width:0;width:100%;background:var(--ink-2);border:1px solid var(--line);border-radius:10px;color:var(--paper);font:600 1rem var(--sans);padding:10px 12px;outline:none}
+  .sw-kinds{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .sw-msg{text-align:center;color:var(--muted);font-size:.9rem;min-height:1.4em;margin:10px 0}
+  .sw-h{font-family:var(--serif);font-size:1.05rem;margin:26px 0 8px}
+  .sw-list{list-style:none;display:grid;gap:6px}
+  .sw-list li{display:grid;grid-template-columns:28px 1fr auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.95rem}
+  .sw-list li .t{font-variant-numeric:tabular-nums;font-weight:700}
+  .sw-list li small{color:var(--muted)}
+  .sw-list li.best{border-color:var(--brass)}
+  .sw-list button{background:none;border:0;color:var(--muted);font-size:.8rem}
   @media(max-width:420px){.fields{gap:8px}.field input{font-size:1.1rem}}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -132,6 +171,8 @@
     <button role="tab" id="tab-metro" aria-selected="false">메트로놈</button>
     <button role="tab" id="tab-dice" aria-selected="false">주사위</button>
     <button role="tab" id="tab-teams" aria-selected="false">팀 나누기</button>
+    <button role="tab" id="tab-schedule" aria-selected="false">수업 시간표</button>
+    <button role="tab" id="tab-stopwatch" aria-selected="false">스톱워치</button>
   </div>
 
   <!-- 멀티 인터벌 타이머 -->
@@ -232,6 +273,48 @@
     <div class="ctl"><button class="btn" id="rx-full" style="flex:0 0 auto;padding:15px 20px" aria-label="전체화면">⛶</button><button class="btn main" id="rx-go">시작</button></div>
     <label class="snd"><input type="checkbox" id="rx-sound" checked> 신호가 바뀔 때 소리</label>
   </section>
+
+  <!-- 수업 시간표 -->
+  <section id="p-schedule" hidden>
+    <div id="sc-edit">
+      <div class="sc-bar"><select id="sc-sel" aria-label="저장한 시간표"></select><button id="sc-new" type="button">새 시간표</button><button id="sc-del" type="button">삭제</button></div>
+      <div class="sc-bar"><input class="sc-name" id="sc-name" maxlength="20" placeholder="시간표 이름 (예: 초급반 월수금)" aria-label="시간표 이름"></div>
+      <div class="sc-steps" id="sc-steps"></div>
+      <button class="chip" id="sc-add" type="button" style="width:100%;border-radius:12px;padding:11px">+ 단계 추가</button>
+      <div class="sc-sum"><span id="sc-total"></span><span id="sc-endat"></span></div>
+      <label class="snd" style="margin-bottom:14px"><input type="checkbox" id="sc-auto" checked> 시간이 끝나면 자동으로 다음 단계로 넘어가기</label>
+      <label class="snd" style="margin-bottom:14px"><input type="checkbox" id="sc-sound" checked> 단계가 바뀔 때·끝나기 3초 전 소리</label>
+      <div class="ctl"><button class="btn main" id="sc-go">수업 시작</button></div>
+    </div>
+    <div class="sc-run" id="sc-run" hidden>
+      <div class="sc-now" id="sc-now"></div>
+      <div class="sc-time" id="sc-time" role="timer">0:00</div>
+      <div class="sc-next" id="sc-next"></div>
+      <div class="sc-seg" id="sc-seg" aria-hidden="true"></div>
+      <div class="sc-foot"><span id="sc-rem"></span><span id="sc-end"></span></div>
+      <div class="ctl"><button class="btn" id="sc-prev">이전</button><button class="btn main" id="sc-pause">일시정지</button><button class="btn" id="sc-skip">다음</button></div>
+      <div class="sc-adj"><button id="sc-m1" type="button">−1분</button><button id="sc-p1" type="button">+1분</button><button id="sc-full" type="button" aria-label="전체화면">⛶</button><button id="sc-stop" type="button">끝내기</button></div>
+    </div>
+  </section>
+
+  <!-- 스톱워치 기록 -->
+  <section id="p-stopwatch" hidden>
+    <div class="sw-kinds" id="sw-kinds" role="group" aria-label="종목"></div>
+    <div class="sw-sel">
+      <select id="sw-who" aria-label="선수 선택"></select>
+      <input id="sw-name" maxlength="20" placeholder="이름 직접 입력" aria-label="이름 직접 입력">
+    </div>
+    <div class="sw-time" id="sw-time" role="timer">0:00<small>.00</small></div>
+    <div class="ctl"><button class="btn" id="sw-reset">초기화</button><button class="btn main" id="sw-go">시작</button></div>
+    <div class="ctl" style="margin-top:10px"><button class="btn" id="sw-save" disabled>이 기록 저장</button></div>
+    <div class="sw-msg" id="sw-msg" aria-live="polite"></div>
+    <div id="sw-board" hidden>
+      <h3 class="sw-h" id="sw-h1">순위 (개인 최고 기록)</h3>
+      <ol class="sw-list" id="sw-rank"></ol>
+      <h3 class="sw-h" id="sw-h2">최근 기록</h3>
+      <ul class="sw-list" id="sw-hist"></ul>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -241,7 +324,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const num = (el, d) => { const n = parseInt(el.value, 10); return Number.isFinite(n) ? n : d; };
 
 /* ---------- 탭 ---------- */
-const TABS = ['timer', 'metro', 'dice', 'teams', 'react'];
+const TABS = ['timer', 'metro', 'dice', 'teams', 'schedule', 'stopwatch', 'react'];
 function showTab(which) {
   if (!TABS.includes(which)) which = 'timer';
   TABS.forEach((t) => { $('#p-' + t).hidden = t !== which; { const b = $('#tab-' + t); if (b) b.setAttribute('aria-selected', String(t === which)); } });
@@ -610,6 +693,192 @@ $('#rx-go').onclick = () => {
   };
   tick();
 };
+
+/* ---------- 수업 시간표 ---------- */
+const SC_COLORS = ['#e9a92b', '#d6483a', '#3f7bd6', '#8b5bd0', '#35a577', '#e58a2b', '#3aa6b0', '#c75b8a'];
+const SC_DEFAULT = { name: '기본 수업', items: [{ n: '준비운동', m: 10 }, { n: '기본기', m: 15 }, { n: '품새', m: 15 }, { n: '겨루기·놀이', m: 15 }, { n: '정리운동', m: 5 }] };
+const sc = store.get('pl-sched', null) || { list: [SC_DEFAULT], cur: 0, auto: true, sound: true };
+if (!Array.isArray(sc.list) || !sc.list.length) { sc.list = [SC_DEFAULT]; sc.cur = 0; }
+sc.cur = clamp(sc.cur | 0, 0, sc.list.length - 1);
+const scSave = () => store.set('pl-sched', sc);
+const scCur = () => sc.list[sc.cur];
+const fmtT = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; };
+const clockOf = (ms) => { const d = new Date(ms); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; };
+function scRenderSel() {
+  $('#sc-sel').innerHTML = sc.list.map((x, i) => `<option value="${i}" ${i === sc.cur ? 'selected' : ''}>${esc(x.name || '이름 없음')}</option>`).join('');
+  $('#sc-name').value = scCur().name || '';
+}
+function scRenderSteps() {
+  const cur = scCur(), box = $('#sc-steps'); box.innerHTML = '';
+  cur.items.forEach((st, i) => {
+    const row = document.createElement('div'); row.className = 'sc-step'; row.style.setProperty('--c', SC_COLORS[i % SC_COLORS.length]);
+    const bar = document.createElement('i');
+    const nm = document.createElement('input'); nm.value = st.n; nm.maxLength = 16; nm.placeholder = '단계 이름'; nm.setAttribute('aria-label', `${i + 1}번째 단계 이름`);
+    nm.oninput = () => { st.n = nm.value; scSave(); };
+    const mi = document.createElement('input'); mi.type = 'number'; mi.min = 1; mi.max = 180; mi.value = st.m; mi.setAttribute('aria-label', `${i + 1}번째 단계 분`);
+    mi.onchange = () => { st.m = clamp(parseInt(mi.value, 10) || 1, 1, 180); mi.value = st.m; scSave(); scSum(); };
+    const mv = document.createElement('div'); mv.className = 'mv';
+    const mk = (t, label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-label', label); b.onclick = fn; return b; };
+    mv.append(
+      mk('↑', '위로', () => { if (i > 0) { [cur.items[i - 1], cur.items[i]] = [cur.items[i], cur.items[i - 1]]; scSave(); scRenderSteps(); } }),
+      mk('↓', '아래로', () => { if (i < cur.items.length - 1) { [cur.items[i + 1], cur.items[i]] = [cur.items[i], cur.items[i + 1]]; scSave(); scRenderSteps(); } }),
+      mk('✕', '삭제', () => { if (cur.items.length > 1) { cur.items.splice(i, 1); scSave(); scRenderSteps(); } }));
+    row.append(bar, nm, mi, mv); box.appendChild(row);
+  });
+  scSum();
+}
+function scSum() {
+  const total = scCur().items.reduce((a, b) => a + b.m, 0);
+  $('#sc-total').textContent = `전체 ${total}분`;
+  $('#sc-endat').textContent = `지금 시작하면 ${clockOf(Date.now() + total * 60000)}에 끝나요`;
+}
+$('#sc-sel').onchange = () => { sc.cur = +$('#sc-sel').value; scSave(); scRenderSel(); scRenderSteps(); };
+$('#sc-name').oninput = () => { scCur().name = $('#sc-name').value; scSave(); const o = $('#sc-sel').options[sc.cur]; if (o) o.textContent = scCur().name || '이름 없음'; };
+$('#sc-new').onclick = () => { if (sc.list.length >= 8) { alert('시간표는 8개까지 저장할 수 있어요.'); return; } sc.list.push({ name: '새 시간표', items: [{ n: '준비운동', m: 10 }, { n: '본 운동', m: 30 }, { n: '정리운동', m: 5 }] }); sc.cur = sc.list.length - 1; scSave(); scRenderSel(); scRenderSteps(); };
+$('#sc-del').onclick = () => { if (sc.list.length <= 1) { alert('시간표가 하나뿐이라 지울 수 없어요.'); return; } if (!confirm(`"${scCur().name}" 시간표를 지울까요?`)) return; sc.list.splice(sc.cur, 1); sc.cur = 0; scSave(); scRenderSel(); scRenderSteps(); };
+$('#sc-add').onclick = () => { const cur = scCur(); if (cur.items.length >= 12) { alert('단계는 12개까지 만들 수 있어요.'); return; } cur.items.push({ n: '', m: 10 }); scSave(); scRenderSteps(); };
+$('#sc-auto').checked = sc.auto !== false; $('#sc-sound').checked = sc.sound !== false;
+$('#sc-auto').onchange = () => { sc.auto = $('#sc-auto').checked; scSave(); };
+$('#sc-sound').onchange = () => { sc.sound = $('#sc-sound').checked; scSave(); };
+scRenderSel(); scRenderSteps();
+
+const scRun = { on: false, i: 0, endAt: 0, left: 0, paused: false, iv: 0, warned: -1, steps: [], startAt: 0, plannedEnd: 0 };
+let scWake = null;
+async function scKeep() { try { if (navigator.wakeLock) scWake = await navigator.wakeLock.request('screen'); } catch (_) {} }
+function scRelease() { try { scWake && scWake.release(); } catch (_) {} scWake = null; }
+function scGoto(i, keepLeft) {
+  scRun.i = i; const st = scRun.steps[i];
+  scRun.left = keepLeft != null ? keepLeft : st.m * 60000; scRun.endAt = Date.now() + scRun.left; scRun.warned = -1;
+  $('#sc-run').classList.remove('over');
+  if (sc.sound !== false && !scRun.first) { beep(660, 0.18); beep(990, 0.28, audio().currentTime + 0.2); }
+  scRun.first = false;
+  const nxt = scRun.steps[i + 1];
+  $('#sc-now').textContent = st.n || `${i + 1}단계`;
+  $('#sc-next').textContent = nxt ? `다음 · ${nxt.n || (i + 2) + '단계'} (${nxt.m}분)` : '마지막 단계예요';
+  $('#sc-skip').textContent = nxt ? '다음' : '끝내기';
+  scDraw();
+}
+function scDraw() {
+  const now = Date.now(), left = scRun.paused ? scRun.left : scRun.endAt - now;
+  const over = left < 0;
+  $('#sc-time').textContent = (over ? '+' : '') + fmtT(Math.abs(left) / 1000);
+  $('#sc-run').classList.toggle('over', over);
+  const st = scRun.steps[scRun.i], done = st.m * 60000 - left;
+  const segs = $('#sc-seg').children;
+  for (let k = 0; k < segs.length; k++) segs[k].style.setProperty('--p', (k < scRun.i ? 100 : k === scRun.i ? clamp(done / (st.m * 60000) * 100, 0, 100) : 0) + '%'), segs[k].classList.toggle('cur', k === scRun.i);
+  const remain = scRun.steps.slice(scRun.i + 1).reduce((a, b) => a + b.m * 60000, 0) + Math.max(0, left);
+  $('#sc-rem').textContent = `수업 남은 시간 ${fmtT(remain / 1000)}`;
+  $('#sc-end').textContent = `종료 예정 ${clockOf((scRun.paused ? now : now) + remain)}`;
+  if (!scRun.paused && sc.sound !== false) { const sec = Math.ceil(left / 1000); if (sec <= 3 && sec > 0 && sec !== scRun.warned) { scRun.warned = sec; beep(880, 0.08); } }
+}
+function scTick() {
+  if (!scRun.on || scRun.paused) return;
+  if (scRun.endAt - Date.now() <= 0 && sc.auto !== false) { scNext(); return; }
+  scDraw();
+}
+function scNext() { if (scRun.i < scRun.steps.length - 1) scGoto(scRun.i + 1); else scFinish(); }
+function scFinish() {
+  clearInterval(scRun.iv); scRun.on = false; scRelease();
+  if (sc.sound !== false) { beep(784, 0.2); beep(988, 0.2, audio().currentTime + 0.22); beep(1318, 0.4, audio().currentTime + 0.44); }
+  $('#sc-now').textContent = '수업 끝!'; $('#sc-time').textContent = '수고하셨어요'; $('#sc-next').textContent = ''; $('#sc-rem').textContent = ''; $('#sc-end').textContent = '';
+  $('#sc-run').classList.remove('over'); $('#sc-pause').hidden = true; $('#sc-prev').hidden = true; $('#sc-skip').hidden = true;
+}
+function scExit() { clearInterval(scRun.iv); scRun.on = false; scRelease(); $('#sc-run').hidden = true; $('#sc-edit').hidden = false; $('#sc-pause').hidden = false; $('#sc-prev').hidden = false; $('#sc-skip').hidden = false; scSum(); }
+$('#sc-go').onclick = () => {
+  audio(); const items = scCur().items.filter((x) => x.m > 0);
+  if (!items.length) return;
+  Object.assign(scRun, { on: true, paused: false, steps: items.map((x) => ({ n: x.n.trim(), m: x.m })), first: true });
+  $('#sc-seg').innerHTML = scRun.steps.map((x, k) => `<i style="--w:${x.m};--c:${SC_COLORS[k % SC_COLORS.length]}"><b></b></i>`).join('');
+  $('#sc-edit').hidden = true; $('#sc-run').hidden = false; $('#sc-pause').textContent = '일시정지';
+  scGoto(0); clearInterval(scRun.iv); scRun.iv = setInterval(scTick, 250); scKeep();
+};
+$('#sc-pause').onclick = () => {
+  if (!scRun.on) return;
+  if (scRun.paused) { scRun.paused = false; scRun.endAt = Date.now() + scRun.left; $('#sc-pause').textContent = '일시정지'; }
+  else { scRun.left = scRun.endAt - Date.now(); scRun.paused = true; $('#sc-pause').textContent = '계속'; }
+  scDraw();
+};
+$('#sc-skip').onclick = () => { if (scRun.on) scNext(); };
+$('#sc-prev').onclick = () => { if (scRun.on) scGoto(Math.max(0, scRun.i - ((scRun.steps[scRun.i].m * 60000 - (scRun.paused ? scRun.left : scRun.endAt - Date.now())) > 5000 ? 0 : 1))); };
+const scAdj = (ms) => { if (!scRun.on) return; if (scRun.paused) scRun.left += ms; else scRun.endAt += ms; scRun.warned = -1; scDraw(); };
+$('#sc-p1').onclick = () => scAdj(60000); $('#sc-m1').onclick = () => scAdj(-60000);
+$('#sc-stop').onclick = () => { if (!scRun.on || confirm('수업 타이머를 끝낼까요?')) scExit(); };
+$('#sc-full').onclick = () => { try { document.fullscreenElement ? document.exitFullscreen() : $('#sc-run').requestFullscreen && $('#sc-run').requestFullscreen(); } catch (_) {} };
+document.addEventListener('visibilitychange', () => { if (!document.hidden && scRun.on) { scKeep(); scTick(); } });
+
+/* ---------- 스톱워치 기록 ---------- */
+const sw = { on: false, t0: 0, acc: 0, raf: 0, item: store.get('pl-sw-item', '줄넘기'), roster: [], member: null, saved: false };
+const swKindsFixed = ['줄넘기', '플랭크', '직접 입력'];
+const fmtSW = (ms) => { const c = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60, m = Math.floor(ms / 60000); return `${m}:${String(s).padStart(2, '0')}<small>.${String(c).padStart(2, '0')}</small>`; };
+const fmtSWtext = (ms) => { const c = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60, m = Math.floor(ms / 60000); return `${m}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`; };
+const swElapsed = () => sw.acc + (sw.on ? performance.now() - sw.t0 : 0);
+function swDraw() { $('#sw-time').innerHTML = fmtSW(swElapsed()); if (sw.on) sw.raf = requestAnimationFrame(swDraw); }
+let swKinds = [];
+function swRenderKinds() {
+  const names = Array.from(new Set(['줄넘기', '플랭크', ...swKinds.map((k) => k.item)])).slice(0, 12);
+  const box = $('#sw-kinds'); box.innerHTML = '';
+  names.concat(['+ 종목 추가']).forEach((n) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n; b.setAttribute('aria-pressed', String(n === sw.item));
+    b.onclick = () => {
+      if (n === '+ 종목 추가') { const v = (prompt('종목 이름을 적어 주세요 (예: 윗몸일으키기)') || '').trim().slice(0, 20); if (!v) return; sw.item = v; if (!names.includes(v)) swKinds.unshift({ item: v, n: 0 }); }
+      else sw.item = n;
+      store.set('pl-sw-item', sw.item); swRenderKinds(); swLoad();
+    };
+    box.appendChild(b);
+  });
+}
+function swWho() {
+  const sel = $('#sw-who'); const prev = sel.value;
+  sel.innerHTML = '<option value="">선수 선택</option>' + sw.roster.map((p) => `<option value="${p.id}">${esc(p.name)}${p.note ? ' · ' + esc(p.note) : ''}</option>`).join('');
+  if (prev) sel.value = prev;
+}
+const swName = () => { const id = $('#sw-who').value; const p = sw.roster.find((x) => String(x.id) === id); return p ? { name: p.name, id: p.id } : { name: $('#sw-name').value.trim(), id: null }; };
+async function swApi(url, opt) { const r = await fetch(url, { ...opt, headers: { 'Content-Type': 'application/json' } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || '문제가 생겼어요.'); return j; }
+async function swLoad() {
+  if (!sw.member) { $('#sw-board').hidden = true; return; }
+  try {
+    const j = await swApi('/api/my/timings?item=' + encodeURIComponent(sw.item));
+    if (j.kinds) { const ex = new Set(swKinds.map((k) => k.item)); j.kinds.forEach((k) => { if (!ex.has(k.item)) swKinds.push(k); }); }
+    swBoard(j.items);
+  } catch (_) {}
+}
+function swBoard(rows) {
+  $('#sw-board').hidden = false;
+  const best = new Map();
+  rows.forEach((r) => { const k = r.roster_id != null ? 'r' + r.roster_id : 'n' + r.name; if (!best.has(k) || r.ms > best.get(k).ms) best.set(k, r); });   // 스톱워치는 오래 버틴 쪽이 좋은 기록
+  const rank = Array.from(best.values()).sort((a, b) => b.ms - a.ms).slice(0, 10);
+  $('#sw-h1').textContent = `${sw.item} 순위 (개인 최고 기록)`;
+  $('#sw-rank').innerHTML = rank.length ? rank.map((r, i) => `<li class="${i === 0 ? 'best' : ''}"><span>${i + 1}</span><span>${esc(r.name)}</span><span class="t">${fmtSWtext(r.ms)}</span><small>${new Date(r.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}</small></li>`).join('') : '<li style="display:block;color:var(--muted)">아직 기록이 없어요.</li>';
+  $('#sw-hist').innerHTML = rows.slice(0, 15).map((r) => `<li><span></span><span>${esc(r.name)}</span><span class="t">${fmtSWtext(r.ms)}</span><button data-del="${r.id}" aria-label="기록 삭제">삭제</button></li>`).join('');
+}
+$('#sw-hist').onclick = async (e) => { const id = e.target.dataset.del; if (id && confirm('이 기록을 삭제할까요?')) { try { await swApi('/api/my/timings/' + id, { method: 'DELETE' }); swLoad(); } catch (er) { alert(er.message); } } };
+function swButtons() { $('#sw-go').textContent = sw.on ? '멈추기' : (sw.acc ? '이어서' : '시작'); $('#sw-save').disabled = sw.on || !sw.acc || sw.saved; }
+$('#sw-go').onclick = () => {
+  if (sw.on) { sw.acc += performance.now() - sw.t0; sw.on = false; cancelAnimationFrame(sw.raf); swDraw(); $('#sw-msg').textContent = ''; }
+  else { sw.t0 = performance.now(); sw.on = true; sw.saved = false; $('#sw-msg').textContent = ''; swDraw(); }
+  swButtons();
+};
+$('#sw-reset').onclick = () => { sw.on = false; sw.acc = 0; sw.saved = false; cancelAnimationFrame(sw.raf); swDraw(); swButtons(); $('#sw-msg').textContent = ''; };
+$('#sw-save').onclick = async () => {
+  const w = swName(), ms = Math.round(swElapsed());
+  if (!sw.member) { $('#sw-msg').innerHTML = '기록을 저장하려면 <a href="/login.html?next=/tools.html%23stopwatch" style="color:var(--brass);text-decoration:underline">로그인</a>이 필요해요.'; return; }
+  if (!w.name) { $('#sw-msg').textContent = '선수를 고르거나 이름을 적어 주세요.'; return; }
+  try {
+    await swApi('/api/my/timings', { method: 'POST', body: JSON.stringify({ item: sw.item, name: w.name, rosterId: w.id, ms }) });
+    sw.saved = true; $('#sw-msg').textContent = `${w.name} · ${sw.item} ${fmtSWtext(ms)} 저장했어요.`; swButtons(); swLoad();
+  } catch (e) { $('#sw-msg').textContent = e.message; }
+};
+$('#sw-who').onchange = () => { if ($('#sw-who').value) $('#sw-name').value = ''; };
+$('#sw-name').oninput = () => { if ($('#sw-name').value) $('#sw-who').value = ''; };
+(async () => {
+  try {
+    const me = await swApi('/api/me'); sw.member = me.member || null;
+    if (sw.member) { const r = await swApi('/api/my/roster'); sw.roster = r.items || []; }
+  } catch (_) {}
+  swWho(); swRenderKinds(); swButtons(); swDraw();
+  if (!sw.member) $('#sw-msg').innerHTML = '로그인하면 선수 명단으로 기록을 저장하고 순위를 볼 수 있어요. <a href="/login.html?next=/tools.html%23stopwatch" style="color:var(--brass);text-decoration:underline">로그인</a>';
+  swLoad().then(swRenderKinds);
+})();
 </script>
 </body>
 </html>
