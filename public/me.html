@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>내 공간 · 플레이 라운지</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;900&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/member.css">
+</head>
+<body>
+<header class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" href="/">홈으로</a></header>
+<main class="wide" id="app" hidden>
+  <h1 id="hello"></h1>
+  <p class="sub" id="org"></p>
+
+  <section class="box">
+    <h2>경기 기록</h2>
+    <p class="hint" style="margin-bottom:12px">로그인한 상태에서 점수판을 열면, 끝난 경기가 여기에 자동으로 저장돼요.</p>
+    <ul class="list" id="records"></ul>
+  </section>
+
+  <section class="box">
+    <h2>선수 명단</h2>
+    <form class="add" id="add">
+      <input name="name" placeholder="이름" maxlength="20" required aria-label="선수 이름">
+      <input name="note" placeholder="메모 (예: 3품, 초등 4학년)" maxlength="40" aria-label="메모">
+      <button class="btn sm">추가</button>
+    </form>
+    <ul class="list" id="roster"></ul>
+  </section>
+
+  <section class="box">
+    <h2>내 정보</h2>
+    <dl id="info"></dl>
+    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+      <button class="btn ghost sm" id="logout">로그아웃</button>
+      <button class="btn danger sm" id="leave">회원 탈퇴</button>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = async (url, opt = {}) => {
+  const r = await fetch(url, { ...opt, headers: { 'Content-Type': 'application/json' } });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = '/login.html'; throw new Error('401'); }
+  if (!r.ok) throw new Error(j.error || '문제가 생겼어요.');
+  return j;
+};
+const ORG = { dojang: '도장', school: '학교', etc: '기타' };
+const fmt = (t) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+async function loadRoster() {
+  const { items } = await api('/api/my/roster');
+  $('#roster').innerHTML = items.length ? items.map((p) =>
+    `<li><span class="grow">${esc(p.name)}${p.note ? `<small>${esc(p.note)}</small>` : ''}</span><button class="btn ghost sm" data-del="${p.id}">삭제</button></li>`).join('')
+    : '<p class="empty">아직 등록한 선수가 없어요. 위에서 이름을 추가해 보세요.</p>';
+}
+async function loadRecords() {
+  const { items } = await api('/api/my/records');
+  $('#records').innerHTML = items.length ? items.map((r) => {
+    const d = r.data || {}, names = d.names || {}, sc = d.scores || {};
+    const line = (d.teams || []).map((t) => `${esc(names[t] || t)} ${sc[t] ?? 0}`).join(' : ');
+    const win = d.winner === 'draw' ? '무승부' : d.winner ? `${esc(names[d.winner] || d.winner)} 승` : '';
+    return `<li><span class="grow">${esc(r.title)} <span class="win">${win}</span><small>${line} · ${fmt(r.playedAt)}</small></span><button class="btn ghost sm" data-rec="${r.id}">삭제</button></li>`;
+  }).join('') : '<p class="empty">저장된 경기가 없어요. 로그인한 채로 점수판에서 경기를 끝내면 기록이 쌓여요.</p>';
+}
+
+(async () => {
+  const { member: m } = await api('/api/me');
+  if (!m) { location.href = '/login.html'; return; }
+  $('#hello').textContent = `${m.name} 님의 공간`;
+  $('#org').textContent = `${ORG[m.orgType] || ''} · ${m.org}`;
+  $('#info').innerHTML = `<dt>아이디</dt><dd>${esc(m.username)}</dd><dt>전화번호</dt><dd>${esc(m.phone)}</dd><dt>소속</dt><dd>${esc(m.org)}</dd>`;
+  $('#app').hidden = false;
+  await Promise.all([loadRoster(), loadRecords()]);
+})();
+
+$('#add').onsubmit = async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try { await api('/api/my/roster', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(f))) }); f.reset(); loadRoster(); }
+  catch (er) { alert(er.message); }
+};
+$('#roster').onclick = async (e) => { const id = e.target.dataset.del; if (id) { await api('/api/my/roster/' + id, { method: 'DELETE' }); loadRoster(); } };
+$('#records').onclick = async (e) => { const id = e.target.dataset.rec; if (id && confirm('이 기록을 삭제할까요?')) { await api('/api/my/records/' + id, { method: 'DELETE' }); loadRecords(); } };
+$('#logout').onclick = async () => { await api('/api/logout', { method: 'POST' }); location.href = '/'; };
+$('#leave').onclick = async () => {
+  const pw = prompt('회원 탈퇴 시 명단과 경기 기록이 모두 삭제돼요.\n계속하려면 비밀번호를 입력하세요.');
+  if (!pw) return;
+  try { await api('/api/me', { method: 'DELETE', body: JSON.stringify({ password: pw }) }); location.href = '/'; }
+  catch (er) { alert(er.message); }
+};
+</script>
+</body>
+</html>

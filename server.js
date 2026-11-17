@@ -17,6 +17,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const tkd = require('./tkd');
+const members = require('./members');
 
 /* ------------------------------ 설정 ------------------------------ */
 const PORT = Number(process.env.PORT) || 3000;
@@ -124,6 +125,7 @@ function loadOrCreateCert(ips) {
 
 /* ------------------------------ 서버 ------------------------------ */
 const app = express();
+members.mount(app, express);
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/config', (_req, res) => {
@@ -326,6 +328,13 @@ function finishTimer(room) {
   const top = Math.max(...teams.map((t) => scores[t]));
   const leaders = teams.filter((t) => scores[t] === top);
   const winner = leaders.length === 1 ? leaders[0] : 'draw';
+  if (room.ownerId && finishedMode === 'round') {
+    const names = {};
+    for (const t of teams) names[t] = (room.teamNames && room.teamNames[t]) || DEFAULT_TEAM_NAMES[t];
+    const GAME_LABEL = { strike: '타격 대결', dodge: '피구', neon: '반응속도', flip: '판 뒤집기' };
+    members.saveRecord(room.ownerId, room.gameType, GAME_LABEL[room.gameType] || room.gameType,
+      { room: room.id, teams, names, scores, winner });
+  }
   toJoined(room, 'timer:end', { mode: finishedMode, scores, winner });
   emitState(room);
 }
@@ -415,6 +424,8 @@ io.on('connection', (socket) => {
         failures.delete(ip);
       }
       room = getOrCreateRoom(roomId);                 // 점수판만 방을 만들 수 있음
+      const owner = members.memberFromCookieHeader(socket.handshake.headers.cookie);
+      if (owner) room.ownerId = owner.id;             // 로그인한 회원이 연 방이면 경기 기록을 그 회원 DB에 저장
       if (GAME_TYPES.includes(payload.game) && room.gameType !== payload.game) {
         room.gameType = payload.game;                 // 점수판이 연 게임 종류로 방을 설정
         room.neon = newNeon();

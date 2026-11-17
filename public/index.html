@@ -145,6 +145,7 @@
       <li><a href="#tkd">태권도 경기</a></li>
       <li><a href="#mission">미션</a></li>
       <li><a href="#how">사용 방법</a></li>
+      <li><a id="nav-member" href="/login.html">로그인</a></li>
     </ul>
     <a class="cta" href="#games">경기 시작하기</a>
   </div>
@@ -315,6 +316,9 @@
       });
     });
   })();
+</script>
+<script>
+fetch('/api/me').then(r=>r.json()).then(j=>{ if(j.member){ const a=document.getElementById('nav-member'); a.textContent=j.member.name+' 님'; a.href='/me.html'; } }).catch(()=>{});
 </script>
 </body>
 </html>

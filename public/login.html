@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>로그인 · 플레이 라운지</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;900&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/member.css">
+</head>
+<body>
+<header class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" href="/">홈으로</a></header>
+<main>
+  <h1>내 공간에 들어가기</h1>
+  <p class="sub">회원마다 선수 명단과 경기 기록을 따로 보관해요.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="t-login" aria-selected="true">로그인</button>
+    <button role="tab" id="t-signup" aria-selected="false">회원가입</button>
+  </div>
+
+  <form id="f-login" autocomplete="on">
+    <label>아이디<input name="username" autocomplete="username" autocapitalize="none" required></label>
+    <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+    <p class="err" role="alert"></p>
+    <button class="btn">로그인</button>
+  </form>
+
+  <form id="f-signup" hidden autocomplete="on">
+    <label>이름<input name="name" autocomplete="name" maxlength="20" required></label>
+    <label>소속
+      <div class="row">
+        <select name="orgType" aria-label="소속 종류"><option value="dojang">도장</option><option value="school">학교</option><option value="etc">기타</option></select>
+        <input name="org" maxlength="30" placeholder="예: ○○태권도장, △△초등학교" aria-label="소속 이름" required>
+      </div>
+    </label>
+    <label>아이디<input name="username" autocomplete="username" autocapitalize="none" maxlength="20" required>
+      <span class="hint">영문 소문자·숫자·밑줄(_) 4~20자</span></label>
+    <label>비밀번호<input name="password" type="password" autocomplete="new-password" maxlength="64" required>
+      <span class="hint">8자 이상, 영문과 숫자를 함께 넣어 주세요</span></label>
+    <label>비밀번호 확인<input name="password2" type="password" autocomplete="new-password" maxlength="64" required></label>
+    <label>전화번호<input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="13" placeholder="010-1234-5678" required></label>
+    <p class="err" role="alert"></p>
+    <button class="btn">가입하고 시작하기</button>
+  </form>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const forms = { login: $('#f-login'), signup: $('#f-signup') };
+function show(which) {
+  for (const k in forms) { forms[k].hidden = k !== which; $('#t-' + k).setAttribute('aria-selected', String(k === which)); }
+}
+$('#t-login').onclick = () => show('login');
+$('#t-signup').onclick = () => show('signup');
+if (location.hash === '#signup') show('signup');
+
+async function send(form, url, body) {
+  const err = form.querySelector('.err'), btn = form.querySelector('.btn');
+  err.textContent = '';
+  form.querySelectorAll('[aria-invalid]').forEach((e) => e.removeAttribute('aria-invalid'));
+  btn.disabled = true;
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      err.textContent = j.error || '문제가 생겼어요. 잠시 후 다시 해 주세요.';
+      const f = j.field && form.querySelector(`[name=${j.field}]`);
+      if (f) { f.setAttribute('aria-invalid', 'true'); f.focus(); }
+      return;
+    }
+    location.href = '/me.html';
+  } catch (_) { err.textContent = '서버에 연결할 수 없어요.'; }
+  finally { btn.disabled = false; }
+}
+forms.login.onsubmit = (e) => { e.preventDefault(); send(forms.login, '/api/login', Object.fromEntries(new FormData(forms.login))); };
+forms.signup.onsubmit = (e) => {
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(forms.signup));
+  if (d.password !== d.password2) {
+    forms.signup.querySelector('.err').textContent = '비밀번호 확인이 일치하지 않아요.';
+    forms.signup.querySelector('[name=password2]').setAttribute('aria-invalid', 'true');
+    return;
+  }
+  delete d.password2;
+  send(forms.signup, '/api/signup', d);
+};
+fetch('/api/me').then((r) => r.json()).then((j) => { if (j.member) location.href = '/me.html'; if (j.enabled === false) $('.sub').textContent = '이 서버에서는 회원 기능을 쓸 수 없어요.'; });
+</script>
+</body>
+</html>
