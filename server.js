@@ -139,7 +139,8 @@ app.use((req, _res, next) => {                        // 이용 통계: 어떤 �
     const p = req.path, q = req.query || {};
     const key = (p === '/' || p === '/index.html') ? 'home'
       : p === '/scoreboard.html' && GAME_TYPES.includes(q.game) ? 'game:' + q.game
-      : p === '/tkd.html' && (q.kind === 'recognized' || q.kind === 'freestyle') ? 'tkd:' + q.kind
+      : p === '/tkd.html' && (q.kind === 'recognized' || q.kind === 'freestyle' || q.kind === 'lifestyle') ? 'tkd:' + q.kind
+      : p === '/board.html' ? 'board'
       : p === '/roulette.html' ? 'roulette' : p === '/deck.html' ? 'deck' : p === '/bomb.html' ? 'bomb' : null;
     if (key) members.track(key);
   }

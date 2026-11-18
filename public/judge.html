@@ -78,6 +78,13 @@
     .hdr.dual .hrow { grid-template-columns: 1fr 1fr; } .hdr.dual .hm { grid-column: 1 / -1; grid-row: 1; flex-direction: row; justify-content: space-between; }
   }
   .hdr { position: sticky; top: 49px; z-index: 9; }
+  .vote { display: grid; gap: 14px; }
+  .vbtn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 32vh; border-radius: 22px; border: 3px solid transparent; font-size: 1rem; color: #fff; }
+  .vbtn.a { background: linear-gradient(180deg, #2f6bff, #1c3f99); } .vbtn.b { background: linear-gradient(180deg, #ff4536, #99281f); }
+  .vbtn .c { font-size: 1.1rem; opacity: .9; } .vbtn .n { font-size: clamp(1.8rem, 9vw, 2.8rem); font-weight: 900; line-height: 1.15; word-break: keep-all; } .vbtn .t { opacity: .85; font-size: 1rem; font-weight: 600; min-height: 1.2em; }
+  .vbtn:active { transform: scale(.98); }
+  .vpick { text-align: center; border-radius: 20px; padding: 26px 14px; border: 3px solid var(--line); } .vpick.a { border-color: var(--blue); background: rgba(47,107,255,.18); } .vpick.b { border-color: var(--red); background: rgba(255,69,54,.18); }
+  .vpick .n { font-size: 2rem; font-weight: 900; margin: 6px 0; }
   .sheet.solo .ded { align-self: start; position: sticky; top: 150px; } .sheet.solo .dbtn { flex: none; min-height: 150px; }
 </style>
 </head>
@@ -104,7 +111,7 @@
   if (!token) { const b = new Uint8Array(12); crypto.getRandomValues(b); token = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join(''); store.set('tkd-token', token); }
   let code = (() => { try { return sessionStorage.getItem('lounge-code') || ''; } catch (_) { return ''; } })();
   let mySeat = Number(store.get('tkd-seat-' + eventId)) || 0;
-  let J = null, formSeq = null, vals = {}, confirming = false, view = 'login', lobby = null, lastErr = '';
+  let J = null, formSeq = null, vals = {}, picked = null, confirming = false, view = 'login', lobby = null, lastErr = '';
 
   if (!eventId) { app.innerHTML = '<div class="center"><div class="big">대회 코드가 없습니다</div>관리자 화면의 QR을 다시 스캔해 주세요.</div>'; return; }
   const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
@@ -120,7 +127,7 @@
       view = r.reason === 'no-event' ? 'noevent' : 'login'; return draw();
     }
     try { sessionStorage.setItem('lounge-code', code); } catch (_) {}
-    $('#ttl').textContent = r.kind === 'freestyle' ? '자유품새 심판' : '공인품새 심판';
+    $('#ttl').textContent = r.kind === 'freestyle' ? '자유품새 심판' : r.kind === 'lifestyle' ? '공인품새(생활체육) 심판' : '공인품새 심판';
     if (r.role === 'lobby') { lobby = r; view = 'lobby'; lastErr = ''; draw(); }
     else { mySeat = r.seat; store.set('tkd-seat-' + eventId, String(mySeat)); $('#seatLabel').textContent = `심판 ${mySeat}`; view = 'judge'; lastErr = ''; draw(); }
   });
@@ -160,8 +167,31 @@
       formSeq = null; confirming = false; return;
     }
     if (J.perf.mySubmitted) { app.innerHTML = '<div class="center"><div class="big">제출 완료 ✔</div><p class="muted">다른 심판의 제출을 기다리고 있습니다.</p></div>'; return; }
-    if (formSeq !== J.perf.seq) { formSeq = J.perf.seq; initVals(); confirming = false; lastErr = ''; }
+    if (formSeq !== J.perf.seq) { formSeq = J.perf.seq; if (J.kind !== 'lifestyle') initVals(); picked = null; confirming = false; lastErr = ''; }
+    if (J.kind === 'lifestyle') return drawVote();
     drawForm();
+  }
+
+  // 생활체육: 점수 없이 청/홍 중 더 잘한 쪽을 선택
+  function drawVote() {
+    const p = J.perf, A = p.sides.find((s) => s.side === 'a') || {}, B = p.sides.find((s) => s.side === 'b') || {};
+    const pill = `<div style="text-align:center"><span class="pill">${p.tiebreak ? '동점 추가 · ' : ''}${esc(p.poomsae || '심사 중')}${!p.tiebreak && p.passCount > 1 ? ` · ${p.pass + 1}/${p.passCount}` : ''}</span></div>`;
+    if (picked) {
+      const s = picked === 'a' ? A : B;
+      app.innerHTML = `${pill}<div class="center" style="padding:16px 0 0"><div class="big">이 선수로 제출할까요?</div><p class="muted">제출 후에는 수정할 수 없습니다.</p></div>
+        <div class="vpick ${picked}"><div>${picked === 'a' ? '청 (靑)' : '홍 (紅)'}</div><div class="n">${esc(s.name)}</div><div class="muted">${esc(s.team)}</div></div>
+        <div class="err" style="text-align:center">${esc(lastErr)}</div>
+        <div class="submit"><div style="display:grid;grid-template-columns:1fr 2fr;gap:10px"><button id="back">다시 고르기</button><button class="primary" id="go">제출</button></div></div>`;
+      $('#back').onclick = () => { picked = null; drawVote(); };
+      $('#go').onclick = () => { $('#go').disabled = true; socket.emit('tkd:submit', { pick: picked }); };
+      return;
+    }
+    app.innerHTML = `${pill}<div class="center" style="padding:6px 0 0"><div class="big" style="font-size:1.25rem">더 잘한 선수를 선택하세요</div></div>
+      <div class="vote">
+        <button class="vbtn a" data-v="a"><span class="c">청 (靑)</span><span class="n">${esc(A.name)}</span><span class="t">${esc(A.team)}</span></button>
+        <button class="vbtn b" data-v="b"><span class="c">홍 (紅)</span><span class="n">${esc(B.name)}</span><span class="t">${esc(B.team)}</span></button>
+      </div><div class="err" style="text-align:center">${esc(lastErr)}</div>`;
+    app.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => { picked = b.dataset.v; if (navigator.vibrate) navigator.vibrate(30); window.scrollTo(0, 0); drawVote(); }));
   }
 
   const f1 = (x) => (Math.round(x * 10) / 10).toFixed(1);

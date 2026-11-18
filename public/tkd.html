@@ -147,7 +147,7 @@
         </div>
       </div>
       <div>
-        <label class="f">심판 수 (1~5명)
+        <label class="f" id="judges-label">심판 수 (1~5명)
           <select id="judges"><option value="1">1명</option><option value="2">2명</option><option value="3" selected>3명</option><option value="4">4명</option><option value="5">5명 (최고·최저 제외 평균)</option></select>
         </label>
         <div id="pool-wrap">
@@ -162,6 +162,16 @@
           <div><b>심판 접속</b><div class="muted" style="font-size:.9rem;margin:4px 0">심판 휴대폰으로 QR을 스캔하고<br>심판 번호를 선택하세요.</div><div class="muted" id="judge-url" style="font-size:.8rem;word-break:break-all;max-width:260px"></div><div id="code-line" class="muted" style="margin-top:6px"></div></div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section class="card ctl" id="boardctl">
+    <h2>전광판 (관객용 점수판)</h2>
+    <p class="muted" style="font-size:.9rem;margin-bottom:10px">이 화면은 그대로 메인 점수판으로 쓰고, 큰 TV나 다른 기기에는 경기 상황만 따로 띄울 수 있어요. 열어 둔 동안만 QR로 접속할 수 있고, 닫으면 연결된 전광판이 모두 꺼집니다.</p>
+    <div class="row"><button class="primary" id="bd-toggle">전광판 열기</button><span class="muted" id="bd-info"></span></div>
+    <div class="qr" id="bd-wrap" style="margin-top:14px" hidden>
+      <div class="qrbox" id="bd-qr"></div>
+      <div><b>전광판 접속</b><div class="muted" style="font-size:.9rem;margin:4px 0">TV나 다른 기기로 QR을 스캔하거나<br>주소를 열면 점수판이 나타납니다.</div><div class="muted" id="bd-url" style="font-size:.8rem;word-break:break-all;max-width:260px"></div><a id="bd-open" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font-size:.9rem">이 기기에서도 열기 ↗</a></div>
     </div>
   </section>
 
@@ -211,10 +221,13 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const f2 = (x) => (x == null ? '-' : Number(x).toFixed(2));
+  const fv = (x) => (x == null ? '-' : String(Math.round(Number(x))) + '표');   // 득표 표시
 
   const params = new URLSearchParams(location.search);
-  const kind = params.get('kind') === 'freestyle' ? 'freestyle' : 'recognized';
-  const KIND_KO = { recognized: '공인품새 대전', freestyle: '자유품새 대전' };
+  const kind = ['freestyle', 'lifestyle'].includes(params.get('kind')) ? params.get('kind') : 'recognized';
+  const KIND_KO = { recognized: '공인품새 대전', lifestyle: '공인품새(생활체육) 대전', freestyle: '자유품새 대전' };
+  const isBracket = kind !== 'freestyle';          // 공인품새·생활체육은 토너먼트 대진표
+  const isLife = kind === 'lifestyle';              // 생활체육: 점수 대신 청/홍 선택(득표)
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let eventId = (params.get('event') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
   if (eventId.length < 4) {
@@ -227,6 +240,11 @@
   $('title').textContent = KIND_KO[kind];
   document.title = `${KIND_KO[kind]} - 플레이 라운지`;
   if (kind === 'freestyle') $('pool-wrap').hidden = true;
+  if (isLife) {
+    $('judges').innerHTML = '<option value="1">1명</option><option value="3" selected>3명 (다수결)</option><option value="5">5명 (다수결)</option>';
+    $('judges-label').firstChild.textContent = '심판 수 (청·홍 중 선택, 많은 표를 받은 쪽이 승리)';
+    $('p-per').innerHTML = '<option value="1" selected>1개</option><option value="2">2개 (두 품새 득표 합산)</option><option value="3">3개 (세 품새 득표 합산)</option>';
+  }
 
   const socket = io({ transports: ['websocket', 'polling'] });   // 웹소켓 우선: 연결 지연 감소
   let S = null, cfg = null, adminPw = '', accessCode = null;
@@ -259,7 +277,7 @@
   socket.on('tkd:state', (s) => { S = s; render(); });
 
   const isLocal = (h) => h === 'localhost' || h === '127.0.0.1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
-  fetch('/api/config').then((r) => r.json()).then((c) => { cfg = c; renderJoinInfo(); });
+  fetch('/api/config').then((r) => r.json()).then((c) => { cfg = c; renderJoinInfo(); if (typeof renderBoardCtl === 'function') renderBoardCtl(); });
   function renderJoinInfo() {
     if (!cfg) return;
     const origin = isLocal(location.hostname) && cfg.ips.length ? `${cfg.protocol}://${cfg.ips[0]}:${cfg.port}` : location.origin;
@@ -270,14 +288,34 @@
     if (typeof QRCode !== 'undefined') new QRCode(box, { text: url, width: 134, height: 134, correctLevel: QRCode.CorrectLevel.M });
   }
 
+  /* ------------ 전광판 열기 / 닫기 ------------ */
+  let bdShown = '';
+  const boardUrl = () => { const origin = cfg && isLocal(location.hostname) && cfg.ips.length ? `${cfg.protocol}://${cfg.ips[0]}:${cfg.port}` : location.origin; return `${origin}/board.html?event=${eventId}`; };
+  function renderBoardCtl() {
+    const b = (S && S.board) || { open: false, viewers: 0 };
+    $('bd-toggle').textContent = b.open ? '전광판 닫기' : '전광판 열기';
+    $('bd-toggle').classList.toggle('danger', b.open); $('bd-toggle').classList.toggle('primary', !b.open);
+    $('bd-info').textContent = b.open ? `열려 있음 · 접속 ${b.viewers}대` : '닫혀 있음';
+    $('bd-wrap').hidden = !b.open;
+    if (b.open) {
+      const url = boardUrl();
+      if (bdShown !== url) {
+        bdShown = url; $('bd-url').textContent = url; $('bd-open').href = url;
+        const box = $('bd-qr'); box.innerHTML = '';
+        if (typeof QRCode !== 'undefined') new QRCode(box, { text: url, width: 134, height: 134, correctLevel: QRCode.CorrectLevel.M });
+      }
+    } else bdShown = '';
+  }
+  $('bd-toggle').addEventListener('click', () => socket.emit('tkd:board', { open: !(S && S.board && S.board.open) }));
+
   /* ------------ 설정 화면 ------------ */
   let cfgTimer = null, lastSent = '';
   const parseCount = () => $('entrants').value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).length;
   function planText(n) {
     if (n < 2) return '선수를 2명 이상 입력하면 진행 방식이 표시됩니다.';
-    if (kind === 'recognized') {
+    if (isBracket) {
       let size = 2; while (size < n) size *= 2;
-      return `<b>${n}명 · 토너먼트</b><br>${size}강 대진표 (${Math.log2(size)}라운드), 부전승 ${size - n}명<br><span class="muted">청·홍 두 선수가 같은 품새를 수행하고 점수가 높은 쪽이 승리합니다.</span>`;
+      return `<b>${n}명 · 토너먼트</b><br>${size}강 대진표 (${Math.log2(size)}라운드), 부전승 ${size - n}명<br><span class="muted">${isLife ? '청·홍 두 선수가 같은 품새를 수행하고, 심판이 더 잘한 쪽(청/홍)을 골라 표가 많은 쪽이 승리합니다.' : '청·홍 두 선수가 같은 품새를 수행하고 점수가 높은 쪽이 승리합니다.'}</span>`;
     }
     if (n <= 8) return `<b>${n}명 · 컷오프</b><br>결승 한 번으로 순위를 결정합니다.`;
     if (n <= 19) return `<b>${n}명 · 컷오프</b><br>준결승(상위 8명 진출) → 결승`;
@@ -286,7 +324,7 @@
   }
   function sendConfig() {
     const payload = { judgeCount: Number($('judges').value), entrants: $('entrants').value };
-    if (kind === 'recognized' && $('p-from').options.length) Object.assign(payload, { poomsaeFrom: $('p-from').value, poomsaeTo: $('p-to').value, poomsaePerMatch: Number($('p-per').value) });
+    if (isBracket && $('p-from').options.length) Object.assign(payload, { poomsaeFrom: $('p-from').value, poomsaeTo: $('p-to').value, poomsaePerMatch: Number($('p-per').value) });
     const key = JSON.stringify(payload); if (key === lastSent) return; lastSent = key;
     socket.emit('tkd:config', payload);
   }
@@ -304,7 +342,7 @@
     '준비': { en: 'Junbi', color: '#7fb0ff', say: '준비' }, '시작': { en: 'Sijak', color: '#ff6b5e', say: '시작' },
     '바로': { en: 'Baro', color: '#6fe39a', say: '바로' }, '쉬어': { en: 'Swieo', color: '#b9c4d6', say: '쉬어' }, '퇴장': { en: 'Exit', color: '#c9a7ff', say: '퇴장' },
   };
-  const CUES = kind === 'recognized' ? ['입장', '경례', '준비', '시작', '바로', '쉬어', '퇴장'] : ['입장', '경례', '준비', '바로', '쉬어', '퇴장'];
+  const CUES = isBracket ? ['입장', '경례', '준비', '시작', '바로', '쉬어', '퇴장'] : ['입장', '경례', '준비', '바로', '쉬어', '퇴장'];
   let cueStep = 0, lastSeq = null, audio = null, cueTimer;
   const getAudio = () => { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (_) {} return audio; };
   function tone(f, dur, o = {}) {
@@ -345,7 +383,7 @@
     if ($('opt-sfx').checked) SFX[name]();
     if ($('opt-voice').checked) setTimeout(() => speak(CUE_DEF[name].say), name === '시작' ? 250 : 120);
     if (name === '준비') timerReset();
-    if (name === '시작' && kind === 'recognized') { timerReset(); timerStart(); }
+    if (name === '시작' && isBracket) { timerReset(); timerStart(); }
     if (name === '바로') timerStop();
     renderCues();
   }
@@ -355,7 +393,7 @@
   }
 
   /* ------------ 시연 시간 (스톱워치) ------------ */
-  const LIM_DEF = kind === 'recognized' ? { min: 0, max: 90 } : { min: 0, max: 100 };
+  const LIM_DEF = isBracket ? { min: 0, max: 90 } : { min: 0, max: 100 };
   let lim = { ...LIM_DEF };
   try { const sv = JSON.parse(localStorage.getItem('tkd-lim-' + kind) || 'null'); if (sv && sv.max > 0) lim = sv; } catch (_) {}
   let tAcc = 0, tT0 = 0, tRun = false;
@@ -524,8 +562,9 @@
     $('final').hidden = S.phase !== 'finished';
     $('footer-acts').hidden = setup;
     syncStage();
+    renderBoardCtl();
     $('seats').innerHTML = S.seats.map((s) => `<span class="seat ${s.submitted ? 'sub' : s.connected ? 'on' : ''}">심판 ${s.seat} ${s.submitted ? '제출' : s.connected ? '접속' : '대기'}</span>`).join('');
-    if (setup) renderSetup(); else { renderCurrent(); if (S.kind === 'recognized') renderBracket(); else renderStages(); }
+    if (setup) renderSetup(); else { renderCurrent(); if (S.kind !== 'freestyle') renderBracket(); else renderStages(); }
     if (S.phase === 'finished') renderFinal();
     musicRefresh();
   }
@@ -533,13 +572,13 @@
     const ae = document.activeElement;
     if (ae !== $('entrants')) $('entrants').value = S.entrants.map((e) => (e.team ? `${e.name} / ${e.team}` : e.name)).join('\n');
     if (ae !== $('judges')) $('judges').value = String(S.judgeCount);
-    if (kind === 'recognized') {
+    if (isBracket) {
       if (!$('p-from').options.length) { const o = S.poomsaeAll.map((n) => `<option>${esc(n)}</option>`).join(''); $('p-from').innerHTML = o; $('p-to').innerHTML = o; }
       if (ae !== $('p-from')) $('p-from').value = S.poomsaeFrom;
       if (ae !== $('p-to')) $('p-to').value = S.poomsaeTo;
       if (ae !== $('p-per')) $('p-per').value = String(S.poomsaePerMatch);
       const a = S.poomsaeAll.indexOf(S.poomsaeFrom), b = S.poomsaeAll.indexOf(S.poomsaeTo), lo = Math.min(a, b), hi = Math.max(a, b);
-      $('pool-note').textContent = `${S.poomsaeAll[lo]} ~ ${S.poomsaeAll[hi]} (${S.poomsaePool.length}개) 중 ${Math.min(S.poomsaePerMatch, S.poomsaePool.length)}개를 대진 추첨 때 뽑아 모든 경기에 똑같이 적용합니다. 동점이면 다른 품새를 1개 더 합니다.`;
+      $('pool-note').textContent = `${S.poomsaeAll[lo]} ~ ${S.poomsaeAll[hi]} (${S.poomsaePool.length}개) 중 ${Math.min(S.poomsaePerMatch, S.poomsaePool.length)}개를 대진 추첨 때 뽑아 모든 경기에 똑같이 적용합니다. ${isLife ? '표가 같으면' : '동점이면'} 다른 품새를 1개 더 합니다.`;
     }
     $('plan').innerHTML = planText(S.entrants.length);
     $('btn-draw').disabled = S.entrants.length < 2;
@@ -547,7 +586,7 @@
   }
 
   function dedButtons(side, c) {
-    if (c.status === 'done') return '';
+    if (c.status === 'done' || !S.deductionKeys.length) return '';
     const d = c.deductions[side] || {};
     const v = S.deductionValues;
     const keys = { time: `시간 −${v.time}`, line: `경계선 −${v.line}`, restart: `재시작 −${v.restart}` };
@@ -563,18 +602,19 @@
     const roundTxt = c.matchId ? (S.bracket.find((r) => r.matches.some((m) => m.id === c.matchId)) || {}).name : (S.stages[S.stageIdx] || {}).name;
     const subm = Object.keys(c.submitted).length, total = c.activeSeats.length;
     const passTxt = c.tiebreak ? ' · 동점 추가 품새' : c.passCount > 1 ? ` · 품새 ${c.pass + 1}/${c.passCount}` : '';
-    const statusTxt = c.status === 'scoring' ? `채점 중${passTxt} · 제출 ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : '확정 완료';
+    const statusTxt = c.status === 'scoring' ? `${isLife ? '투표 중' : '채점 중'}${passTxt} · ${isLife ? '투표' : '제출'} ${subm}/${total}` : c.status === 'review' ? '채점 완료 · 감점 확인 후 점수를 확정하세요' : '확정 완료';
     const sides = c.sides.map((s) => {
       const r = c.result && c.result[s.side];
       const win = c.result && c.result.winner && c.result.winner === s.side;
       const cls = s.side === 'solo' ? '' : s.side;
-      const prevP = (c.passResults || []).map((pr) => `${pr.tb ? '동점 ' : ''}${esc(pr.poomsae)} ${f2(pr[s.side].total)}`).join(' · ');
-      const jl = c.judgeScores && c.judgeScores[s.side] ? Object.entries(c.judgeScores[s.side]).map(([k, v]) => `심판${k} ${f2(v.total)}`).join(' · ') : '';
+      const prevP = (c.passResults || []).map((pr) => `${pr.tb ? '동점 ' : ''}${esc(pr.poomsae)} ${isLife ? fv(pr[s.side].total) : f2(pr[s.side].total)}`).join(' · ');
+      const jl = c.judgeScores && c.judgeScores[s.side] ? (isLife ? Object.entries(c.judgeScores[s.side]).filter(([, v]) => v.total === 1).map(([k]) => `심판${k}`).join(' · ') + ' 선택' : Object.entries(c.judgeScores[s.side]).map(([k, v]) => `심판${k} ${f2(v.total)}`).join(' · ')) : '';
       return `<div class="side ${cls} ${win ? 'win' : ''}">
         <div class="corner">${s.label ? (s.side === 'a' ? '청 (靑)' : '홍 (紅)') : '연기 중'}${win ? ' · 승리' : ''}</div>
         <div class="pname">${esc(s.name)}</div><div class="pteam">${esc(s.team)}</div>
-        ${prevP ? `<div class="jlist">${c.status === 'done' ? '품새별 ' : '확정된 품새 '}${prevP}${c.status === 'done' && !(c.result && c.result.tb && c.result.tb.length) ? ' → 평균' : ''}</div>` : ''}
-        ${r ? `<div class="bigscore">${f2(r.total)}</div>
+        ${prevP ? `<div class="jlist">${c.status === 'done' ? '품새별 ' : '확정된 품새 '}${prevP}${c.status === 'done' && !isLife && !(c.result && c.result.tb && c.result.tb.length) ? ' → 평균' : ''}</div>` : ''}
+        ${r && isLife ? `<div class="bigscore">${fv(r.total)}</div><div class="jlist">${esc(jl)}</div>` : ''}
+        ${r && !isLife ? `<div class="bigscore">${f2(r.total)}</div>
           <table class="brk"><tr><td>${LBL().a} 평균</td><td>${f2(r.a)}</td></tr><tr><td>${LBL().p} 평균</td><td>${f2(r.p)}</td></tr><tr><td>감점</td><td>${r.ded ? '−' + f2(r.ded) : '0.00'}</td></tr></table>
           <div class="jlist">${esc(jl)}${r.dropped ? '<br>(최고·최저 점수 제외 평균)' : ''}</div>` : ''}
         ${dedButtons(s.side, c)}</div>`;
@@ -602,7 +642,7 @@
       const row = (side) => {
         const id = m[side]; const res = m.result && m.result[side];
         const w = m.result && m.result.winner === side, l = m.result && m.result.winner && !w && !m.result.bye;
-        return `<div class="mrow ${side} ${id ? '' : 'empty'} ${w ? 'w' : ''} ${l ? 'l' : ''}"><span class="n">${id ? esc(nameOf(id)) : (m.bye ? '—' : '대기')}</span><span class="s">${res ? f2(res.total) : ''}</span></div>`;
+        return `<div class="mrow ${side} ${id ? '' : 'empty'} ${w ? 'w' : ''} ${l ? 'l' : ''}"><span class="n">${id ? esc(nameOf(id)) : (m.bye ? '—' : '대기')}</span><span class="s">${res ? (isLife ? fv(res.total) : f2(res.total)) : ''}</span></div>`;
       };
       const ready = m.state === 'pending' && m.a && m.b;
       const doneTxt = m.state === 'done' ? (m.result.passes || []).map((x) => x.poomsae).join(' · ') + (m.result.tb && m.result.tb.length ? ' · 동점→ ' + m.result.tb.map((x) => x.poomsae).join(', ') : '') : '';
@@ -645,7 +685,7 @@
     const p = S.podium; if (!p) return;
     const medal = (m, label, names, cls) => names.map((n) => `<div class="pod ${cls}"><div class="m">${m}</div><div>${label}</div><div class="pn">${esc(nameOf(n))}</div><div class="muted">${esc(teamOf(n))}</div></div>`).join('');
     let html = '';
-    if (S.kind === 'recognized') html = medal('🥇', '우승', p.gold, 'g') + medal('🥈', '준우승', p.silver, '') + medal('🥉', '공동 3위', p.bronze, '');
+    if (S.kind !== 'freestyle') html = medal('🥇', '우승', p.gold, 'g') + medal('🥈', '준우승', p.silver, '') + medal('🥉', '공동 3위', p.bronze, '');
     else {
       const ranks = p.ranks.slice(0, 8);
       const top = ranks.filter((r) => r.rank <= 3);

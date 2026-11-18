@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d0c0b">
+<title>전광판 - 플레이 라운지</title>
+<style>
+  :root { --bg:#0d0c0b; --panel:#1b1a17; --panel2:#262421; --ink:#f4efe3; --muted:#a9a190; --line:#35322b; --blue:#2f6bff; --red:#ff4536; --gold:#ffd23f;
+    --font:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; --serif:"Noto Serif KR","Nanum Myeongjo",serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body { font-family:var(--font); background:var(--bg); color:var(--ink); display:flex; flex-direction:column; overflow-x:hidden; }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 28px; border-bottom:1px solid var(--line); flex:none; }
+  .top h1 { font-family:var(--serif); font-size:clamp(1.1rem,2.4vw,1.8rem); font-weight:900; }
+  .top .round { color:var(--gold); font-weight:900; font-size:clamp(1rem,2vw,1.5rem); }
+  main { flex:1; width:100%; max-width:1500px; margin:0 auto; padding:clamp(12px,2.4vw,28px); display:flex; flex-direction:column; gap:clamp(12px,2vw,24px); }
+  .poom { text-align:center; color:var(--muted); font-size:clamp(1rem,2vw,1.5rem); }
+  .poom b { display:inline-block; margin:0 .3em; padding:.1em .8em; border-radius:999px; background:var(--panel2); color:var(--gold); border:1px solid transparent; }
+  .poom b.now { border-color:var(--gold); } .poom b.past { text-decoration:line-through; opacity:.55; }
+  .sides { display:grid; grid-template-columns:1fr 1fr; gap:clamp(10px,2vw,24px); flex:1; min-height:42vh; }
+  .side { position:relative; border-radius:24px; border:4px solid var(--line); background:var(--panel2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.3em; padding:44px 14px 20px; text-align:center; transition:box-shadow .3s, opacity .3s; }
+  .side.a { border-color:var(--blue); background:linear-gradient(180deg, rgba(47,107,255,.38), rgba(47,107,255,.08)); }
+  .side.b { border-color:var(--red); background:linear-gradient(180deg, rgba(255,69,54,.38), rgba(255,69,54,.08)); }
+  .side.win { box-shadow:0 0 0 8px var(--gold), 0 0 80px rgba(255,210,63,.45); }
+  .side.lose { opacity:.45; }
+  .corner { font-size:clamp(1rem,2.2vw,1.6rem); font-weight:900; opacity:.9; }
+  .pname { font-family:var(--serif); font-size:clamp(2rem,6.5vw,6rem); font-weight:900; line-height:1.15; word-break:keep-all; }
+  .pteam { color:var(--muted); font-size:clamp(1rem,2.4vw,2rem); min-height:1.3em; }
+  .big { font-size:clamp(3rem,11vw,10rem); font-weight:900; font-variant-numeric:tabular-nums; line-height:1; margin-top:.1em; }
+  .sub { color:var(--muted); font-size:clamp(.95rem,1.8vw,1.4rem); min-height:1.4em; }
+  .badge { position:absolute; top:-18px; left:50%; transform:translateX(-50%); background:var(--gold); color:#11141b; font-weight:900; padding:.15em 1.1em; border-radius:999px; font-size:clamp(1rem,2.2vw,1.8rem); }
+  .status { text-align:center; font-size:clamp(1.1rem,2.4vw,1.9rem); font-weight:800; color:var(--gold); min-height:1.4em; }
+  .solo { grid-template-columns:1fr; }
+  /* 대진표 */
+  .bracket { display:flex; gap:22px; overflow-x:auto; padding-bottom:8px; }
+  .col { min-width:220px; display:flex; flex-direction:column; gap:8px; } .col h3 { text-align:center; color:var(--muted); font-size:.95rem; }
+  .col .ms { flex:1; display:flex; flex-direction:column; gap:10px; justify-content:space-around; }
+  .match { background:var(--panel2); border:2px solid var(--line); border-radius:10px; overflow:hidden; } .match.now { border-color:var(--gold); }
+  .mrow { display:flex; align-items:center; gap:8px; padding:7px 10px; border-left:5px solid transparent; } .mrow.a { border-left-color:var(--blue); } .mrow.b { border-left-color:var(--red); }
+  .mrow + .mrow { border-top:1px solid var(--line); } .mrow .n { flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mrow .s { font-weight:800; font-variant-numeric:tabular-nums; } .mrow.w { background:rgba(255,210,63,.16); } .mrow.l { opacity:.5; } .mrow.empty .n { color:#776f60; font-weight:500; }
+  h2.sec { font-size:1.1rem; color:var(--muted); font-weight:700; }
+  table.t { width:100%; border-collapse:collapse; } .t th, .t td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; } .t th { color:var(--muted); font-size:.85rem; }
+  .t tr.nowp td { background:rgba(255,210,63,.18); } .t tr.adv td { background:rgba(46,204,113,.12); }
+  .gname { font-weight:900; margin:12px 0 6px; }
+  .podium { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+  .pod { text-align:center; padding:28px 12px; border-radius:18px; background:var(--panel2); } .pod .m { font-size:3rem; } .pod .pn { font-size:2rem; font-weight:900; margin-top:6px; font-family:var(--serif); }
+  .pod.g { background:linear-gradient(180deg, rgba(255,210,63,.32), var(--panel2)); }
+  .wait { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px; color:var(--muted); padding:40px 20px; }
+  .wait b { color:var(--ink); font-family:var(--serif); font-size:clamp(1.6rem,5vw,3.2rem); }
+  .conn { position:fixed; left:0; right:0; top:0; background:#b3261e; text-align:center; padding:6px; font-weight:700; display:none; z-index:9; }
+  @media (max-width:700px) { .sides { grid-template-columns:1fr; } .top { padding:10px 16px; } }
+  @media (prefers-reduced-motion:reduce) { .side { transition:none; } }
+</style>
+</head>
+<body>
+<div class="conn" id="conn" role="alert">연결이 끊겼습니다. 다시 연결하는 중…</div>
+<div class="top"><h1 id="ttl">전광판</h1><span class="round" id="round"></span></div>
+<main id="app"><div class="wait"><b>연결 중…</b></div></main>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const f2 = (x) => (x == null ? '-' : Number(x).toFixed(2));
+  const eventId = (new URLSearchParams(location.search).get('event') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const app = $('app');
+  const KIND_KO = { recognized: '공인품새 대전', lifestyle: '공인품새(생활체육) 대전', freestyle: '자유품새 대전' };
+  let S = null, retry = null;
+
+  if (!eventId) { app.innerHTML = '<div class="wait"><b>대회 코드가 없습니다</b>관리자 화면의 QR을 다시 스캔해 주세요.</div>'; return; }
+  const socket = io({ transports: ['websocket', 'polling'] });
+  const join = () => socket.emit('tkd:join', { role: 'board', event: eventId });
+  const waiting = (msg) => { S = null; $('round').textContent = ''; app.innerHTML = `<div class="wait"><b>${esc(msg)}</b><span>관리자가 전광판을 열면 자동으로 나타납니다.</span></div>`; clearTimeout(retry); retry = setTimeout(join, 4000); };
+  socket.on('connect', () => { $('conn').style.display = 'none'; join(); });
+  socket.on('disconnect', () => { $('conn').style.display = 'block'; });
+  socket.on('tkd:join:result', (r) => {
+    if (r.ok) { clearTimeout(retry); return; }
+    waiting(r.reason === 'no-event' ? '대회가 아직 열리지 않았어요' : r.reason === 'board-closed' ? '전광판이 닫혀 있어요' : '입장할 수 없어요');
+  });
+  socket.on('tkd:board', (s) => { S = s; draw(); });
+  socket.on('tkd:board:closed', () => waiting('전광판이 닫혔어요'));
+
+  const nameOf = (id) => (S.entrants.find((e) => e.id === id) || {}).name || '';
+  const teamOf = (id) => (S.entrants.find((e) => e.id === id) || {}).team || '';
+  const isLife = () => S.kind === 'lifestyle';
+  const fv = (x) => (x == null ? '-' : Math.round(Number(x)) + '표');
+  const val = (r) => (isLife() ? fv(r.total) : f2(r.total));
+
+  function draw() {
+    if (!S) return;
+    $('ttl').textContent = KIND_KO[S.kind] || '전광판';
+    document.title = `전광판 · ${KIND_KO[S.kind] || ''}`;
+    if (S.phase === 'setup') { $('round').textContent = ''; app.innerHTML = `<div class="wait"><b>대진을 준비하고 있어요</b><span>선수 ${S.entrants.length}명 등록됨</span></div>`; return; }
+    let html = '';
+    if (S.phase === 'finished') html += finalHtml();
+    else html += currentHtml();
+    html += S.kind === 'freestyle' ? stagesHtml() : bracketHtml();
+    app.innerHTML = html;
+  }
+
+  function poomHtml(c) {
+    if (c.type !== 'match' || !c.poomsaeList) return '';
+    return `<div class="poom">품새 ${c.poomsaeList.map((n, i) => `<b class="${c.status !== 'done' && i === c.pass ? 'now' : ''} ${c.status !== 'done' && i < c.pass ? 'past' : ''}">${i >= (c.regularCount || c.passCount) ? '동점 ' : c.passCount > 1 ? (i + 1) + '. ' : ''}${esc(n)}</b>`).join('')}</div>`;
+  }
+  function currentHtml() {
+    const c = S.current;
+    if (!c) { $('round').textContent = ''; return `<div class="wait" style="flex:none;padding:30px"><b>다음 경기를 기다리는 중</b></div>`; }
+    const roundTxt = c.matchId ? (S.bracket.find((r) => r.matches.some((m) => m.id === c.matchId)) || {}).name : (S.stages && S.stages[S.stageIdx] || {}).name;
+    $('round').textContent = roundTxt || '';
+    const subm = Object.keys(c.submitted || {}).length, total = (c.activeSeats || []).length;
+    let status;
+    if (c.status === 'scoring') status = c.tiebreak ? `동점 · 다른 품새로 한 번 더! ${isLife() ? '투표' : '채점'} 중 ${subm}/${total}` : `${isLife() ? '투표' : '채점'} 중 ${subm}/${total}`;
+    else if (c.status === 'review') status = '점수 확인 중';
+    else status = c.result && c.result.winner ? `${c.result.winner === 'a' ? '청' : '홍'} 승리` : '경기 종료';
+    const sides = c.sides.map((s) => {
+      const r = c.result && c.result[s.side];
+      const win = c.status === 'done' && c.result && c.result.winner === s.side;
+      const lose = c.status === 'done' && c.result && c.result.winner && c.result.winner !== s.side;
+      const cls = s.side === 'solo' ? '' : s.side;
+      let body = '';
+      if (c.status === 'done' && r) {
+        if (isLife()) {
+          const who = c.judgeScores && c.judgeScores[s.side] ? Object.entries(c.judgeScores[s.side]).filter(([, v]) => v.total === 1).map(([k]) => `심판${k}`).join(' · ') : '';
+          body = `<div class="big">${fv(r.total)}</div><div class="sub">${esc(who)}</div>`;
+        } else body = `<div class="big">${f2(r.total)}</div><div class="sub">${esc(S.schema.labels.a)} ${f2(r.a)} · ${esc(S.schema.labels.p)} ${f2(r.p)}${r.ded ? ' · 감점 −' + f2(r.ded) : ''}</div>`;
+      } else if (c.status === 'review' && !isLife()) body = `<div class="sub" style="font-size:1.4rem">점수 확인 중…</div>`;
+      else if (c.status === 'scoring' && c.type === 'match' && (c.passResults || []).length) {
+        body = `<div class="sub">${c.passResults.map((pr) => `${pr.tb ? '동점 ' : ''}${esc(pr.poomsae)} ${isLife() ? fv(pr[s.side].total) : f2(pr[s.side].total)}`).join(' · ')}</div>`;
+      }
+      return `<div class="side ${cls} ${win ? 'win' : ''} ${lose ? 'lose' : ''}">${win ? '<div class="badge">승리</div>' : ''}
+        <div class="corner">${s.side === 'a' ? '청 (靑)' : s.side === 'b' ? '홍 (紅)' : '연기 중'}</div>
+        <div class="pname">${esc(s.name)}</div><div class="pteam">${esc(s.team)}</div>${body}</div>`;
+    }).join('');
+    return `${poomHtml(c)}<div class="sides ${c.sides.length === 1 ? 'solo' : ''}">${sides}</div><div class="status">${esc(status)}</div>`;
+  }
+
+  function bracketHtml() {
+    const nowId = S.current && S.current.status !== 'done' ? S.current.matchId : null;
+    const cols = S.bracket.map((r) => `<div class="col"><h3>${esc(r.name)}</h3><div class="ms">${r.matches.map((m) => {
+      const row = (side) => {
+        const id = m[side], res = m.result && m.result[side];
+        const w = m.result && m.result.winner === side, l = m.result && m.result.winner && !w && !m.result.bye;
+        return `<div class="mrow ${side} ${id ? '' : 'empty'} ${w ? 'w' : ''} ${l ? 'l' : ''}"><span class="n">${id ? esc(nameOf(id)) : (m.bye ? '—' : '대기')}</span><span class="s">${res ? val(res) : ''}</span></div>`;
+      };
+      return `<div class="match ${nowId === m.id ? 'now' : ''}">${row('a')}${row('b')}</div>`;
+    }).join('')}</div></div>`).join('');
+    return `<div><h2 class="sec" style="margin-bottom:8px">대진표</h2><div class="bracket">${cols}</div></div>`;
+  }
+
+  function stagesHtml() {
+    const st = S.stages && S.stages[S.stageIdx]; if (!st) return '';
+    const nowE = S.current && S.current.status !== 'done' ? S.current.entrantId : null;
+    const groups = st.groups.map((g, gi) => {
+      const rk = st.rankings && st.rankings[gi];
+      const rows = (rk ? rk.entries : g.ids.map((id) => ({ id, res: st.scores[id] }))).map((e, i) => {
+        const r = e.res;
+        return `<tr class="${rk && e.advance ? 'adv' : nowE === e.id ? 'nowp' : ''}"><td>${rk ? e.rank : i + 1}</td><td><b>${esc(nameOf(e.id))}</b> <span style="color:var(--muted)">${esc(teamOf(e.id))}</span></td><td>${r ? f2(r.a) : ''}</td><td>${r ? f2(r.p) : ''}</td><td>${r && r.ded ? '−' + f2(r.ded) : ''}</td><td><b>${r ? f2(r.total) : ''}</b></td></tr>`;
+      }).join('');
+      return `<div class="gname">${esc(g.name)}</div><table class="t"><thead><tr><th>${rk ? '순위' : '순서'}</th><th>선수</th><th>${esc(S.schema.labels.a)}</th><th>${esc(S.schema.labels.p)}</th><th>감점</th><th>합계</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }).join('');
+    return `<div><h2 class="sec">${esc(st.name)}</h2>${groups}</div>`;
+  }
+
+  function finalHtml() {
+    const p = S.podium; if (!p) return '';
+    $('round').textContent = '최종 결과';
+    const medal = (m, label, ids, cls) => ids.map((n) => `<div class="pod ${cls}"><div class="m">${m}</div><div>${label}</div><div class="pn">${esc(nameOf(n))}</div><div style="color:var(--muted)">${esc(teamOf(n))}</div></div>`).join('');
+    let html = '';
+    if (S.kind !== 'freestyle') html = medal('🥇', '우승', p.gold, 'g') + medal('🥈', '준우승', p.silver, '') + medal('🥉', '공동 3위', p.bronze, '');
+    else html = (p.ranks || []).filter((r) => r.rank <= 3).map((r) => `<div class="pod ${r.rank === 1 ? 'g' : ''}"><div class="m">${['🥇', '🥈', '🥉'][r.rank - 1]}</div><div>${r.rank}위</div><div class="pn">${esc(nameOf(r.id))}</div><div style="color:var(--muted)">${esc(teamOf(r.id))} · ${f2(r.res.total)}점</div></div>`).join('');
+    return `<div><h2 class="sec" style="margin-bottom:10px">🏆 최종 결과</h2><div class="podium">${html}</div></div>`;
+  }
+})();
+</script>
+</body>
+</html>

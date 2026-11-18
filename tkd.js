@@ -8,13 +8,15 @@
  *   - 정확성(기술)과 표현 점수는 각각 '최고·최저 1개씩 제외한 평균'(심판 5명 이상일 때), 감점은 합산 후 차감
  *   - 컷오프: 20명 이상 예선(조별 상위 50%) → 9~19명 준결승(상위 8명) → 8명 이하 결승
  *   - 공인품새 토너먼트: 추첨 대진, 청·홍이 같은 품새를 동시에 수행하고 점수가 높은 쪽이 승리
+ *   - 공인품새(생활체육) 대전: 대진·품새 추첨은 공인품새와 같고, 심판은 점수 대신 청/홍 중 한 쪽을 골라 표가 많은 쪽이 승리
  */
 const MAX_JUDGES = 5;
 const MAX_ENTRANTS = 128;
 const EVENT_ID_RE = /^[A-Z0-9]{4,12}$/;
-const KINDS = ['recognized', 'freestyle'];
+const KINDS = ['recognized', 'freestyle', 'lifestyle'];
+const isBracketKind = (k) => k === 'recognized' || k === 'lifestyle';   // 토너먼트 대진표를 쓰는 종목
 const DEDUCTION_VALUES = { time: 0.3, line: 0.3, restart: 0.6 };
-const DEDUCTION_KEYS = { recognized: ['time', 'line', 'restart'], freestyle: ['time', 'line'] };
+const DEDUCTION_KEYS = { recognized: ['time', 'line', 'restart'], freestyle: ['time', 'line'], lifestyle: [] };
 const POOMSAE_ALL = [...Array.from({ length: 8 }, (_, i) => `태극 ${i + 1}장`), '고려', '금강', '태백', '평원', '십진', '지태', '천권', '한수', '일여'];
 const DEFAULT_POOL = POOMSAE_ALL.slice(0, 8);
 const MAX_PER_MATCH = 3;
@@ -44,6 +46,10 @@ const SCHEMAS = {
       { key: 'rhythm', group: 'p', type: 'score', label: '강유/완급/리듬', min: 0.5, max: 2.0, def: 2.0 },
       { key: 'energy', group: 'p', type: 'score', label: '기의 표현', min: 0.5, max: 2.0, def: 2.0 },
     ],
+  },
+  lifestyle: {                                   // 점수 없이 청/홍 선택(투표): vote 1 = 이 쪽을 선택
+    labels: { a: '득표', p: '' },
+    fields: [{ key: 'vote', group: 'a', type: 'count', label: '선택', max: 1, def: 0 }],
   },
   freestyle: {
     labels: { a: '기술', p: '표현' },
@@ -92,6 +98,7 @@ function validateScores(kind, input) {
   return out;
 }
 function judgeTotals(kind, v) {
+  if (kind === 'lifestyle') return { a: v.vote, p: 0, total: v.vote };
   if (kind === 'recognized') {
     const a = Math.max(0, r2(4 - 0.1 * v.minor - 0.3 * v.major));
     const p = r2(v.power + v.rhythm + v.energy);
@@ -115,6 +122,11 @@ function combine(list, deduction) {
     a, p, ded: r2(deduction), total: Math.max(0, r2(a + p - deduction)),
     sumAll: r2(list.reduce((s, x) => s + x.total, 0)), judges: list.length, dropped: drop,
   };
+}
+// 투표 종목: 심판 한 표 = 1점, 감점·평균 없이 표를 그대로 더한다
+function combineVotes(list) {
+  const votes = list.reduce((s, x) => s + x.total, 0);
+  return { a: votes, p: 0, ded: 0, total: votes, sumAll: votes, judges: list.length, dropped: false };
 }
 const deductionTotal = (d) => r2((d.time ? DEDUCTION_VALUES.time : 0) + (d.line ? DEDUCTION_VALUES.line : 0) + (d.restart || 0) * DEDUCTION_VALUES.restart);
 // 양수면 x가 우세: 합계 → (공인: 표현성 / 자유: 기술) → 전체 심판 점수 합(최고·최저 포함)
@@ -184,11 +196,12 @@ const events = new Map();
 
 function newEvent(id, kind) {
   return {
-    id, kind, phase: 'setup', judgeCount: 3, entrants: [], poomsaePool: DEFAULT_POOL.slice(), poomsaeFrom: POOMSAE_ALL[0], poomsaeTo: POOMSAE_ALL[7], poomsaePerMatch: 2, drawnPoomsae: null,
+    id, kind, phase: 'setup', judgeCount: 3, entrants: [], poomsaePool: DEFAULT_POOL.slice(), poomsaeFrom: POOMSAE_ALL[0], poomsaeTo: POOMSAE_ALL[7], poomsaePerMatch: kind === 'lifestyle' ? 1 : 2, drawnPoomsae: null, boardOpen: false,
     bracket: null, stages: null, stageIdx: 0, current: null, podium: null, seats: {}, lastActive: Date.now(), prelimCount: 0,
   };
 }
 const entrantMap = (ev) => Object.fromEntries(ev.entrants.map((e) => [e.id, e]));
+const boardRoomOf = (id) => `T:${id}:board`;
 const seatList = (ev) => Array.from({ length: ev.judgeCount }, (_, i) => {
   const s = ev.seats[i + 1];
   return { seat: i + 1, connected: !!(s && s.connected), submitted: !!(ev.current && ev.current.status !== 'done' && ev.current.submitted[i + 1]) };
@@ -221,8 +234,11 @@ function adminSnapshot(ev) {
     seats: seatList(ev), schema: SCHEMAS[ev.kind], deductionValues: DEDUCTION_VALUES, deductionKeys: DEDUCTION_KEYS[ev.kind],
     bracket: ev.bracket ? ev.bracket.map((round, r) => ({ name: roundName(ev.bracket.length, r), matches: round })) : null,
     stages: ev.stages, stageIdx: ev.stageIdx, current, podium: ev.podium,
+    board: { open: !!ev.boardOpen, viewers: ev.boardOpen && ioRef ? (ioRef.sockets.adapter.rooms.get(boardRoomOf(ev.id)) || { size: 0 }).size : 0 },
   };
 }
+let ioRef = null;                                       // 전광판 접속자 수를 세기 위해 io 를 보관
+function boardSnapshot(ev) { const s = adminSnapshot(ev); delete s.seats; return s; }
 function judgeSnapshot(ev, seat) {
   const c = ev.current;
   const active = c && c.status === 'scoring' && c.activeSeats.includes(seat);
@@ -235,8 +251,9 @@ function judgeSnapshot(ev, seat) {
 
 /* ------------------------------ 진행 로직 ------------------------------ */
 const avg = (arr, k) => r2(arr.reduce((t, x) => t + x[k], 0) / arr.length);
-function mergePasses(list) {
+function mergePasses(list, kind) {
   if (list.length === 1) return list[0];
+  if (kind === 'lifestyle') { const t = list.reduce((s, x) => s + x.total, 0); return { a: t, p: 0, ded: 0, total: t, sumAll: t, judges: list[0].judges, dropped: false }; }
   return { a: avg(list, 'a'), p: avg(list, 'p'), ded: avg(list, 'ded'), total: avg(list, 'total'), sumAll: r2(list.reduce((t, x) => t + x.sumAll, 0)), judges: list[0].judges, dropped: list.some((x) => x.dropped) };
 }
 function finalizePerf(ev) {
@@ -247,7 +264,7 @@ function finalizePerf(ev) {
   for (const side of sides) {
     const list = Object.values(c.scores[side] || {});
     if (!list.length) return false;
-    one[side] = combine(list, deductionTotal(c.deductions[side]));
+    one[side] = ev.kind === 'lifestyle' ? combineVotes(list) : combine(list, deductionTotal(c.deductions[side]));
   }
   if (c.type === 'match') {
     c.passResults = c.passResults || [];
@@ -273,12 +290,12 @@ function finalizePerf(ev) {
       if (tbDiff === 0) { addTiebreak(); return true; }                        // 추가 품새도 동점이면 또 하나
     } else if (c.pass < c.regularCount - 1) { c.pass += 1; openPass(); return true; }
     else {
-      const base = { a: mergePasses(c.passResults.map((pr) => pr.a)), b: mergePasses(c.passResults.map((pr) => pr.b)) };
+      const base = { a: mergePasses(c.passResults.map((pr) => pr.a), ev.kind), b: mergePasses(c.passResults.map((pr) => pr.b), ev.kind) };
       if (cmpResult(ev.kind, base.a, base.b) === 0) { addTiebreak(); return true; }
     }
   }
   const result = {};
-  for (const side of sides) result[side] = c.type === 'match' ? mergePasses(c.passResults.filter((pr) => !pr.tb).map((pr) => pr[side])) : one[side];
+  for (const side of sides) result[side] = c.type === 'match' ? mergePasses(c.passResults.filter((pr) => !pr.tb).map((pr) => pr[side]), ev.kind) : one[side];
   c.result = result;
   c.status = 'done';
   if (c.type === 'match') {
@@ -315,6 +332,7 @@ function finishBracket(ev) {
 
 /* ------------------------------ 소켓 연결 ------------------------------ */
 function attach(io, socket, auth) {
+  ioRef = io;
   const adminRoom = (id) => `T:${id}:admin`;
   const seatRoom = (id, n) => `T:${id}:seat:${n}`;
   const lobbyRoom = (id) => `T:${id}:lobby`;
@@ -324,6 +342,7 @@ function attach(io, socket, auth) {
     io.to(adminRoom(ev.id)).emit('tkd:state', adminSnapshot(ev));
     for (let n = 1; n <= ev.judgeCount; n++) io.to(seatRoom(ev.id, n)).emit('tkd:judge', judgeSnapshot(ev, n));
     io.to(lobbyRoom(ev.id)).emit('tkd:seats', { judgeCount: ev.judgeCount, seats: seatList(ev) });
+    if (ev.boardOpen) io.to(boardRoomOf(ev.id)).emit('tkd:board', boardSnapshot(ev));
   };
   const err = (code, extra) => socket.emit('tkd:error', { code, ...extra });
   const leaveAll = () => { for (const r of socket.rooms) if (r !== socket.id && String(r).startsWith('T:')) socket.leave(r); };
@@ -348,6 +367,18 @@ function attach(io, socket, auth) {
       socket.join(adminRoom(id));
       socket.emit('tkd:join:result', { ok: true, role: 'admin', kind: ev.kind, event: id, accessCode: auth.ACCESS_CODE || null });
       socket.emit('tkd:state', adminSnapshot(ev));
+      return;
+    }
+
+    if (p.role === 'board') {                                              // 관객용 전광판(읽기 전용): 관리자가 열어 둔 동안만 접속 가능
+      const ev = events.get(id);
+      if (!ev) return fail('no-event');
+      if (!ev.boardOpen) return fail('board-closed');
+      socket.data.tkd = { role: 'board', id };
+      socket.join(boardRoomOf(id));
+      socket.emit('tkd:join:result', { ok: true, role: 'board', kind: ev.kind });
+      socket.emit('tkd:board', boardSnapshot(ev));
+      io.to(adminRoom(id)).emit('tkd:state', adminSnapshot(ev));        // 접속자 수 갱신
       return;
     }
 
@@ -382,6 +413,7 @@ function attach(io, socket, auth) {
 
   socket.on('disconnect', () => {
     const t = socket.data.tkd;
+    if (t && t.role === 'board') { const bev = events.get(t.id); if (bev) setTimeout(() => io.to(adminRoom(bev.id)).emit('tkd:state', adminSnapshot(bev)), 50); return; }
     if (!t || t.role !== 'judge') return;
     const ev = events.get(t.id);
     if (ev && ev.seats[t.seat] && ev.seats[t.seat].sid === socket.id) { ev.seats[t.seat].connected = false; broadcast(ev); }
@@ -411,6 +443,7 @@ function attach(io, socket, auth) {
       const pool = (Array.isArray(p.poomsaePool) ? p.poomsaePool : String(p.poomsaePool).split(/[,\n]/)).map((x) => String(x).trim().slice(0, 20)).filter(Boolean).slice(0, 40);
       if (pool.length) ev.poomsaePool = pool;
     }
+    if (ev.kind === 'lifestyle' && ev.judgeCount % 2 === 0) ev.judgeCount = Math.min(MAX_JUDGES, ev.judgeCount + 1);   // 투표는 동표가 나오지 않게 홀수 심판
     if (p.poomsaePerMatch != null) ev.poomsaePerMatch = Math.min(MAX_PER_MATCH, Math.max(1, Math.round(Number(p.poomsaePerMatch)) || 1));
     broadcast(ev);
   }));
@@ -419,7 +452,7 @@ function attach(io, socket, auth) {
     if (ev.phase !== 'setup') return err('not-setup');
     if (ev.entrants.length < 2) return err('few-entrants');
     ev.current = null; ev.podium = null; ev.prelimCount = 0;
-    if (ev.kind === 'recognized') {
+    if (isBracketKind(ev.kind)) {
       ev.bracket = buildBracket(ev.entrants); ev.stages = null;
       ev.drawnPoomsae = drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch);          // 대진 추첨과 함께 품새도 추첨: 모든 경기가 같은 품새
     }
@@ -430,6 +463,12 @@ function attach(io, socket, auth) {
 
   socket.on('tkd:reset', admin((ev) => {
     ev.phase = 'setup'; ev.drawnPoomsae = null; ev.bracket = null; ev.stages = null; ev.stageIdx = 0; ev.current = null; ev.podium = null;
+    broadcast(ev);
+  }));
+
+  socket.on('tkd:board', admin((ev, p) => {                              // 전광판 열기 / 닫기
+    ev.boardOpen = !!p.open;
+    if (!ev.boardOpen) { io.to(boardRoomOf(ev.id)).emit('tkd:board:closed'); io.in(boardRoomOf(ev.id)).socketsLeave(boardRoomOf(ev.id)); }
     broadcast(ev);
   }));
 
@@ -446,7 +485,7 @@ function attach(io, socket, auth) {
   };
 
   socket.on('tkd:startMatch', admin((ev, p) => {
-    if (ev.kind !== 'recognized' || ev.phase !== 'running') return;
+    if (!isBracketKind(ev.kind) || ev.phase !== 'running') return;
     const m = ev.bracket.flat().find((x) => x.id === p.matchId);
     if (!m || m.state !== 'pending' || !m.a || !m.b) return err('bad-match');
     const poomsaeList = (ev.drawnPoomsae && ev.drawnPoomsae.length ? ev.drawnPoomsae : drawPoomsae(ev.poomsaePool, ev.poomsaePerMatch)).slice();
@@ -513,6 +552,10 @@ function attach(io, socket, auth) {
     if (!c || c.status !== 'scoring' || !c.activeSeats.includes(t.seat) || c.submitted[t.seat]) return err('not-open');
     const sides = c.type === 'match' ? ['a', 'b'] : ['solo'];
     const cleaned = {};
+    if (ev.kind === 'lifestyle') {                                          // 청/홍 선택 → 선택한 쪽 1표
+      if (c.type !== 'match' || (p.pick !== 'a' && p.pick !== 'b')) return err('bad-scores');
+      p = { scores: { a: { vote: p.pick === 'a' ? 1 : 0 }, b: { vote: p.pick === 'b' ? 1 : 0 } } };
+    }
     for (const side of sides) {
       const vals = validateScores(ev.kind, p.scores && p.scores[side]);
       if (!vals) return err('bad-scores');
@@ -520,7 +563,7 @@ function attach(io, socket, auth) {
     }
     for (const side of sides) c.scores[side] = { ...(c.scores[side] || {}), [t.seat]: { vals: cleaned[side], ...judgeTotals(ev.kind, cleaned[side]) } };
     c.submitted[t.seat] = true;
-    if (c.activeSeats.every((s) => c.submitted[s])) c.status = 'review';
+    if (c.activeSeats.every((s) => c.submitted[s])) { c.status = 'review'; if (ev.kind === 'lifestyle') finalizePerf(ev); }   // 투표는 감점 확인이 없으니 바로 확정
     broadcast(ev);
   });
 }
@@ -530,4 +573,4 @@ setInterval(() => {
   for (const [id, ev] of events) if (now - ev.lastActive > IDLE_TTL_MS) events.delete(id);
 }, 10 * 60 * 1000).unref();
 
-module.exports = { attach, _test: { buildBracket, planStage, combine, judgeTotals, cmpResult, rankGroup, validateScores, seedOrder, roundName, events } };
+module.exports = { attach, _test: { combineVotes, mergePasses, boardSnapshot, buildBracket, planStage, combine, judgeTotals, cmpResult, rankGroup, validateScores, seedOrder, roundName, events } };

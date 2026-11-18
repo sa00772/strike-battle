@@ -127,7 +127,7 @@
   .row[data-open] { cursor: pointer; }
   .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
   .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; } .row.play5 { --seal: #b5532e; } .row.play6 { --seal: #8a2f2f; } .row.tool6 { --seal: #5b6fc9; } .row.tool7 { --seal: #2e8f8a; }
-  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.tool4 { --seal: #4f8a5b; } .row.tool5 { --seal: #b5532e; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; }
+  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.tool4 { --seal: #4f8a5b; } .row.tool5 { --seal: #b5532e; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; } .row.life { --seal: #2f8a6f; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
     border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(37,36,43,.18), inset 0 0 0 3px rgba(0,0,0,.12), inset 0 0 0 4px rgba(255,255,255,.4); transition: transform .3s; }
   .row[data-open]:hover .seal { transform: rotate(0deg) scale(1.04); }
@@ -407,6 +407,15 @@
         <p class="sub">청·홍 두 선수가 같은 품새를 겨룹니다. 참가 인원에 맞춰 무작위 토너먼트 대진표를 만듭니다.</p>
       </div>
       <a class="act" href="/tkd.html?kind=recognized">경기 열기</a>
+    </article>
+
+    <article class="row life" id="life">
+      <div class="seal" aria-hidden="true"></div>
+      <div class="main">
+        <h3>공인품새(생활체육) 대전<span class="tag">청·홍 선택</span></h3>
+        <p class="sub">점수 없이 심판이 청·홍 중 한 명을 골라 표가 많은 선수가 이깁니다. 대진표는 같고, 전광판을 따로 열어 QR로 보여줄 수 있습니다.</p>
+      </div>
+      <a class="act" href="/tkd.html?kind=lifestyle">경기 열기</a>
     </article>
 
     <article class="row free" id="free">
