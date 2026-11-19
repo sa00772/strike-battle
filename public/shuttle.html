@@ -80,7 +80,7 @@
     <p class="note" id="vnote"></p>
   </div>
 </main>
-<audio id="au" src="/audio/shuttle-beep.mp3" preload="auto" playsinline></audio>
+<audio id="au" preload="auto" playsinline></audio>
 
 <script>
 const LAPS=[5.0, 13.72, 22.19, 30.66, 39.13, 47.6, 56.07, 64.79, 72.79, 80.79, 88.79, 96.79, 104.79, 112.79, 120.79, 129.04, 136.62, 144.2, 151.78, 159.36, 166.94, 174.52, 182.09, 189.92, 197.12, 204.32, 211.52, 218.72, 225.92, 233.12, 240.32, 247.52, 254.97, 261.83, 268.69, 275.54, 282.4, 289.26, 296.12, 302.97, 309.83, 316.94, 323.48, 330.03, 336.57, 343.12, 349.66, 356.21, 362.76, 369.3, 375.85, 382.64, 388.9, 395.16, 401.42, 407.69, 413.95, 420.21, 426.47, 432.73, 438.99, 445.5, 451.5, 457.5, 463.5, 469.5, 475.5, 481.5, 487.5, 493.5, 499.5, 505.5, 511.5, 517.51, 523.27, 529.03, 534.79, 540.55, 546.31, 552.07, 557.83, 563.59, 569.35, 575.36, 580.9, 586.44, 591.98, 597.51, 603.05, 608.59, 614.13, 619.67, 625.21, 630.74, 636.53, 641.87, 647.2, 652.53, 657.87, 663.2, 668.53, 673.87, 679.2, 684.53, 689.87, 695.2, 700.53, 705.93, 711.07, 716.21, 721.35, 726.5, 731.64, 736.78, 741.93, 747.07, 752.21, 757.35, 762.75, 767.71, 772.68, 777.64, 782.61, 787.58, 792.54, 797.51, 802.47, 807.44, 812.4, 817.37, 822.33, 827.55, 832.35, 837.15, 841.95, 846.75, 851.55, 856.35, 861.15, 865.95, 870.75, 875.55, 880.35, 885.15, 889.95, 894.84, 899.49, 904.13, 908.78, 913.42, 918.07, 922.72, 927.36, 932.01, 936.65, 941.3, 945.94, 950.59, 955.34, 959.84, 964.34, 968.84, 973.34, 977.84, 982.34, 986.84, 991.34, 995.84, 1000.34, 1004.84, 1009.34, 1014.09, 1018.45, 1022.81, 1027.18, 1031.54, 1035.9, 1040.27, 1044.63, 1049.0, 1053.36, 1057.72, 1062.09, 1066.45, 1070.81, 1075.18, 1079.66, 1083.9, 1088.13, 1092.37, 1096.6, 1100.84, 1105.07, 1109.31, 1113.54, 1117.78, 1122.02, 1126.25, 1130.49, 1134.72, 1139.21, 1143.32, 1147.43, 1151.55, 1155.66, 1159.78, 1163.89, 1168.01, 1172.12, 1176.23, 1180.35, 1184.46, 1188.58, 1192.69, 1196.81, 1201.17, 1205.17, 1209.17, 1213.17, 1217.17, 1221.17, 1225.17, 1229.17, 1233.17, 1237.17, 1241.17, 1245.17, 1249.17, 1253.17, 1257.17, 1261.17, 1265.17, 1269.31, 1273.2, 1277.1, 1280.99, 1284.88, 1288.77, 1292.66, 1296.56, 1300.45, 1304.34, 1308.23, 1312.12, 1316.01, 1319.91, 1323.8, 1328.39];
@@ -145,7 +145,8 @@ const CD=[2.0,3.0,4.0];
       } catch (_) { vstat('목소리 오류'); }
     }, delay == null ? 0 : delay);
   }
-  const warm = () => { try { if (synth) { synth.cancel(); const w = new SpeechSynthesisUtterance(' '); w.volume = 0; synth.speak(w); } } catch (_) {} };   // 아이폰: 누른 순간 음성 허용
+  const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const warm = () => { try { if (synth && IOS) { synth.cancel(); const w = new SpeechSynthesisUtterance(' '); w.volume = 0; synth.speak(w); } } catch (_) {} };   // 아이폰: 누른 순간 음성 허용
   $('test').addEventListener('click', () => { warm(); say('삼, 이, 일, 시작, 하나, 둘, 셋', 200); });
 
   // ---- 진행 ----
@@ -204,6 +205,7 @@ const CD=[2.0,3.0,4.0];
   function unlock(on) { $('start').disabled = on; }
 
   $('play').addEventListener('click', () => {
+    if (!loaded) { loadAudio(); return; }
     if (running) { halt(); $('play').textContent = '이어서'; result(); return; }
     warm();
     if (!started) { build(); au.currentTime = startAt; $('result').hidden = true; started = true; unlock(true); }
@@ -213,9 +215,36 @@ const CD=[2.0,3.0,4.0];
   });
   au.addEventListener('ended', () => { running = false; clearInterval(timer); $('play').textContent = '다시 시작'; $('count').textContent = TOTAL; $('sub').textContent = '마지막 단계까지 모두 끝났어요'; result(); started = false; unlock(false); });
   au.addEventListener('error', () => { vstat('음원을 불러오지 못했습니다. 새로고침해 주세요.'); });
-  const ready = () => { if ($('play').disabled) { $('play').disabled = false; $('play').textContent = '시작'; } };
-  if (au.readyState >= 2) ready(); au.addEventListener('canplay', ready); au.addEventListener('loadeddata', ready);
-  setTimeout(ready, 4000);                                  // 일부 기기는 미리 불러오기를 막아서 이벤트가 안 옴
+  // 음원은 먼저 통째로 내려받아 재생한다(재생 도중 네트워크가 느려서 멈추는 일과 중간 위치 이동 오차를 없앤다)
+  let loaded = false;
+  async function loadAudio() {
+    $('play').disabled = true; $('play').textContent = '음원 내려받는 중…'; vstat('');
+    try {
+      const res = await fetch('/audio/shuttle-beep.mp3', { cache: 'force-cache' });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const total = parseInt(res.headers.get('content-length') || '0', 10);
+      const rd = res.body && res.body.getReader ? res.body.getReader() : null;
+      let blob;
+      if (rd) {
+        const parts = []; let got = 0;
+        for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (total) $('play').textContent = '음원 내려받는 중… ' + Math.min(99, Math.round(got / total * 100)) + '%'; }
+        blob = new Blob(parts, { type: 'audio/mpeg' });
+      } else blob = await res.blob();
+      au.src = URL.createObjectURL(blob);
+      await new Promise((ok, no) => { au.addEventListener('loadedmetadata', ok, { once: true }); au.addEventListener('error', () => no(new Error('decode')), { once: true }); au.load(); });
+      loaded = true; $('play').disabled = false; $('play').textContent = '시작';
+    } catch (e) {
+      loaded = false; $('play').disabled = false; $('play').textContent = '음원 다시 불러오기'; vstat('음원을 불러오지 못했습니다(' + (e && e.message || '오류') + '). 버튼을 눌러 다시 시도해 주세요.');
+    }
+  }
+  loadAudio();
+  // 재생이 멈춘 채 있으면 화면에 알린다
+  let lastCt = -1, still = 0;
+  setInterval(() => {
+    if (!running) { still = 0; return; }
+    if (au.currentTime === lastCt) { if (++still >= 3) vstat('음원이 멈춰 있습니다. 멈춤 → 이어서를 눌러 보세요.'); } else { still = 0; if (/음원이 멈춰/.test($('vstat').textContent)) vstat(''); }
+    lastCt = au.currentTime;
+  }, 1000);
   $('reset').addEventListener('click', () => { halt(); started = false; unlock(false); $('play').textContent = '시작'; $('result').hidden = true; $('lvl').textContent = '준비'; $('count').textContent = '0'; $('sub').textContent = '시작을 누르면 카운트다운 후 출발합니다'; $('bar').style.width = '0'; $('next').textContent = ''; try { au.currentTime = 0; } catch (_) {} });
   window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); $('play').click(); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && running) tick(); });
