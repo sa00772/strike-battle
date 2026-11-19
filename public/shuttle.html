@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0c0b">
+<title>셔틀런 · 플레이 라운지</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;900&display=swap">
+<style>
+  :root{color-scheme:dark;--ink:#0d0c0b;--ink-2:#171513;--paper:#f1ebdd;--muted:#a8a090;--brass:#c9a862;--line:rgba(241,235,221,.14);--go:#4fb286;
+    --serif:"Noto Serif KR","Nanum Myeongjo",serif;--sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{background:var(--ink);color:var(--paper);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;transition:background .12s}
+  body.beep{background:#14261e}
+  a{color:inherit;text-decoration:none} button{font:inherit;color:inherit;cursor:pointer}
+  button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+  .top{height:58px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line)}
+  .top .logo{font-family:var(--serif);font-weight:900;letter-spacing:.04em} .top .back{color:var(--muted);font-size:.86rem}
+  main{flex:1;width:100%;max-width:560px;margin:0 auto;padding:18px 20px calc(30px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+  h1{font-family:var(--serif);font-weight:900;font-size:1.4rem} .lead{color:var(--muted);font-size:.9rem;line-height:1.65;word-break:keep-all}
+  .stage{flex:1;min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;border:1px solid var(--line);border-radius:18px;background:var(--ink-2);padding:20px 12px}
+  .lvl{font-family:var(--serif);font-weight:900;font-size:1.5rem;color:var(--brass)}
+  .count{font-weight:900;font-size:clamp(7rem,38vw,13rem);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .unit{color:var(--muted);font-size:1rem}
+  .sub{color:var(--muted);font-size:.95rem;font-variant-numeric:tabular-nums}
+  .bar{width:min(86%,380px);height:10px;border-radius:99px;background:rgba(241,235,221,.1);overflow:hidden;margin-top:12px}
+  .bar i{display:block;height:100%;width:0;background:var(--go)}
+  .next{font-size:.85rem;color:var(--muted);height:1.3em}
+  .row{display:flex;gap:10px}
+  .btn{flex:1;min-height:54px;border-radius:12px;border:1px solid var(--line);background:var(--ink-2);font-weight:800;font-size:1.05rem}
+  .btn.main{background:var(--brass);color:#1a1308;border-color:var(--brass)}
+  .btn.sm{min-height:44px;font-size:.92rem;font-weight:700}
+  .opts{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.92rem}
+  .opt .sync{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+  .opt .sync button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--ink-2);font-size:1.1rem}
+  .opt input[type=checkbox]{width:22px;height:22px;accent-color:var(--brass)}
+  .best{color:var(--muted);font-size:.88rem;text-align:center;min-height:1.3em}
+  .result{border:1px solid var(--brass);border-radius:14px;padding:14px;text-align:center;line-height:1.7}
+  .result b{font-family:var(--serif);font-size:1.6rem;color:var(--brass)}
+  .err{color:#ff8a7a;font-size:.9rem;text-align:center}
+  @media (prefers-reduced-motion:reduce){body{transition:none}}
+</style>
+</head>
+<body>
+<div class="top"><a class="logo" href="/">플레이 라운지</a><a class="back" href="/#tools">← 도구실</a></div>
+<main>
+  <div><h1>셔틀런 (왕복오래달리기)</h1>
+  <p class="lead">음원의 신호음에 맞춰 횟수와 단계가 같이 올라갑니다. 재생 버튼을 누르면 음악이 시작되고, 소리에서 나오는 숫자와 화면 숫자가 함께 갑니다.</p></div>
+
+  <section class="stage" aria-live="off">
+    <div class="lvl" id="lvl">준비</div>
+    <div class="count" id="count">0</div>
+    <div class="unit">회</div>
+    <div class="sub" id="sub">단계 시작까지 대기</div>
+    <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+    <div class="next" id="next"></div>
+  </section>
+
+  <div class="row">
+    <button class="btn main" id="play">재생</button>
+    <button class="btn" id="reset" style="flex:none;padding:0 20px">처음으로</button>
+  </div>
+  <div class="err" id="err" hidden></div>
+  <div class="result" id="result" hidden></div>
+  <div class="best" id="best"></div>
+
+  <div class="opts">
+    <label class="opt"><span>신호음마다 화면 깜빡임</span><input type="checkbox" id="flash" checked></label>
+    <label class="opt"><span>신호음마다 진동 <small style="color:var(--muted)">(지원 기기)</small></span><input type="checkbox" id="vib"></label>
+    <div class="opt"><span>화면 숫자 타이밍 조정<br><small style="color:var(--muted)">숫자가 소리보다 느리면 +, 빠르면 −</small></span>
+      <span class="sync"><button id="m" aria-label="빠르게">−</button><span id="off">0.00초</span><button id="p" aria-label="늦게">+</button></span></div>
+    <div class="opt"><span>시작 위치로 건너뛰기</span><span class="sync"><button id="ff" style="width:auto;padding:0 12px">단계 선택</button><select id="lsel" style="min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--ink-2);color:var(--paper);padding:0 8px" aria-label="단계"></select></span></div>
+  </div>
+</main>
+<audio id="au" src="/audio/shuttle.mp3" preload="auto"></audio>
+
+<script>
+const LAPS=[17.08, 26.06, 35.08, 44.06, 53.06, 62.08, 71.08, 80.08, 88.08, 96.06, 104.08, 112.08, 120.06, 128.08, 136.06, 144.06, 151.64, 159.2, 166.76, 174.34, 181.9, 189.48, 197.04, 204.6, 211.8, 219.0, 226.2, 233.4, 240.6, 247.8, 255.0, 262.2, 269.4, 276.28, 283.14, 290.0, 296.86, 303.74, 310.6, 317.48, 324.34, 331.2, 337.74, 344.28, 350.8, 357.34, 363.86, 370.4, 376.94, 383.46, 390.0, 396.54, 402.8, 409.08, 415.34, 421.6, 427.88, 434.14, 440.4, 446.68, 452.94, 459.2, 465.2, 471.2, 477.2, 483.2, 489.2, 495.2, 501.2, 507.2, 513.2, 519.2, 525.2, 530.96, 536.74, 542.5, 548.26, 554.04, 559.8, 565.56, 571.34, 577.1, 582.86, 588.64, 594.18, 599.7, 605.24, 610.78, 616.3, 621.84, 627.36, 632.9, 638.44, 643.96, 649.36, 654.84, 660.16, 665.5, 670.84, 676.18, 681.5, 686.84, 692.16, 697.5, 702.84, 708.18, 713.5, 718.38, 723.78, 728.9, 734.04, 739.16, 744.3, 749.44, 754.58, 759.7, 764.84, 769.98, 775.1, 779.96, 785.04, 790.0, 794.98, 799.94, 804.9, 809.86, 814.84, 819.8, 824.76, 829.74, 834.7, 839.66, 844.54, 849.26, 854.06, 858.88, 863.68, 868.46, 873.26, 878.06, 882.86, 887.66, 892.46, 897.28, 902.08, 906.7, 911.34, 915.98, 920.6, 925.24, 929.86, 934.5, 939.14, 943.76, 948.4, 953.04, 957.66, 962.1];
+const LEVEL_OF=[1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16];
+(() => {
+  const $ = (i) => document.getElementById(i);
+  const au = $('au');
+  const TOTAL = LAPS.length - 1;                 // 마지막 신호까지의 왕복 횟수
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} } };
+  let off = parseFloat(store.get('shuttle_off') || '0') || 0;     // 초 단위 타이밍 조정
+  let lastCount = 0, raf = 0, started = false;
+  try { fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k: 'tool:shuttle' }), keepalive: true }).catch(() => {}); } catch (_) {}
+
+  // 단계별 시작 횟수 (표시용)
+  const lvFirst = [];
+  LEVEL_OF.forEach((L, i) => { if (!lvFirst[L]) lvFirst[L] = i + 1; });
+  const maxLv = LEVEL_OF[LEVEL_OF.length - 1];
+  for (let L = 1; L <= maxLv; L++) { const o = document.createElement('option'); o.value = L; o.textContent = L + '단계'; $('lsel').appendChild(o); }
+  const lvLast = (L) => { let n = 0; LEVEL_OF.forEach((x, i) => { if (x === L) n = i + 1; }); return n; };
+
+  const countAt = (t) => { let n = 0; while (n < TOTAL && LAPS[n + 1] <= t) n++; return n; };
+  $('off').textContent = off.toFixed(2) + '초';
+  const showBest = () => { const b = parseInt(store.get('shuttle_best') || '0', 10); $('best').textContent = b ? '내 최고 기록 ' + b + '회 (이 기기)' : ''; };
+  showBest();
+
+  function draw() {
+    const t = au.currentTime - off;
+    const n = countAt(t);
+    if (n !== lastCount) {
+      lastCount = n;
+      if ($('flash').checked && n > 0) { document.body.classList.add('beep'); setTimeout(() => document.body.classList.remove('beep'), 160); }
+      if ($('vib').checked && navigator.vibrate) navigator.vibrate(40);
+    }
+    $('count').textContent = n;
+    if (t < LAPS[0]) {
+      $('lvl').textContent = '준비'; $('sub').textContent = '출발까지 ' + Math.ceil(LAPS[0] - t) + '초';
+      $('bar').style.width = '0'; $('next').textContent = '';
+    } else if (n >= TOTAL) {
+      $('lvl').textContent = maxLv + '단계'; $('sub').textContent = '마지막 신호'; $('bar').style.width = '100%'; $('next').textContent = '';
+    } else {
+      const L = LEVEL_OF[n];                       // n회 완료 후 진행 중인 왕복의 단계
+      const inLv = n - (lvFirst[L] - 1);
+      const lapsInLv = lvLast(L) - lvFirst[L] + 1;
+      $('lvl').textContent = L + '단계';
+      $('sub').textContent = '이 단계 ' + inLv + '/' + lapsInLv + '회 · 지금 ' + (n + 1) + '번째 왕복';
+      const a = LAPS[n], b = LAPS[n + 1];
+      $('bar').style.width = Math.max(0, Math.min(100, (t - a) / (b - a) * 100)) + '%';
+      const left = b - t; $('next').textContent = left < 3 ? '다음 신호까지 ' + left.toFixed(1) + '초' : '';
+    }
+  }
+  const loop = () => { draw(); if (!au.paused) raf = requestAnimationFrame(loop); };
+
+  function finish() {
+    const n = lastCount;
+    const L = n > 0 ? LEVEL_OF[Math.min(n, TOTAL) - 1] : 0;
+    const best = parseInt(store.get('shuttle_best') || '0', 10);
+    let msg = '<b>' + n + '회</b><br>' + (L ? L + '단계까지 달렸어요' : '출발 전에 멈췄어요');
+    if (n > best) { store.set('shuttle_best', String(n)); msg += '<br>새 최고 기록!'; }
+    $('result').innerHTML = msg; $('result').hidden = false; showBest();
+  }
+
+  $('play').addEventListener('click', () => {
+    $('err').hidden = true;
+    if (au.paused) {
+      if (au.ended) au.currentTime = 0;
+      $('result').hidden = true;
+      au.play().then(() => { started = true; $('play').textContent = '멈춤'; cancelAnimationFrame(raf); loop(); })
+        .catch(() => { $('err').textContent = '음원을 재생할 수 없습니다. 소리 설정을 확인하고 다시 눌러 주세요.'; $('err').hidden = false; });
+    } else {
+      au.pause(); $('play').textContent = '이어서'; draw(); if (started) finish();
+    }
+  });
+  au.addEventListener('ended', () => { $('play').textContent = '다시 재생'; draw(); finish(); });
+  au.addEventListener('error', () => { $('err').textContent = '음원을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'; $('err').hidden = false; });
+  $('reset').addEventListener('click', () => { au.pause(); au.currentTime = 0; lastCount = 0; $('play').textContent = '재생'; $('result').hidden = true; draw(); });
+  const setOff = (v) => { off = Math.round(Math.max(-1, Math.min(1, v)) * 100) / 100; store.set('shuttle_off', String(off)); $('off').textContent = off.toFixed(2) + '초'; draw(); };
+  $('m').addEventListener('click', () => setOff(off - 0.05));
+  $('p').addEventListener('click', () => setOff(off + 0.05));
+  $('ff').addEventListener('click', () => {                      // 선택한 단계 직전부터 재생 (예: 5단계 선택 → 4단계 마지막 신호 3초 전)
+    const L = parseInt($('lsel').value, 10);
+    const n = lvFirst[L] - 1;                                      // 이 단계 시작 전까지 완료한 횟수
+    au.currentTime = Math.max(0, (n === 0 ? LAPS[0] : LAPS[n]) - 3 + off);
+    lastCount = countAt(au.currentTime - off); draw();
+  });
+  window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); $('play').click(); } });
+  draw();
+})();
+</script>
+</body>
+</html>

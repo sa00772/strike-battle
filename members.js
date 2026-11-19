@@ -287,7 +287,7 @@ const TRACK_LABELS = {
   'react': '색깔·방향 반응 훈련', 'bomb': '폭탄 돌리기',
   'tkd:recognized': '공인품새 대전', 'tkd:lifestyle': '공인품새(생활체육) 대전', 'tkd:freestyle': '자유품새 대전', 'board': '전광판(관객 점수판)',
   'deck': '돌발 미션 덱', 'roulette': '미션 뽑기',
-  'tool:timer': '멀티 인터벌 타이머', 'tool:metro': '메트로놈', 'tool:dice': '주사위', 'tool:teams': '팀 나누기', 'tool:schedule': '수업 시간표', 'tool:stopwatch': '스톱워치 기록',
+  'tool:timer': '멀티 인터벌 타이머', 'tool:metro': '메트로놈', 'tool:dice': '주사위', 'tool:teams': '팀 나누기', 'tool:schedule': '수업 시간표', 'tool:stopwatch': '스톱워치 기록', 'tool:shuttle': '셔틀런',
 };
 const kstDay = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
 function track(key) {

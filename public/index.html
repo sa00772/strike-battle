@@ -126,7 +126,7 @@
   .row { --seal: #b4432e; position: relative; display: grid; grid-template-columns: 72px 1fr auto; gap: 8px 28px; align-items: center; padding: 28px 12px; border-bottom: 1px solid var(--line); scroll-margin-top: 70px; transition: background .25s; }
   .row[data-open] { cursor: pointer; }
   .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
-  .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; } .row.play5 { --seal: #b5532e; } .row.play6 { --seal: #8a2f2f; } .row.tool6 { --seal: #5b6fc9; } .row.tool7 { --seal: #2e8f8a; }
+  .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; } .row.play5 { --seal: #b5532e; } .row.play6 { --seal: #8a2f2f; } .row.tool6 { --seal: #5b6fc9; } .row.tool7 { --seal: #2e8f8a; } .row.tool8 { --seal: #c2573f; }
   .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.tool4 { --seal: #4f8a5b; } .row.tool5 { --seal: #b5532e; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; } .row.life { --seal: #2f8a6f; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
     border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(37,36,43,.18), inset 0 0 0 3px rgba(0,0,0,.12), inset 0 0 0 4px rgba(255,255,255,.4); transition: transform .3s; }
@@ -392,6 +392,14 @@
         <details class="info"><summary>설명 보기</summary><p class="sub">줄넘기, 플랭크 버티기 같은 시간을 재고, 로그인하면 선수 명단의 이름으로 기록을 저장합니다. 종목별 순위와 최근 기록을 볼 수 있어요. 로그인하지 않아도 스톱워치는 쓸 수 있습니다.</p></details>
       </div>
       <a class="act" href="/tools.html#stopwatch">스톱워치 열기</a>
+    </article>
+    <article class="row tool8" id="tool-shuttle">
+      <div class="seal" aria-hidden="true"></div>
+      <div class="main">
+        <h3>셔틀런<span class="tag">음원 · 숫자 같이 카운트</span></h3>
+        <details class="info"><summary>설명 보기</summary><p class="sub">왕복오래달리기 음원을 재생하면 신호음에 맞춰 화면의 횟수와 단계가 같이 올라갑니다. 숫자가 소리와 어긋나면 타이밍을 조금씩 조정할 수 있고, 멈춘 횟수는 이 기기의 최고 기록으로 남습니다.</p></details>
+      </div>
+      <a class="act" href="/shuttle.html">셔틀런 열기</a>
     </article>
   </div>
 </section>
