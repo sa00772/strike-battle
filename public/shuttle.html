@@ -65,6 +65,8 @@
     <button class="btn main" id="play">시작</button>
     <button class="btn" id="reset" style="flex:none;padding:0 20px">처음으로</button>
   </div>
+  <button class="btn" id="test" style="flex:none;min-height:44px;font-size:.95rem">소리 확인 (신호음 + 목소리)</button>
+  <p class="note" id="snote">아이폰은 무음 스위치(벨 모양)가 켜져 있어도 소리가 나도록 처리했지만, 음량이 0이면 들리지 않습니다. 소리 확인으로 먼저 점검해 보세요.</p>
   <div class="result" id="result" hidden></div>
   <div class="best" id="best"></div>
 
@@ -124,6 +126,32 @@
       const v = voices.find((x) => x.name === $('vsel').value); if (v) u.voice = v;
       synth.speak(u);
     } catch (_) {}
+  }
+
+  // ---- 아이폰 무음 스위치 우회: 소리 없는 <audio>를 반복 재생하면 웹 오디오도 '미디어 재생'으로 취급되어 들립니다 ----
+  let keep = null;
+  function silentWavUrl() {
+    const sr = 8000, n = sr, b = new Uint8Array(44 + n), dv = new DataView(b.buffer);
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); w(36, 'data'); dv.setUint32(40, n, true);
+    b.fill(128, 44);
+    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+  }
+  function keepAlive(on) {
+    try {
+      if (on) { if (!keep) { keep = new Audio(silentWavUrl()); keep.loop = true; keep.setAttribute('playsinline', ''); } const pr = keep.play(); if (pr && pr.catch) pr.catch(() => {}); }
+      else if (keep) keep.pause();
+    } catch (_) {}
+  }
+  async function openCtx() {                                    // 반드시 버튼을 누른 그 순간에 호출
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    keepAlive(true);
+    const c = new AC();
+    try { if (synth) { synth.cancel(); const w = new SpeechSynthesisUtterance(' '); w.volume = 0; synth.speak(w); } } catch (_) {}
+    try { await c.resume(); } catch (_) {}
+    return c;
   }
 
   // ---- 신호음 (브라우저 오디오 시계로 미리 예약해서 정확하게) ----
@@ -204,24 +232,37 @@
     try { synth && synth.cancel(); } catch (_) {}
     if (showResult && ctx && nowT() >= 0) resultNow();
     if (ctx) { try { ctx.close(); } catch (_) {} ctx = null; }
+    keepAlive(false);
     ['start', 'dist'].forEach((id) => { $(id).disabled = false; });
     $('play').textContent = '시작';
   }
   function finish() { stop(true); $('sub').textContent = '마지막 단계까지 모두 끝났어요'; }
 
-  $('play').addEventListener('click', () => {
+  $('play').addEventListener('click', async () => {
     if (running) { stop(true); return; }
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) { $('sub').textContent = '이 브라우저는 소리를 낼 수 없습니다.'; return; }
-    ctx = new AC();
-    if (ctx.state === 'suspended') ctx.resume();
-    try { if (synth) { synth.cancel(); const w = new SpeechSynthesisUtterance(' '); w.volume = 0; synth.speak(w); } } catch (_) {}   // iOS: 누른 순간 음성 사용 권한 확보
+    if (testCtx) { try { testCtx.close(); } catch (_) {} testCtx = null; }
+    $('play').disabled = true;
+    ctx = await openCtx();
+    $('play').disabled = false;
+    if (!ctx) { $('sub').textContent = '이 브라우저는 소리를 낼 수 없습니다.'; return; }
     buildSchedule();
     $('result').hidden = true;
     t0 = ctx.currentTime + COUNTDOWN; scheduled = 0; spoken = 0; lastShown = -1; pump.cd = {}; running = true;
     ['start', 'dist'].forEach((id) => { $(id).disabled = true; });
     $('play').textContent = '멈춤';
     timer = setInterval(tick, 50); frame();
+  });
+  let testCtx = null;
+  $('test').addEventListener('click', async () => {
+    if (running) return;
+    if (testCtx) { try { testCtx.close(); } catch (_) {} }
+    const c = await openCtx(); if (!c) { $('snote').textContent = '이 브라우저는 소리를 낼 수 없습니다.'; return; }
+    testCtx = c; const keepCtx = ctx; ctx = c;
+    beep(c.currentTime + 0.05, false); beep(c.currentTime + 0.5, false);
+    ctx = keepCtx;
+    setTimeout(() => say('소리 확인, 하나 둘 셋'), 900);
+    $('snote').textContent = c.state === 'running' ? '신호음 두 번과 목소리가 들려야 합니다. 신호음만 들리면 목소리 안내 설정이나 기기의 한국어 음성을 확인해 주세요. 아무 소리도 안 들리면 기기 음량과 무음 모드를 확인해 주세요.' : '오디오가 시작되지 않았습니다(' + c.state + '). 화면을 한 번 더 눌러 주세요.';
+    setTimeout(() => keepAlive(false), 4000);
   });
   $('reset').addEventListener('click', () => { stop(false); $('result').hidden = true; $('lvl').textContent = '준비'; $('count').textContent = '0'; $('sub').textContent = '시작을 누르면 5초 뒤 출발합니다'; $('bar').style.width = '0'; $('next').textContent = ''; });
   window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); $('play').click(); } });
