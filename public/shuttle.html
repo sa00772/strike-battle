@@ -150,7 +150,7 @@
     keepAlive(true);
     const c = new AC();
     try { if (synth) { synth.cancel(); const w = new SpeechSynthesisUtterance(' '); w.volume = 0; synth.speak(w); } } catch (_) {}
-    try { await c.resume(); } catch (_) {}
+    try { await Promise.race([c.resume(), new Promise((r) => setTimeout(r, 600))]); } catch (_) {}
     return c;
   }
 
@@ -159,7 +159,7 @@
   let laps = [];                // laps[k] = 출발(0) 기준 k번째 신호 시각(초)
   let levelOf = [];             // levelOf[i] = i+1번째 왕복이 속한 단계
   let baseCount = 0;            // 시작 단계 이전의 표준 누적 횟수
-  let t0 = 0;                   // 출발 신호의 오디오 시각
+  let P0 = 0;                   // 출발 신호의 기기 시각(performance.now, ms) — 화면과 진행의 기준 시계
   let scheduled = 0, spoken = 0, lastShown = -1, ended = false;
 
   function buildSchedule() {
@@ -178,12 +178,14 @@
   }
   function pump() {                                             // 앞으로 약 2초 분량의 신호음을 예약
     if (!ctx || !running) return;
-    while (scheduled < laps.length && t0 + laps[scheduled] < ctx.currentTime + 2) { beep(t0 + laps[scheduled], scheduled === 0); scheduled++; }
-    for (let s = 1; s <= 3; s++) { const at = t0 - COUNTDOWN + (COUNTDOWN - s); if (!pump.cd[s] && at < ctx.currentTime + 2 && at > ctx.currentTime - 0.05) { pump.cd[s] = 1; beep(at, false); } }
+    if (ctx.state !== 'running') { try { ctx.resume(); } catch (_) {} }          // 아이폰이 오디오를 멈췄으면 다시 깨운다
+    const now = nowT(), base = ctx.currentTime;                                  // 기기 시계 → 오디오 시계로 환산해서 예약
+    while (scheduled < laps.length && laps[scheduled] - now < 2) { beep(base + Math.max(0, laps[scheduled] - now), scheduled === 0); scheduled++; }
+    for (let s = 1; s <= 3; s++) { const d = -s - now; if (!pump.cd[s] && d < 2 && d > -0.05) { pump.cd[s] = 1; beep(base + Math.max(0, d), false); } }
   }
   pump.cd = {};
 
-  function nowT() { return ctx.currentTime - t0; }             // 출발 신호 기준 경과 시간 (출발 전에는 음수)
+  function nowT() { return (performance.now() - P0) / 1000; }             // 출발 신호 기준 경과 시간 (출발 전에는 음수)
   function tick() {
     if (!ctx || !running) return;
     pump();
@@ -247,7 +249,7 @@
     if (!ctx) { $('sub').textContent = '이 브라우저는 소리를 낼 수 없습니다.'; return; }
     buildSchedule();
     $('result').hidden = true;
-    t0 = ctx.currentTime + COUNTDOWN; scheduled = 0; spoken = 0; lastShown = -1; pump.cd = {}; running = true;
+    P0 = performance.now() + COUNTDOWN * 1000; scheduled = 0; spoken = 0; lastShown = -1; pump.cd = {}; running = true;
     ['start', 'dist'].forEach((id) => { $(id).disabled = true; });
     $('play').textContent = '멈춤';
     timer = setInterval(tick, 50); frame();
