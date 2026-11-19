@@ -59,6 +59,7 @@
     <div class="sub" id="sub">시작을 누르면 5초 뒤 출발합니다</div>
     <div class="bar" aria-hidden="true"><i id="bar"></i></div>
     <div class="next" id="next"></div>
+    <div class="note" id="vstat" style="min-height:1.2em"></div>
   </section>
 
   <div class="row">
@@ -117,15 +118,23 @@
   if (synth) { loadVoices(); synth.addEventListener && synth.addEventListener('voiceschanged', loadVoices); }
   else $('vnote').textContent = '이 브라우저는 음성 안내를 지원하지 않아 신호음만 울립니다.';
   $('vsel').addEventListener('change', () => store.set('shuttle_voiceName', $('vsel').value));
-  function say(text) {
+  // 끊김 방지: ① 객체를 붙들어 둔다(브라우저가 읽는 도중 지우는 버그) ② 앞 소리가 아직 끝나지 않았을 때만 자른다 ③ 신호음이 끝난 뒤에 읽는다
+  const live = new Set();
+  const vstat = (t) => { const el = $('vstat'); if (el) el.textContent = t; };
+  function say(text, delay) {
     if (!synth || !$('voice').checked) return;
-    try {
-      synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'ko-KR'; u.rate = 1.05; u.volume = parseFloat($('vol').value) || 1;
-      const v = voices.find((x) => x.name === $('vsel').value); if (v) u.voice = v;
-      synth.speak(u);
-    } catch (_) {}
+    setTimeout(() => {
+      try {
+        if (synth.speaking || synth.pending) synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'ko-KR'; u.rate = 1.0; u.volume = parseFloat($('vol').value) || 1;
+        const v = voices.find((x) => x.name === $('vsel').value); if (v) u.voice = v;
+        live.add(u);
+        u.onend = () => { live.delete(u); vstat(''); };
+        u.onerror = (e) => { live.delete(u); if (e && e.error && e.error !== 'canceled' && e.error !== 'interrupted') vstat('목소리 오류: ' + e.error); };
+        synth.speak(u);
+      } catch (e) { vstat('목소리 오류'); }
+    }, delay == null ? 0 : delay);
   }
 
   // ---- 아이폰 무음 스위치 우회: 소리 없는 <audio>를 반복 재생하면 웹 오디오도 '미디어 재생'으로 취급되어 들립니다 ----
@@ -193,16 +202,16 @@
     let n = 0; while (n < levelOf.length && laps[n + 1] <= t) n++;       // 완료한 왕복 수
     if (t < 0) {                                                          // 출발 전 카운트다운
       const left = Math.ceil(-t);
-      if (left !== lastShown) { lastShown = left; if (left <= 3) say(String(left)); else if (left === COUNTDOWN) say('준비'); }
+      if (left !== lastShown) { lastShown = left; if (left <= 3) say(String(left), 250); else if (left === COUNTDOWN) say('준비', 0); }
       $('lvl').textContent = '준비'; $('count').textContent = baseCount; $('sub').textContent = '출발까지 ' + left + '초'; $('bar').style.width = '0'; $('next').textContent = '';
       return;
     }
-    if (lastShown !== -2) { lastShown = -2; say('출발'); }
+    if (lastShown !== -2) { lastShown = -2; say('출발', 350); }
     if (n !== spoken) {                                                   // 신호음이 울린 순간 횟수를 읽는다
       spoken = n;
       if (n > 0) {
         const total = baseCount + n, newLv = n < levelOf.length && levelOf[n] !== levelOf[n - 1];
-        say(newLv ? total + ', ' + levelOf[n] + '단계' : String(total));
+        say(newLv ? total + ', ' + levelOf[n] + '단계' : String(total), 300);
         if ($('flash').checked) { document.body.classList.add('beep'); setTimeout(() => document.body.classList.remove('beep'), 160); }
         if ($('vib').checked && navigator.vibrate) navigator.vibrate(40);
       }
@@ -262,7 +271,7 @@
     testCtx = c; const keepCtx = ctx; ctx = c;
     beep(c.currentTime + 0.05, false); beep(c.currentTime + 0.5, false);
     ctx = keepCtx;
-    setTimeout(() => say('소리 확인, 하나 둘 셋'), 900);
+    say('소리 확인, 하나 둘 셋', 900);
     $('snote').textContent = c.state === 'running' ? '신호음 두 번과 목소리가 들려야 합니다. 신호음만 들리면 목소리 안내 설정이나 기기의 한국어 음성을 확인해 주세요. 아무 소리도 안 들리면 기기 음량과 무음 모드를 확인해 주세요.' : '오디오가 시작되지 않았습니다(' + c.state + '). 화면을 한 번 더 눌러 주세요.';
     setTimeout(() => keepAlive(false), 4000);
   });
