@@ -201,18 +201,23 @@ const CD=[2.0,3.0,4.0];
     if (done > 0 && startLap === 0 && n > best) { store.set('shuttle_best', String(n)); msg += '<br>새 최고 기록!'; }
     $('result').innerHTML = msg; $('result').hidden = false; showBest();
   }
-  function halt() { running = false; cancelAnimationFrame(raf); clearInterval(timer); try { au.pause(); synth && synth.cancel(); } catch (_) {} }
+  let userStop = false;
+  function halt() { userStop = true; running = false; cancelAnimationFrame(raf); clearInterval(timer); try { au.pause(); synth && synth.cancel(); } catch (_) {} }
   function unlock(on) { $('start').disabled = on; }
 
   $('play').addEventListener('click', () => {
     if (!loaded) { loadAudio(); return; }
     if (running) { halt(); $('play').textContent = '이어서'; result(); return; }
-    warm();
+    warm(); userStop = false;
     if (!started) { build(); au.currentTime = startAt; $('result').hidden = true; started = true; unlock(true); }
     else $('result').hidden = true;
     au.play().then(() => { running = true; $('play').textContent = '멈춤'; clearInterval(timer); timer = setInterval(tick, 50); frame(); })
       .catch(() => { vstat('음원을 재생할 수 없습니다. 음량을 확인하고 다시 눌러 주세요.'); });
   });
+  // 목소리가 나올 때 기기가 음원을 멋대로 멈추는 경우(오디오 포커스)가 있어서, 사용자가 멈춘 게 아니면 바로 이어서 재생한다
+  const resume = () => { if (running && !userStop && !au.ended && au.paused) { const pr = au.play(); if (pr && pr.catch) pr.catch(() => {}); } };
+  au.addEventListener('pause', () => { if (running && !userStop && !au.ended) { setTimeout(resume, 120); setTimeout(resume, 600); } });
+  au.addEventListener('stalled', () => setTimeout(resume, 300));
   au.addEventListener('ended', () => { running = false; clearInterval(timer); $('play').textContent = '다시 시작'; $('count').textContent = TOTAL; $('sub').textContent = '마지막 단계까지 모두 끝났어요'; result(); started = false; unlock(false); });
   au.addEventListener('error', () => { vstat('음원을 불러오지 못했습니다. 새로고침해 주세요.'); });
   // 음원은 먼저 통째로 내려받아 재생한다(재생 도중 네트워크가 느려서 멈추는 일과 중간 위치 이동 오차를 없앤다)
@@ -242,7 +247,7 @@ const CD=[2.0,3.0,4.0];
   let lastCt = -1, still = 0;
   setInterval(() => {
     if (!running) { still = 0; return; }
-    if (au.currentTime === lastCt) { if (++still >= 3) vstat('음원이 멈춰 있습니다. 멈춤 → 이어서를 눌러 보세요.'); } else { still = 0; if (/음원이 멈춰/.test($('vstat').textContent)) vstat(''); }
+    if (au.currentTime === lastCt) { if (au.paused) resume(); if (++still >= 3) vstat('음원이 멈춰 있습니다. 멈춤 → 이어서를 눌러 보세요.'); } else { still = 0; if (/음원이 멈춰/.test($('vstat').textContent)) vstat(''); }
     lastCt = au.currentTime;
   }, 1000);
   $('reset').addEventListener('click', () => { halt(); started = false; unlock(false); $('play').textContent = '시작'; $('result').hidden = true; $('lvl').textContent = '준비'; $('count').textContent = '0'; $('sub').textContent = '시작을 누르면 카운트다운 후 출발합니다'; $('bar').style.width = '0'; $('next').textContent = ''; try { au.currentTime = 0; } catch (_) {} });
