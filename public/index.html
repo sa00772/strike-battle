@@ -127,7 +127,7 @@
   .row[data-open] { cursor: pointer; }
   .row[data-open]:hover { background: linear-gradient(90deg, rgba(255,255,255,.07), transparent 70%); }
   .row.strike { --seal: #b4432e; } .row.dodge { --seal: #b8832f; } .row.react { --seal: #4e7d68; } .row.flip { --seal: #7a5fa3; } .row.play5 { --seal: #b5532e; } .row.play6 { --seal: #8a2f2f; } .row.tool6 { --seal: #5b6fc9; } .row.tool7 { --seal: #2e8f8a; } .row.tool8 { --seal: #c2573f; }
-  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.tool4 { --seal: #4f8a5b; } .row.tool5 { --seal: #b5532e; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; } .row.life { --seal: #2f8a6f; }
+  .row.tool1 { --seal: #2f7a8c; } .row.tool2 { --seal: #8c5a2f; } .row.tool3 { --seal: #9a3f5f; } .row.tool4 { --seal: #4f8a5b; } .row.tool5 { --seal: #b5532e; } .row.mission { --seal: #a52a2a; } .row.mission2 { --seal: #d9822b; } .row.recog { --seal: #3f5fa6; } .row.free { --seal: #a8762a; } .row.life { --seal: #2f8a6f; } .row.fsmusic { --seal: #6a3fa0; }
   .seal { width: 64px; height: 64px; display: grid; place-items: center; background: var(--seal); color: #fff; font-family: var(--serif); font-weight: 900; font-size: 1.9rem; line-height: 1;
     border-radius: 3px; transform: rotate(-3deg); box-shadow: 0 6px 14px rgba(37,36,43,.18), inset 0 0 0 3px rgba(0,0,0,.12), inset 0 0 0 4px rgba(255,255,255,.4); transition: transform .3s; }
   .row[data-open]:hover .seal { transform: rotate(0deg) scale(1.04); }
@@ -433,6 +433,15 @@
         <p class="sub">선수가 차례로 연기하고 점수로 순위를 정합니다. 인원에 따라 예선, 준결승, 결승으로 걸러냅니다.</p>
       </div>
       <a class="act" href="/tkd.html?kind=freestyle">경기 열기</a>
+    </article>
+
+    <article class="row fsmusic" id="fsmusic">
+      <div class="seal" aria-hidden="true"></div>
+      <div class="main">
+        <h3>자유품새 음원 만들기<span class="tag">자동 작곡</span></h3>
+        <p class="sub">분위기와 길이를 고르고 발차기 타이밍을 찍으면, 그 순간에 맞춰 북이 몰아치고 크게 터지는 음원을 만들어 줍니다. 선수 음원으로 바로 저장하거나 WAV로 내려받을 수 있어요.</p>
+      </div>
+      <a class="act" href="/poomsae-music.html">음원 만들기</a>
     </article>
   </div>
 </section>

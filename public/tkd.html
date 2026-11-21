@@ -111,7 +111,7 @@
   .m-row:first-of-type { border-top:0; }
   .m-row .who { flex:1 1 130px; min-width:0; overflow-wrap:anywhere; }
   .m-row .fn { flex:2 1 150px; min-width:0; color:#9fb0c8; font-size:.82rem; overflow-wrap:anywhere; }
-  .m-row button, .m-row label.pick { font-size:.8rem; padding:5px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.25); background:none; color:inherit; cursor:pointer; }
+  .m-row a.pick { text-decoration:none; } .m-row button, .m-row label.pick, .m-row a.pick { font-size:.8rem; padding:5px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.25); background:none; color:inherit; cursor:pointer; }
   .m-row input[type=file] { display:none; }
   #music-bar { margin-top:10px; padding:10px 12px; border:1px solid rgba(255,255,255,.18); border-radius:12px; display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; font-size:.9rem; }
   #music-bar .m-title { flex:1 1 100%; } #music-bar .m-title b { color:#ffd27a; }
@@ -142,7 +142,7 @@
         </label>
         <div class="music-box" id="music-setup" hidden>
           <h3>🎵 선수별 음원 (선택)</h3>
-          <div class="muted" style="font-size:.8rem;margin-bottom:6px">선수 이름 옆에서 음악 파일을 넣어 두면 경기 화면에서 재생할 수 있어요. 파일은 이 컴퓨터의 브라우저에만 저장돼요. (mp3 · m4a · wav · ogg, 30MB 이하)</div>
+          <div class="muted" style="font-size:.8rem;margin-bottom:6px">선수 이름 옆에서 음악 파일을 넣어 두면 경기 화면에서 재생할 수 있어요. 파일은 이 컴퓨터의 브라우저에만 저장돼요. (mp3 · m4a · wav · ogg, 30MB 이하) 음원이 없으면 <b>🎼 만들기</b>로 북·비트 음원을 직접 만들 수 있어요.</div>
           <div id="music-list"></div>
         </div>
       </div>
@@ -492,6 +492,7 @@
       return `<div class="m-row" data-k="${esc(k)}"><span class="who"><b>${esc(r.name)}</b> <span class="muted">${esc(r.team)}</span></span>
         <span class="fn">${has ? '🎵 ' + esc((t && t.name) || '음원 등록됨') : '음원 없음'}</span>
         <label class="pick">${has ? '바꾸기' : '파일 넣기'}<input type="file" accept="audio/*" data-i="${i}"></label>
+        <a class="pick" href="/poomsae-music.html?name=${encodeURIComponent(r.name)}&team=${encodeURIComponent(r.team)}" target="_blank" rel="noopener">🎼 만들기</a>
         ${has ? `<button data-pv="${i}">${playingKey === k && !au.paused ? '■ 정지' : '▶ 미리듣기'}</button><button data-rm="${i}">삭제</button>` : ''}</div>`;
     }).join('');
     for (const r of rows) { const k = mKey(r.name, r.team); if (haveKeys.has(k) && !trackCache.has(k)) loadTrack(k).then((t) => { if (t) { const f = [...el.querySelectorAll('.m-row')].find((x) => x.dataset.k === k); if (f) f.querySelector('.fn').textContent = '🎵 ' + t.name; } }); }
@@ -545,6 +546,8 @@
   $('m-stop').addEventListener('click', () => { const l = linked(); mStop(); if (l) timerReset(); });
   $('m-vol').addEventListener('input', () => { au.volume = Number($('m-vol').value) / 100; });
   $('entrants').addEventListener('input', () => { if (kind === 'freestyle') renderMusicSetup(); });
+  // 음원 만들기 창에서 저장하고 돌아오면 목록을 새로 읽음
+  window.addEventListener('focus', () => { if (kind !== 'freestyle' || !au.paused) return; trackCache.clear(); auKey = null; if (!S || S.phase === 'setup') renderMusicSetup(); musicRefresh(); });
 
   /* ------------ 렌더링 ------------ */
   const nameOf = (id) => (S.entrants.find((e) => e.id === id) || {}).name || '';
