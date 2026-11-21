@@ -95,6 +95,8 @@
     <div class="lenhint">기본 길이는 95초입니다. WT 자유품새 경기 시간은 90~100초입니다. 참가 대회 요강을 확인하세요.</div>
     <div class="ihead"><b>악기</b><small>분위기를 고르면 어울리는 악기가 켜져요. 눌러서 더하거나 뺄 수 있어요.</small></div>
     <div class="inst" id="inst"></div>
+    <div class="ihead"><b>타악기</b><small>여러 개를 켤수록 리듬이 촘촘해져요.</small></div>
+    <div class="inst" id="perc"></div>
     <p class="hint" style="margin-top:8px">변주 번호를 바꾸면 같은 설정에서 화음 진행과 멜로디가 달라져요. 마음에 드는 번호를 적어 두면 똑같이 다시 만들 수 있어요.</p>
   </section>
 
@@ -168,10 +170,21 @@ const INSTR = [
   ['flute', '🪈 대금·피리', /대금|피리|플루트|플룻|단소|소금|퉁소/],
   ['bells', '🔔 종소리', /종소리|벨소리|차임|글로켄|실로폰|오르골/],
   ['gong', '🌕 징', /징|gong/i],
-  ['shaker', '🪇 셰이커', /셰이커|쉐이커|마라카스|탬버린/],
+  ['shaker', '🪇 셰이커', /셰이커|쉐이커|마라카스/],
   ['clap', '👏 박수', /박수|클랩|손뼉/],
+  ['taikoL', '🪘 대북', /대북|큰북|태고|타이코|모둠북|북\s*합주/, 'perc'],
+  ['msnare', '🥁 행진 스네어', /스네어|행진|마칭|드럼라인/, 'perc'],
+  ['fills', '🥁 톰 필인', /필인|필\s인|탐탐|톰/, 'perc'],
+  ['cymbal', '💿 심벌·라이드', /심벌|심볼|라이드|크래시/, 'perc'],
+  ['janggu', '🪘 장구', /장구|사물놀이/, 'perc'],
+  ['kkwaeng', '🔔 꽹과리', /꽹과리|꽹가리|사물놀이/, 'perc'],
+  ['conga', '🪘 콩가·봉고', /콩가|봉고|젬베|퍼커션/, 'perc'],
+  ['cowbell', '🐄 카우벨', /카우벨/, 'perc'],
+  ['tamb', '🪇 탬버린', /탬버린|탐부린/, 'perc'],
+  ['wood', '🪵 우드블록', /우드블록|목탁|클라베|딱딱이/, 'perc'],
 ];
-const STYLE_INST = { epic: ['strings', 'choir', 'gong', 'brass'], edm: ['bells', 'clap'], gugak: ['flute', 'gong'], hiphop: ['piano', 'bells'], latin: ['piano', 'brass', 'shaker'] };
+const STYLE_INST = { epic: ['strings', 'choir', 'gong', 'brass', 'taikoL', 'fills', 'cymbal'], edm: ['bells', 'clap', 'tamb', 'cymbal'], gugak: ['flute', 'gong', 'janggu', 'kkwaeng', 'taikoL'], hiphop: ['piano', 'bells', 'msnare', 'wood'], latin: ['piano', 'brass', 'shaker', 'conga', 'cowbell', 'tamb', 'wood'] };
+const PERC_SET = ['taikoL', 'fills', 'cymbal', 'msnare', 'conga', 'tamb'];
 const instOff = () => Object.fromEntries(INSTR.map(([k]) => [k, false]));
 const instFor = (st) => { const o = instOff(); for (const k of STYLE_INST[st] || []) o[k] = true; return o; };
 const KEYS = [['A', 0], ['B', 2], ['C', 3], ['D', 5], ['E', -5], ['F', -4], ['G', -2]];
@@ -194,6 +207,7 @@ function defaults(dur = 95) {
 }
 const LS = 'pl-fs-composer-v3';
 let cfg; try { cfg = JSON.parse(localStorage.getItem(LS)) || defaults(); } catch (_) { cfg = defaults(); }
+if (cfg.opts && !('taikoL' in cfg.opts)) { const rec = instFor(cfg.style); for (const [k, , , g] of INSTR) if (g === 'perc') cfg.opts[k] = rec[k]; }   // 타악기가 생기기 전 저장된 설정
 cfg.opts = { ...instOff(), endBig: false, ...(cfg.opts || {}) };
 const persist = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (_) {} };
 
@@ -206,8 +220,10 @@ function renderStyles() {
   $('styles').querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => { cfg.style = b.dataset.s; cfg.bpm = STYLES[cfg.style].bpm; $('bpm').value = cfg.bpm; cfg.opts = { ...cfg.opts, ...instFor(cfg.style) }; changed(); renderStyles(); renderInst(); }));
 }
 function renderInst() {
-  $('inst').innerHTML = INSTR.map(([k, l]) => `<button class="chip${cfg.opts[k] ? ' on' : ''}" data-in="${k}" aria-pressed="${!!cfg.opts[k]}">${l}</button>`).join('');
-  $('inst').querySelectorAll('[data-in]').forEach((b) => b.addEventListener('click', () => { cfg.opts[b.dataset.in] = !cfg.opts[b.dataset.in]; renderInst(); changed(); }));
+  const chip = ([k, l]) => `<button class="chip${cfg.opts[k] ? ' on' : ''}" data-in="${k}" aria-pressed="${!!cfg.opts[k]}">${l}</button>`;
+  $('inst').innerHTML = INSTR.filter((x) => !x[3]).map(chip).join('');
+  $('perc').innerHTML = INSTR.filter((x) => x[3] === 'perc').map(chip).join('');
+  document.querySelectorAll('[data-in]').forEach((b) => b.addEventListener('click', () => { cfg.opts[b.dataset.in] = !cfg.opts[b.dataset.in]; renderInst(); changed(); }));
 }
 function fillInputs() { renderInst(); $('ask').value = cfg.prompt || ''; $('dur').value = cfg.dur; $('bpm').value = cfg.bpm; $('key').value = cfg.key; $('seed').value = cfg.seed; $('endhit').value = cfg.endHit; }
 const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
@@ -315,6 +331,7 @@ function parsePrompt(text) {
   const key = T.match(/([A-Ga-g])\s*(?:단조|마이너|minor|m\b)/); if (key && KEYS.some((k) => k[0] === key[1].toUpperCase())) { cfg.key = key[1].toUpperCase(); done.push(`${cfg.key} 단조`); }
   // 악기
   const noRe = /빼|없이|말고|제외/;
+  if (/타악기|퍼커션|리듬\s*(?:악기|많이|강하게)|북\s*많이/.test(T) && !/타악기\s*(?:는|은)?\s*(?:빼|없이)/.test(T)) { for (const k of PERC_SET) cfg.opts[k] = true; done.push('🥁 타악기 더하기'); }
   for (const [k, l, re] of INSTR) {
     const m = T.match(re); if (!m) continue;
     let end = T.length; const pm = T.slice(m.index).search(/[,.\n]/); if (pm > 0) end = m.index + pm;
@@ -428,6 +445,9 @@ function makeKit(ctx, out, hz) {
       [[92, 1], [139, .7], [196, .5], [253, .35], [341, .25], [470, .15]].forEach(([f, a]) => { const gg = ctx.createGain(); gg.gain.value = a; gg.connect(g); const o = osc('sine', f * 1.01, 0, 3.5, gg); o.frequency.exponentialRampToValueAtTime(f, 1.2); });
       noise(0, .2, .06, 1.5, 'lowpass', 900); },
     shaker: () => noise(0, .008, .12, .05, 'bandpass', 6500, 1.2),
+    tamb: () => { noise(0, .002, .16, .13, 'bandpass', 7200, 3); noise(0, .002, .1, .08, 'highpass', 9500); const g = G(); const end = E(g, 0, .001, .03, .12); osc('square', 5100, 0, end, g); osc('square', 6900, 0, end, g); },
+    wood: () => { const g = G(); const end = E(g, 0, .001, .4, .05); osc('sine', 1050, 0, end, g); const g2 = G(); osc('sine', 1580, 0, E(g2, 0, .001, .15, .03), g2); },
+    ride: () => { noise(0, .002, .1, .5, 'highpass', 6500); const g = G(); const end = E(g, 0, .001, .04, .6); for (const f of [3150, 4210, 5320]) osc('square', f, 0, end, g); },
     choir: (semis, d) => { const g = G(); g.gain.setValueAtTime(0, 0); g.gain.linearRampToValueAtTime(.5, Math.min(.45, d * .4)); g.gain.setValueAtTime(.5, Math.max(.46, d - .2)); g.gain.linearRampToValueAtTime(0, d + .35);
       const f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 760; f1.Q.value = 5; const f2 = ctx.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1180; f2.Q.value = 6; f1.connect(g); f2.connect(g);
       const lfo = ctx.createOscillator(); lfo.frequency.value = 4.8; const lg = ctx.createGain(); lg.gain.value = 3; lfo.connect(lg); lfo.start(0); lfo.stop(d + .4);
@@ -437,7 +457,7 @@ function makeKit(ctx, out, hz) {
   };
   return K;
 }
-const SAMPLE_LEN = { piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
+const SAMPLE_LEN = { tamb: .2, wood: .1, ride: .7, piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
 
 async function renderTrack(c, onProg) {
   const sr = 44100, D = c.dur, N = Math.ceil(sr * D);
@@ -461,6 +481,7 @@ async function renderTrack(c, onProg) {
   const pluck = (t, f, v, type, bright, bus, dec = .22) => P(bus, 'pluck', t, v, f, type, bright, dec);
   const strings = (t, semis, d, v = 1) => P('MU', 'strings', t, v, semis, d), piano = (t, semi, v = 1) => P('MU', 'piano', t, v, semi);
   const guitar = (t, semi, d, v = 1) => P('GT', 'guitar', t, v, semi, d), flute = (t, d, f, v = 1) => P('LD', 'flute', t, v, d, f), bells = (t, f, v = 1) => P('LD', 'bells', t, v, f);
+  const tamb = (t, v = 1) => P('DR', 'tamb', t, v), wood = (t, v = 1) => P('DR', 'wood', t, v), ride = (t, v = 1) => P('DR', 'ride', t, v);
   const gong = (t, v = 1) => P('FX', 'gong', t, v), shaker = (t, v = 1) => P('DR', 'shaker', t, v, Math.floor(rnd() * 3)), choir = (t, semis, d, v = 1) => P('MU', 'choir', t, v, semis, d);
   const lead = (t, d, f, v, kind) => P('LD', 'lead', t, v, d, f, kind), brass = (t, semis, v = 1) => P('MU', 'brass', t, v, semis);
 
@@ -574,6 +595,26 @@ async function renderTrack(c, onProg) {
       if (O.clap && (i === 4 || i === 12) && !(style === 'edm' && L >= 2)) clap(t, L === 0 ? .8 : .65);
       if (s.accent && [2, 6, 10, 13, 14, 15].includes(i)) tom(t, 150 + (i % 3) * 30, i >= 13 ? .7 : .85);   // 짧은 북소리
       if (O.shaker && L >= 1) shaker(t, eighth ? .45 : .8);
+      // 타악기
+      const fillBar = O.fills && L >= 1 && (b - s.bar) % 4 === 3 && !(nextHit(t0 + BAR - 1e-3) != null && nextHit(t0 + BAR - 1e-3) - t0 < BAR * 2);
+      if (fillBar && i >= 12) tom(t, [210, 165, 125, 95][i - 12], .9);
+      if (fillBar && i === 10) tom(t, 240, .7);
+      if (O.taikoL) {
+        const pat = [[0], [0, 8], [0, 3, 8, 11], [0, 3, 6, 8, 10, 12, 14]][L];
+        if (pat.includes(i) && !(fillBar && i >= 10)) taiko(t, i === 0 || i === 8 ? .95 : .7, i === 0 || i === 8 ? 52 : 74);
+      }
+      if (O.msnare && L >= 1 && !(fillBar && i >= 10)) {
+        if (L === 1 && (i === 4 || i === 12)) { snare(t - .018, .3); snare(t, .75); }
+        if (L === 2 && [4, 7, 10, 12, 14, 15].includes(i)) snare(t, i === 4 || i === 12 ? .8 : .4);
+        if (L === 3) { snare(t, q ? .75 : .3); if (i === 14) for (let r = 1; r < 4; r++) snare(t + r * s16 / 2, .3 + r * .1); }
+      }
+      if (O.janggu && style !== 'gugak' && L >= 1) { if (i === 0 || i === 8) { tom(t, 82, .7); rim(t, .6); } if ([3, 10, 11, 14].includes(i)) rim(t, .5); if (i === 6 || i === 12) tom(t, 88, .55); }
+      if (O.kkwaeng && (style === 'gugak' ? L >= 1 && L < 3 : L >= 2) && eighth) kkw(t, q ? .9 : .5);
+      if (O.conga && style !== 'latin' && L >= 1) { if (i === 6 || i === 14) tom(t, 195, .5); if (i === 7 || i === 15) tom(t, 240, .45); if (L >= 2 && i === 4) rim(t, .4); }
+      if (O.cowbell && L >= 1 && !(style === 'latin' && L >= 2)) { if (q) bell(t, i === 0 ? .6 : .45); if (L >= 3 && i % 4 === 2) bell(t, .3); }
+      if (O.tamb && L >= 1) { if (i % 4 === 2) tamb(t, .7); else if (L >= 3) tamb(t, .3); }
+      if (O.wood && L >= 1) { if ((L === 1 ? [3, 10] : [0, 3, 6, 10, 12]).includes(i)) wood(t, .6); }
+      if (O.cymbal && L >= 1) { if (i === 0 && (b - s.bar) % 4 === 0 && b !== s.bar) crash(t, .45); if (L >= 3 ? eighth : L >= 2 && q) ride(t, q ? .7 : .45); }
       if (O.strings && L >= 1 && eighth) { const pat = [0, 0, 2, 0, 1, 0, 2, 1], sm = ch[pat[(i / 2) % 8]]; strings(t, L >= 3 ? [sm, sm + 12] : [sm], s16 * 1.6, [0, .7, .85, 1][L]); }
       if (O.piano && L >= 1 && (L === 1 ? (i === 0 || i === 8) : [0, 3, 6, 10].includes(i))) for (const sm of ch) piano(t, sm + 12, L === 1 ? .55 : .5);
       if (O.guitar && L >= 2 && !firstOfSec && eighth) guitar(t, ch[0], s16 * 1.4, q ? .85 : .65);
