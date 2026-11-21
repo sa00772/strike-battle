@@ -96,6 +96,7 @@
     <div class="ihead"><b>악기</b><small>분위기를 고르면 어울리는 악기가 켜져요. 눌러서 더하거나 뺄 수 있어요.</small></div>
     <div class="inst" id="inst"></div>
     <div class="ihead"><b>타악기</b><small>여러 개를 켤수록 리듬이 촘촘해져요.</small></div>
+    <label class="f" style="margin-top:6px;flex-direction:row;align-items:center;gap:8px">🥁 드럼 세트 리듬<select id="dstyle" style="width:auto;flex:1;max-width:260px"><option value="rock">록 (쿵-짝 기본)</option><option value="funk">펑크 (통통 튀는)</option><option value="disco">디스코 (네 박 쿵쿵)</option><option value="break">브레이크비트 (쪼개진)</option><option value="half">하프타임 (묵직하게)</option></select></label>
     <div class="inst" id="perc"></div>
     <p class="hint" style="margin-top:8px">변주 번호를 바꾸면 같은 설정에서 화음 진행과 멜로디가 달라져요. 마음에 드는 번호를 적어 두면 똑같이 다시 만들 수 있어요.</p>
   </section>
@@ -172,6 +173,7 @@ const INSTR = [
   ['gong', '🌕 징', /징|gong/i],
   ['shaker', '🪇 셰이커', /셰이커|쉐이커|마라카스/],
   ['clap', '👏 박수', /박수|클랩|손뼉/],
+  ['drumkit', '🥁 드럼 세트', /드럼\s*세트|드럼(?!라인)|록\s*비트|락\s*비트|밴드\s*드럼/, 'perc'],
   ['taikoL', '🪘 대북', /대북|큰북|태고|타이코|모둠북|북\s*합주/, 'perc'],
   ['msnare', '🥁 행진 스네어', /스네어|행진|마칭|드럼라인/, 'perc'],
   ['fills', '🥁 톰 필인', /필인|필\s인|탐탐|톰/, 'perc'],
@@ -198,7 +200,7 @@ const secColor = (n) => (SEC_TYPES.find((x) => x[0] === n) || [0, 0, '#555'])[2]
 function defaults(dur = 95) {
   const k = dur / 100, r = (x) => Math.round(x * k * 2) / 2;
   return {
-    style: 'epic', dur, bpm: 120, key: 'A', seed: 1, opts: { ...instFor('epic'), endBig: false }, prompt: '',
+    style: 'epic', drumStyle: 'rock', dur, bpm: 120, key: 'A', seed: 1, opts: { ...instFor('epic'), endBig: false }, prompt: '',
     sections: [[0, '준비·인트로'], [8, '기본동작'], [22, '뛰어 옆차기'], [34, '다단계 발차기'], [46, '회전 발차기'], [58, '연속 발차기'], [70, '아크로바틱'], [84, '마무리']]
       .map(([t, n]) => ({ t: r(t), name: n, lv: SEC_TYPES.find((x) => x[0] === n)[1] })),
     hits: [[29, '뛰어 옆차기'], [41, '다단계'], [53, '회전'], [65, '연속'], [78, '아크로바틱']].map(([t, l]) => ({ t: r(t), label: l })),
@@ -208,7 +210,7 @@ function defaults(dur = 95) {
 const LS = 'pl-fs-composer-v3';
 let cfg; try { cfg = JSON.parse(localStorage.getItem(LS)) || defaults(); } catch (_) { cfg = defaults(); }
 if (cfg.opts && !('taikoL' in cfg.opts)) { const rec = instFor(cfg.style); for (const [k, , , g] of INSTR) if (g === 'perc') cfg.opts[k] = rec[k]; }   // 타악기가 생기기 전 저장된 설정
-cfg.opts = { ...instOff(), endBig: false, ...(cfg.opts || {}) };
+cfg.opts = { ...instOff(), endBig: false, ...(cfg.opts || {}) }; cfg.drumStyle = cfg.drumStyle || 'rock';
 const persist = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (_) {} };
 
 /* ------------ 화면 ------------ */
@@ -225,7 +227,7 @@ function renderInst() {
   $('perc').innerHTML = INSTR.filter((x) => x[3] === 'perc').map(chip).join('');
   document.querySelectorAll('[data-in]').forEach((b) => b.addEventListener('click', () => { cfg.opts[b.dataset.in] = !cfg.opts[b.dataset.in]; renderInst(); changed(); }));
 }
-function fillInputs() { renderInst(); $('ask').value = cfg.prompt || ''; $('dur').value = cfg.dur; $('bpm').value = cfg.bpm; $('key').value = cfg.key; $('seed').value = cfg.seed; $('endhit').value = cfg.endHit; }
+function fillInputs() { renderInst(); $('dstyle').value = cfg.drumStyle; $('ask').value = cfg.prompt || ''; $('dur').value = cfg.dur; $('bpm').value = cfg.bpm; $('key').value = cfg.key; $('seed').value = cfg.seed; $('endhit').value = cfg.endHit; }
 const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 
 function renderTimeline() {
@@ -273,6 +275,7 @@ $('dur').addEventListener('change', () => { const old = cfg.dur; cfg.dur = num($
   if (cfg.endHit > cfg.dur - 1 || cfg.endHit === old - 4) cfg.endHit = Math.max(5, cfg.dur - 4); $('endhit').value = cfg.endHit; changed(); });
 $('bpm').addEventListener('change', () => { cfg.bpm = num($('bpm').value, 70, 180, 120); $('bpm').value = cfg.bpm; changed(); });
 $('key').addEventListener('change', () => { cfg.key = $('key').value; changed(); });
+$('dstyle').addEventListener('change', () => { cfg.drumStyle = $('dstyle').value; if (!cfg.opts.drumkit) { cfg.opts.drumkit = true; renderInst(); } changed(); });
 $('ask').addEventListener('input', () => { cfg.prompt = $('ask').value.slice(0, 600); persist(); });
 $('seed').addEventListener('change', () => { cfg.seed = Math.round(num($('seed').value, 1, 9999, 1)); $('seed').value = cfg.seed; changed(); });
 $('dice').addEventListener('click', () => { cfg.seed = 1 + Math.floor(Math.random() * 9999); $('seed').value = cfg.seed; changed(); });
@@ -331,6 +334,8 @@ function parsePrompt(text) {
   const key = T.match(/([A-Ga-g])\s*(?:단조|마이너|minor|m\b)/); if (key && KEYS.some((k) => k[0] === key[1].toUpperCase())) { cfg.key = key[1].toUpperCase(); done.push(`${cfg.key} 단조`); }
   // 악기
   const noRe = /빼|없이|말고|제외/;
+  const ds = [['funk', /펑크|펑키|funk/i], ['disco', /디스코|four|포비트/i], ['break', /브레이크\s*비트|브레이크비트|브레익/], ['half', /하프\s*타임|묵직한\s*드럼/], ['rock', /록|락|rock/i]].find(([, re]) => re.test(T));
+  if (ds) { cfg.drumStyle = ds[0]; cfg.opts.drumkit = true; done.push('🥁 드럼 ' + $('dstyle').querySelector(`[value=${ds[0]}]`).textContent.split(' ')[0]); }
   if (/타악기|퍼커션|리듬\s*(?:악기|많이|강하게)|북\s*많이/.test(T) && !/타악기\s*(?:는|은)?\s*(?:빼|없이)/.test(T)) { for (const k of PERC_SET) cfg.opts[k] = true; done.push('🥁 타악기 더하기'); }
   for (const [k, l, re] of INSTR) {
     const m = T.match(re); if (!m) continue;
@@ -445,6 +450,10 @@ function makeKit(ctx, out, hz) {
       [[92, 1], [139, .7], [196, .5], [253, .35], [341, .25], [470, .15]].forEach(([f, a]) => { const gg = ctx.createGain(); gg.gain.value = a; gg.connect(g); const o = osc('sine', f * 1.01, 0, 3.5, gg); o.frequency.exponentialRampToValueAtTime(f, 1.2); });
       noise(0, .2, .06, 1.5, 'lowpass', 900); },
     shaker: () => noise(0, .008, .12, .05, 'bandpass', 6500, 1.2),
+    akick: () => { const g = G(); osc('sine', 125, 0, E(g, 0, .002, 1, .32), g).frequency.exponentialRampToValueAtTime(50, .1); const g2 = G(); osc('triangle', 70, 0, E(g2, 0, .002, .35, .15), g2); noise(0, .001, .2, .015, 'bandpass', 3200, 1); },
+    asnare: () => { const g = G(); osc('triangle', 215, 0, E(g, 0, .001, .5, .1), g).frequency.exponentialRampToValueAtTime(175, .05); noise(0, .001, .45, .2, 'bandpass', 2600, .8); noise(0, .001, .25, .14, 'highpass', 5500); },
+    chat: () => { noise(0, .001, .14, .045, 'highpass', 8500); const g = G(); const end = E(g, 0, .001, .025, .04); for (const f of [3150, 4210, 5320, 6680]) osc('square', f, 0, end, g); },
+    ohat2: () => { noise(0, .002, .15, .32, 'highpass', 7500); const g = G(); const end = E(g, 0, .001, .03, .3); for (const f of [3150, 4210, 5320, 6680]) osc('square', f, 0, end, g); },
     tamb: () => { noise(0, .002, .16, .13, 'bandpass', 7200, 3); noise(0, .002, .1, .08, 'highpass', 9500); const g = G(); const end = E(g, 0, .001, .03, .12); osc('square', 5100, 0, end, g); osc('square', 6900, 0, end, g); },
     wood: () => { const g = G(); const end = E(g, 0, .001, .4, .05); osc('sine', 1050, 0, end, g); const g2 = G(); osc('sine', 1580, 0, E(g2, 0, .001, .15, .03), g2); },
     ride: () => { noise(0, .002, .1, .5, 'highpass', 6500); const g = G(); const end = E(g, 0, .001, .04, .6); for (const f of [3150, 4210, 5320]) osc('square', f, 0, end, g); },
@@ -457,7 +466,7 @@ function makeKit(ctx, out, hz) {
   };
   return K;
 }
-const SAMPLE_LEN = { tamb: .2, wood: .1, ride: .7, piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
+const SAMPLE_LEN = { akick: .45, asnare: .32, chat: .08, ohat2: .4, tamb: .2, wood: .1, ride: .7, piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
 
 async function renderTrack(c, onProg) {
   const sr = 44100, D = c.dur, N = Math.ceil(sr * D);
@@ -517,6 +526,16 @@ async function renderTrack(c, onProg) {
   const nextHit = (t) => { for (const h of hits) if (h >= t - 1e-4) return h; return null; };
   const prevHit = (h) => { let p = 0; for (const x of hits) if (x < h - 1e-4) p = x; return p; };
   const pumpBeats = [];
+  // 드럼 세트를 켜면 분위기의 기본 킥·스네어·하이햇 대신 드럼 세트가 박자를 맡음
+  const DK = !!O.drumkit, nop = () => {}, bk = DK ? nop : kick, bs = DK ? nop : snare, bh = DK ? nop : hat, bc = DK ? nop : clap;
+  const DRUMS = {
+    rock:  { k: [[0], [0, 8], [0, 8, 10], [0, 3, 8, 10]], s: [4, 12], g: [], h: 'e' },
+    funk:  { k: [[0], [0, 10], [0, 6, 10], [0, 3, 6, 10]], s: [4, 12], g: [7, 9, 15], h: 's' },
+    disco: { k: [[0], [0, 8], [0, 4, 8, 12], [0, 4, 8, 12]], s: [4, 12], g: [], h: 'o' },
+    break: { k: [[0], [0, 10], [0, 2, 10, 11], [0, 2, 10, 11]], s: [4, 12], g: [7, 9, 15], h: 'e' },
+    half:  { k: [[0], [0], [0, 7], [0, 7, 10]], s: [8], g: [14], h: 'e' },
+  };
+  const DP = DRUMS[c.drumStyle] || DRUMS.rock;
 
   for (let b = 0; b < nBars; b++) {
     const t0 = b * BAR; if (t0 >= endT) break;
@@ -557,23 +576,23 @@ async function renderTrack(c, onProg) {
       if (BRK) continue;
       const q = i % 4 === 0, eighth = i % 2 === 0;
       if (style === 'edm') {
-        if (q && (L >= 1 || i === 0)) kick(t, L ? 1 : .6);
-        if (L >= 2 && (i === 4 || i === 12)) clap(t, .9);
-        if (L >= 1 && i % 4 === 2) hat(t, .8, true);
-        if (L >= 3 && !q && i % 4 !== 2) hat(t, .5);
+        if (q && (L >= 1 || i === 0)) bk(t, L ? 1 : .6);
+        if (L >= 2 && (i === 4 || i === 12)) bc(t, .9);
+        if (L >= 1 && i % 4 === 2) bh(t, .8, true);
+        if (L >= 3 && !q && i % 4 !== 2) bh(t, .5);
       } else if (style === 'epic') {
         if (L === 0 && i === 0 && b % 2 === 0) taiko(t, .55);
         if (L >= 1 && [0, 6, 8].includes(i)) taiko(t, i === 0 ? .9 : .65);
         if (L >= 1 && [10, 14].includes(i)) tom(t, 95, .6);
-        if (L >= 2 && (i === 0 || i === 8)) kick(t, .9);
-        if (L >= 2 && (i === 4 || i === 12)) snare(t, .7);
+        if (L >= 2 && (i === 0 || i === 8)) bk(t, .9);
+        if (L >= 2 && (i === 4 || i === 12)) bs(t, .7);
         if (L >= 3 && [3, 11, 13].includes(i)) taiko(t, .6, 80);
-        if (L >= 3 && eighth) hat(t, .45);
+        if (L >= 3 && eighth) bh(t, .45);
       } else if (style === 'gugak') {
         if (L === 0 && i === 0) { tom(t, 80, .6); rim(t, .5); }
         if (L >= 1) { if (i === 0) { tom(t, 80, .8); rim(t, .7); } if ([3, 8, 11].includes(i)) rim(t, .6); if ([6, 10].includes(i)) tom(t, 85, .6); if (i === 14 || i === 15) rim(t, .35); }
-        if (L >= 2 && (i === 0 || i === 8 || i === 10)) kick(t, .85);
-        if (L >= 2 && (i === 4 || i === 12)) snare(t, .55);
+        if (L >= 2 && (i === 0 || i === 8 || i === 10)) bk(t, .85);
+        if (L >= 2 && (i === 4 || i === 12)) bs(t, .55);
         if (L >= 3 && eighth) kkw(t, q ? 1 : .55);
       } else if (style === 'latin') {
         const clv = (b - s.bar) % 2 === 0 ? [0, 6, 12] : [4, 8];        // 3-2 손 클라베
@@ -582,17 +601,33 @@ async function renderTrack(c, onProg) {
         if (L >= 1 && (i === 4 || i === 12)) rim(t, .45);
         if (L >= 1 && i === 6) tom(t, 235, .45);
         if (L >= 2 && q) bell(t, i === 0 ? .7 : .5);
-        if (L >= 2 && (i === 0 || i === 8)) kick(t, .75);
-        if (L >= 3 && !eighth) hat(t, .3);
+        if (L >= 2 && (i === 0 || i === 8)) bk(t, .75);
+        if (L >= 3 && !eighth) bh(t, .3);
       } else {
-        if (L >= 1 && [0, 7, 10].includes(i)) kick(t, .95);
-        if (L === 0 && i === 0) kick(t, .5);
-        if (L >= 1 && i === 8) { snare(t, .9); clap(t, .5); }
-        if (L >= 1 && eighth) hat(t, .55);
-        if (L >= 2 && !eighth) hat(t, .3);
-        if (L >= 3 && i === 14) for (let r = 1; r < 6; r++) hat(t + r * s16 / 3, .25 + r * .05);
+        if (L >= 1 && [0, 7, 10].includes(i)) bk(t, .95);
+        if (L === 0 && i === 0) bk(t, .5);
+        if (L >= 1 && i === 8) { bs(t, .9); bc(t, .5); }
+        if (L >= 1 && eighth) bh(t, .55);
+        if (L >= 2 && !eighth) bh(t, .3);
+        if (L >= 3 && i === 14) for (let r = 1; r < 6; r++) bh(t + r * s16 / 3, .25 + r * .05);
       }
-      if (O.clap && (i === 4 || i === 12) && !(style === 'edm' && L >= 2)) clap(t, L === 0 ? .8 : .65);
+      if (O.clap && (i === 4 || i === 12) && !(style === 'edm' && L >= 2 && !DK)) clap(t, L === 0 ? .8 : .65);
+      if (DK) {   // 드럼 세트
+        const ph = (b - s.bar) % 4, dfill = L >= 1 && ph === 3 && !O.fills && !(nextHit(t0 + BAR - 1e-3) != null && nextHit(t0 + BAR - 1e-3) - t0 < BAR * 2);
+        if (dfill && i >= 12) { (i % 2 ? P('DR', 'asnare', t, .5 + (i - 12) * .12) : tom(t, [180, 0, 120][i - 12] || 150, .8)); }
+        else {
+          if (DP.k[L].includes(i)) P('DR', 'akick', t, i === 0 ? 1 : .85);
+          if (L >= 1 && DP.s.includes(i)) P('DR', 'asnare', t, L === 1 ? .7 : .9);
+          if (L >= 2 && DP.g.includes(i)) P('DR', 'asnare', t, .22);
+          if (L >= 1) {
+            const hs = DP.h === 's' || L >= 3 ? true : eighth;
+            if (DP.h === 'o' && i % 4 === 2) P('DR', 'ohat2', t, .55);
+            else if (hs && !(L >= 3 && DP.h !== 'o' && i === 14)) P('DR', 'chat', t, (eighth ? .6 : .35) * (DP.h === 's' && !eighth ? .8 : 1));
+            if (L >= 3 && DP.h !== 'o' && i === 14) P('DR', 'ohat2', t, .5);
+          }
+        }
+        if (i === 0 && L >= 2 && ph === 0 && b !== s.bar) crash(t, .5);
+      }
       if (s.accent && [2, 6, 10, 13, 14, 15].includes(i)) tom(t, 150 + (i % 3) * 30, i >= 13 ? .7 : .85);   // 짧은 북소리
       if (O.shaker && L >= 1) shaker(t, eighth ? .45 : .8);
       // 타악기
