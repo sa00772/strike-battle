@@ -116,7 +116,7 @@
     <h2>3. 구간과 타격</h2>
     <div class="tl" id="tl" aria-label="음원 타임라인 (눌러서 이동)"><div class="ph" id="ph"></div></div>
     <div class="ticks" id="ticks"></div>
-    <div class="legend"><span><i style="background:var(--gold)"></i>타격 포인트 (직전에 북이 몰아치고 그 순간 큰북, 효과음 없음)</span><span><i style="background:#ff5a4a"></i>마지막 동작</span></div>
+    <div class="legend"><span><i style="background:var(--gold)"></i>타격 포인트 (그 순간 큰북이 한 번 울림)</span><span><i style="background:#ff5a4a"></i>마지막 동작</span></div>
 
     <div class="lhead"><h3>구간</h3><div class="row"><select id="preset" style="width:auto;padding:.35em .5em;font-size:.85rem" aria-label="구성 틀" title="실제 대회 곡의 흐름을 본뜬 시작 구성이에요"><option value="">구성 틀 고르기…</option></select><button class="small" id="add-sec">+ 구간</button></div></div>
     <div class="list" id="secs"></div>
@@ -709,19 +709,7 @@ async function renderTrack(c, onProg) {
         }
         if (O.bells && L >= 2 && n.end) bells(t + s16 * 4, hz(semi + 12, 8), .45);   // 마침에 종으로 메아리
       }
-      const buildLen = h == null ? 0 : Math.min(BAR, Math.max(spb, (h - prevHit(h)) * .5));
-      if (Math.abs(toHit) < 1e-4) continue;                      // 타격 순간은 아래 큰북이 맡음
-      if (toHit < buildLen) {                                     // 타격 직전 몰아치기
-        const k = 1 - toHit / buildLen;
-        if (toHit <= s16 + 1e-4) continue;                        // 바로 앞 한 칸은 비워 긴장감
-        const every = toHit < spb * 2 ? 1 : 2;
-        if (i % every === 0) {
-          const v = .35 + .65 * k;
-          if (style === 'gugak') (i % 2 ? rim(t, v) : tom(t, 95 + 70 * k, v));
-          else (i % 2 ? tom(t, 110 + 60 * k, v) : taiko(t, v * .8, 70));   // 기술 직전에는 북 몰아치기와 멜로디만
-        }
-        continue;
-      }
+      if (Math.abs(toHit) < 1e-4) continue;                      // 타격 순간은 아래 큰북이 맡음 (직전 북 몰아치기는 없음: 반주가 그대로 이어짐)
       if (BRK) continue;
       const q = i % 4 === 0, eighth = i % 2 === 0;
       const p4 = (b - s.bar) % 4, vs = (s.bar + c.seed) % 3;   // 4마디 안 위치, 구간별 변형 번호: 마디마다·구간마다 비트를 조금씩 다르게
@@ -804,7 +792,7 @@ async function renderTrack(c, onProg) {
         }
         if (i === 0 && L >= 2 && ph === 0 && b !== s.bar) crash(t, .5);
       }
-      if (s.accent && [2, 6, 10, 13, 14, 15].includes(i)) tom(t, 150 + (i % 3) * 30, i >= 13 ? .7 : .85);   // 짧은 북소리
+      if (s.accent && [2, 6, 10, 13, 14, 15].includes(i)) { if (style === 'pro') snare(t, i >= 13 ? .5 : .65); else tom(t, 150 + (i % 3) * 30, i >= 13 ? .7 : .85); }   // 짧은 북소리(대회 하이브리드는 스네어로)
       if (O.shaker && L >= 1) shaker(t, eighth ? .45 : .8);
       // 타악기
       const fillBar = O.fills && L >= 1 && (b - s.bar) % 4 === 3 && !(nextHit(t0 + BAR - 1e-3) != null && nextHit(t0 + BAR - 1e-3) - t0 < BAR * 2);
