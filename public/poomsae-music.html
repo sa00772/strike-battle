@@ -116,7 +116,7 @@
     <h2>3. 구간과 타격</h2>
     <div class="tl" id="tl" aria-label="음원 타임라인 (눌러서 이동)"><div class="ph" id="ph"></div></div>
     <div class="ticks" id="ticks"></div>
-    <div class="legend"><span><i style="background:var(--gold)"></i>타격 포인트 (직전에 북이 몰아치고 그 순간 큰 타격음)</span><span><i style="background:#ff5a4a"></i>마지막 동작</span></div>
+    <div class="legend"><span><i style="background:var(--gold)"></i>타격 포인트 (직전에 북이 몰아치고 그 순간 큰북, 효과음 없음)</span><span><i style="background:#ff5a4a"></i>마지막 동작</span></div>
 
     <div class="lhead"><h3>구간</h3><div class="row"><select id="preset" style="width:auto;padding:.35em .5em;font-size:.85rem" aria-label="구성 틀" title="실제 대회 곡의 흐름을 본뜬 시작 구성이에요"><option value="">구성 틀 고르기…</option></select><button class="small" id="add-sec">+ 구간</button></div></div>
     <div class="list" id="secs"></div>
@@ -482,12 +482,12 @@ function makeKit(ctx, out, hz) {
   };
   return K;
 }
-const SAMPLE_LEN = { akick: .45, asnare: .32, chat: .08, ohat2: .4, tamb: .2, wood: .1, ride: .7, piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
+const SAMPLE_LEN = { timp: 1, akick: .45, asnare: .32, chat: .08, ohat2: .4, tamb: .2, wood: .1, ride: .7, piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
 
 /* 실제 악기 샘플: audio/inst/<악기>/<MIDI번호>.mp3 (FluidR3_GM, CC BY 3.0). 필요한 악기만 처음 한 번 받아 둠 */
 const INST = new Map(), INST_LOADING = new Map();
 const INST_GAIN = {};   // 합성음과 크기를 맞추는 악기별 배율(아래 표는 샘플을 최고점 1로 맞춘 뒤 적용)
-Object.assign(INST_GAIN, { acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .8, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
+Object.assign(INST_GAIN, { taiko_drum: .85, melodic_tom: 1, timpani: 1.1, acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .8, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
 let instIndex = null;
 async function loadInst(names, onProg) {
   try { if (!instIndex) instIndex = await (await fetch('audio/inst/index.json')).json(); } catch (_) { return; }
@@ -653,18 +653,16 @@ async function renderTrack(c, onProg) {
         if (O.bells && L >= 2 && n.end) bells(t + s16 * 4, hz(semi + 12, 8), .45);   // 마침에 종으로 메아리
       }
       const buildLen = h == null ? 0 : Math.min(BAR, Math.max(spb, (h - prevHit(h)) * .5));
-      if (Math.abs(toHit) < 1e-4) continue;                      // 타격 순간은 impact가 맡음
+      if (Math.abs(toHit) < 1e-4) continue;                      // 타격 순간은 아래 큰북이 맡음
       if (toHit < buildLen) {                                     // 타격 직전 몰아치기
         const k = 1 - toHit / buildLen;
         if (toHit <= s16 + 1e-4) continue;                        // 바로 앞 한 칸은 비워 긴장감
         const every = toHit < spb * 2 ? 1 : 2;
         if (i % every === 0) {
           const v = .35 + .65 * k;
-          if (style === 'epic') (i % 2 ? tom(t, 110 + 60 * k, v) : taiko(t, v * .8, 70));
-          else if (style === 'gugak') (i % 2 ? rim(t, v) : tom(t, 95 + 70 * k, v));
-          else snare(t, v * .8);
+          if (style === 'gugak') (i % 2 ? rim(t, v) : tom(t, 95 + 70 * k, v));
+          else (i % 2 ? tom(t, 110 + 60 * k, v) : taiko(t, v * .8, 70));   // 기술 직전에는 북 몰아치기와 멜로디만
         }
-        if (i % 4 === 0 && L >= 1 && style !== 'hiphop') bass(t, spb * .9, ch[0], .7);
         continue;
       }
       if (BRK) continue;
@@ -765,14 +763,7 @@ async function renderTrack(c, onProg) {
     }
   }
   for (const h of hits) {
-    const bl = Math.min(BAR, Math.max(spb, (h - prevHit(h)) * .5));
-    riser(h - bl, h, .9); impact(h, 1);
-    const ch = chordAt(Math.floor(h / BAR + 1e-6));
-    if (style === 'epic' || O.brass) brass(h, ch, 1);
-    if (O.gong) gong(h, .9); if (O.choir) choir(h, ch, Math.min(BAR, 1.6), .9); if (O.guitar) guitar(h, ch[0], Math.min(BAR, 1.4), 1); if (O.strings) strings(h, [ch[0], ch[0] + 12], .6, 1);
-    if (style === 'latin') { bell(h, .8); clave(h + s16, .6); }
-    if (style === 'gugak') { kkw(h, 1.2); kkw(h + s16, .6); kkw(h + s16 * 2, .4); }
-    if (style === 'edm' || style === 'hiphop') down(h + .05, Math.min(1.4, BAR * .7), .8);
+    taiko(h, 1, 48); taiko(h, .8, 62); kick(h, .8); P('DR', 'timp', h, .9, 55); tom(h + s16, 90, .55);   // 기술 순간: 효과음 없이 큰북·팀파니 한 방
   }
   riser(Math.max(0, endT - BAR), endT, 1.1); impact(endT, O.endBig ? 1.6 : 1.25);
   if (O.endBig) { taiko(endT, 1, 45); crash(endT + .02, .8); kick(endT, 1); }
@@ -801,6 +792,9 @@ async function renderTrack(c, onProg) {
         const inst = style === 'gugak' ? 'koto' : style === 'epic' ? 'orchestral_harp' : style === 'latin' ? (a[1] === 'square' ? 'acoustic_guitar_nylon' : 'marimba') : null;
         return inst ? { inst, notes: [toMidi(a[0])], d: Math.max(.4, a[3] * 2.5), r: .2 } : null;
       }
+      case 'taiko': return { inst: 'taiko_drum', notes: [Math.max(33, Math.min(63, 45 + 12 * Math.log2(a[0] / 62)))], d: 1.1, r: .25 };   // 실제 큰북
+      case 'tom': return { inst: 'melodic_tom', notes: [Math.max(42, Math.min(75, 50 + 12 * Math.log2(a[0] / 80)))], d: .55, r: .15 };
+      case 'timp': return { inst: 'timpani', notes: [36 + 12 * Math.log2(a[0] / 55)], d: 1.6, r: .3 };
       default: return null;
     }
   };
@@ -827,7 +821,7 @@ async function renderTrack(c, onProg) {
     const sp = SAMP(spec), useS = sp && INST.has(sp.inst);
     const len = Math.max(.05, useS ? sp.d + sp.r + .05 : lenOf(spec)), oc = new OfflineAudioContext(1, Math.ceil(sr * len), sr);
     if (useS) playSamp(oc, sp);
-    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); K[spec[0]](...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
+    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); (K[spec[0]] || K.taiko)(...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
     const d = (await oc.startRendering()).getChannelData(0); let n = d.length; while (n > 1 && Math.abs(d[n - 1]) < 1e-5) n--;
     samples.set(k, d.subarray(0, n)); done++; if (onProg && done % 8 === 0) onProg(.05 + .6 * done / list.length);
   };
