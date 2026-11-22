@@ -6,3 +6,7 @@ License: Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/
 
 kit_* (킥·스네어·하이햇·크래시·라이드): Virtuosity Drums (Versilian Studios, 연주 Austin McMahon), CC0 1.0
 https://github.com/sfzinstruments/virtuosity_drums — 클로즈 마이크와 오버헤드를 섞어 모노 MP3로 다시 저장함.
+kit_shaker·kit_tamb·kit_clave·kit_cowbell·kit_conga·kit_wood·kit_rim도 Virtuosity Drums(CC0)의 퍼커션·크로스스틱 녹음.
+
+kit_gong(징 대용 공), kit_kkw(꽹과리 대용 브레이크 드럼): VSCO 2 Community Edition (Versilian Studios), CC0 1.0
+https://github.com/sgossner/VSCO-2-CE

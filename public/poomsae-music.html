@@ -487,7 +487,7 @@ const SAMPLE_LEN = { timp: 1, akick: .45, asnare: .32, chat: .08, ohat2: .4, tam
 /* 실제 악기 샘플: audio/inst/<악기>/<MIDI번호>.mp3 (FluidR3_GM, CC BY 3.0). 필요한 악기만 처음 한 번 받아 둠 */
 const INST = new Map(), INST_LOADING = new Map();
 const INST_GAIN = {};   // 합성음과 크기를 맞추는 악기별 배율(아래 표는 샘플을 최고점 1로 맞춘 뒤 적용)
-Object.assign(INST_GAIN, { kit_kick: .85, kit_snare: .75, kit_hat: .5, kit_ohat: .5, kit_crash: .45, kit_ride: .75, taiko_drum: .85, melodic_tom: 1, timpani: 1.1, acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .8, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
+Object.assign(INST_GAIN, { kit_shaker: .12, kit_tamb: .2, kit_clave: 1.8, kit_cowbell: .45, kit_wood: .57, kit_rim: .45, kit_conga: .7, kit_kkw: .45, kit_gong: 1.1, string_ensemble_2: 4, pad_2_warm: 3.2, kit_kick: .85, kit_snare: .75, kit_hat: .5, kit_ohat: .5, kit_crash: .45, kit_ride: .75, taiko_drum: .85, melodic_tom: 1, timpani: 1.1, acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .8, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
 let instIndex = null;
 async function loadInst(names, onProg) {
   try { if (!instIndex) instIndex = await (await fetch('audio/inst/index.json')).json(); } catch (_) { return; }
@@ -524,9 +524,10 @@ async function renderTrack(c, onProg) {
   const P = (bus, name, t, v, ...args) => { if (t < D && v > 0) events.push([bus, t, v, name, ...args.map((a) => (typeof a === 'number' ? r3(a) : a))]); };
   const kick = (t, v = 1) => P('DR', 'kick', t, v), snare = (t, v = 1) => P('DR', 'snare', t, v, Math.floor(rnd() * 3)), clap = (t, v = 1) => P('DR', 'clap', t, v);
   const hat = (t, v = 1, open) => P('DR', open ? 'ohat' : 'hat', t, v, Math.floor(rnd() * 3)), tom = (t, f = 120, v = 1) => P('DR', 'tom', t, v, Math.round(f / 5) * 5);
+  const conga = (t, f, v = 1) => P('DR', 'conga', t, v, f >= 220 ? 240 : 190);   // 실제 콩가(높은 음)·툼바(낮은 음)
   const clave = (t, v = 1) => P('DR', 'clave', t, v), bell = (t, v = 1) => P('DR', 'bell', t, v);
   const taiko = (t, v = 1, f = 62) => P('DR', 'taiko', t, v, f), rim = (t, v = 1) => P('DR', 'rim', t, v), kkw = (t, v = 1) => P('DR', 'kkw', t, v), crash = (t, v = 1) => P('FX', 'crash', t, v);
-  const impact = (t, v = 1) => P('FX', 'impact', t, v), riser = (t0, t1, v = 1) => { if (t1 - t0 >= .2) P('FX', 'riser', t0, v, t1 - t0); }, down = (t, len, v = 1) => P('FX', 'down', t, v, len);
+  const impact = (t, v = 1) => { P('DR', 'kick', t, v); P('DR', 'taiko', t, v, 48); P('DR', 'timp', t, v * .9, 55); P('FX', 'crash', t, v * .8); }, riser = (t0, t1, v = 1) => { if (t1 - t0 >= .2) P('FX', 'riser', t0, v, t1 - t0); }, down = (t, len, v = 1) => P('FX', 'down', t, v, len);
   const pad = (t, d, semis, v, bright, bus = 'MU') => P(bus, 'pad', t, v, d, semis, Math.round(bright));
   const bass = (t, d, semi, v = 1) => P('BA', 'bass', t, v, d, semi), b808 = (t, d, semi, v = 1, from = null) => P('BA', 'b808', t, v, d, semi, from);
   const pluck = (t, f, v, type, bright, bus, dec = .22) => P(bus, 'pluck', t, v, f, type, bright, dec);
@@ -703,9 +704,9 @@ async function renderTrack(c, onProg) {
       } else if (style === 'latin') {
         const clv = (b - s.bar) % 2 === 0 ? [0, 6, 12] : [4, 8];        // 3-2 손 클라베
         if (clv.includes(i)) clave(t, L ? .8 : .6);
-        if (L >= 1 && (i === 14 || i === 15)) tom(t, 190, .55);
+        if (L >= 1 && (i === 14 || i === 15)) conga(t, 190, .55);
         if (L >= 1 && (i === 4 || i === 12)) rim(t, .45);
-        if (L >= 1 && i === 6) tom(t, 235, .45);
+        if (L >= 1 && i === 6) conga(t, 235, .45);
         if (L >= 2 && q) bell(t, i === 0 ? .7 : .5);
         if (L >= 2 && (i === 0 || i === 8)) bk(t, .75);
         if (L >= 3 && !eighth) bh(t, .3);
@@ -751,7 +752,7 @@ async function renderTrack(c, onProg) {
       }
       if (O.janggu && style !== 'gugak' && L >= 1) { if (i === 0 || i === 8) { tom(t, 82, .7); rim(t, .6); } if ([3, 10, 11, 14].includes(i)) rim(t, .5); if (i === 6 || i === 12) tom(t, 88, .55); }
       if (O.kkwaeng && (style === 'gugak' ? L >= 1 && L < 3 : L >= 2) && eighth) kkw(t, q ? .9 : .5);
-      if (O.conga && style !== 'latin' && L >= 1) { if (i === 6 || i === 14) tom(t, 195, .5); if (i === 7 || i === 15) tom(t, 240, .45); if (L >= 2 && i === 4) rim(t, .4); }
+      if (O.conga && style !== 'latin' && L >= 1) { if (i === 6 || i === 14) conga(t, 195, .5); if (i === 7 || i === 15) conga(t, 240, .45); if (L >= 2 && i === 4) rim(t, .4); }
       if (O.cowbell && L >= 1 && !(style === 'latin' && L >= 2)) { if (q) bell(t, i === 0 ? .6 : .45); if (L >= 3 && i % 4 === 2) bell(t, .3); }
       if (O.tamb && L >= 1) { if (i % 4 === 2) tamb(t, .7); else if (L >= 3) tamb(t, .3); }
       if (O.wood && L >= 1) { if ((L === 1 ? [3, 10] : [0, 3, 6, 10, 12]).includes(i)) wood(t, .6); }
@@ -803,7 +804,7 @@ async function renderTrack(c, onProg) {
       case 'guitar': return { inst: 'distortion_guitar', notes: [0, 7, 12].map((m) => mOf(a[0] + m, 2)), d: a[1], r: .06, sus: true };
       case 'bass': return { inst: BASS_I, notes: [mOf(a[1])], d: a[0], at: .004, r: .07, sus: true };
       case 'pluck': {
-        const inst = style === 'gugak' ? 'koto' : style === 'epic' ? 'orchestral_harp' : style === 'latin' ? (a[1] === 'square' ? 'acoustic_guitar_nylon' : 'marimba') : null;
+        const inst = style === 'gugak' ? 'koto' : style === 'epic' ? 'orchestral_harp' : style === 'latin' ? (a[1] === 'square' ? 'acoustic_guitar_nylon' : 'marimba') : style === 'hiphop' ? 'electric_piano_1' : 'lead_2_sawtooth';
         return inst ? { inst, notes: [toMidi(a[0])], d: Math.max(.4, a[3] * 2.5), r: .2 } : null;
       }
       case 'mdbl': return { inst: LEAD_I[0] === 'string_ensemble_1' ? 'french_horn' : 'string_ensemble_1', notes: [toMidi(a[1])], d: a[0], at: .05, r: .3, sus: true };   // 멜로디 겹침·화음
@@ -813,6 +814,16 @@ async function renderTrack(c, onProg) {
       case 'ohat': case 'ohat2': return { inst: 'kit_ohat', notes: [0], d: name === 'ohat' ? .4 : .5, r: .12 };
       case 'crash': return { inst: 'kit_crash', notes: [0], d: 2.6, r: .35 };
       case 'ride': return { inst: 'kit_ride', notes: [0], d: 1.3, r: .25 };
+      case 'pad': return { inst: style === 'edm' || style === 'hiphop' ? 'pad_2_warm' : 'string_ensemble_2', notes: a[1].map((x) => mOf(x, 4)), d: a[0], at: Math.min(.35, a[0] * .3), r: .3, sus: true };
+      case 'shaker': return { inst: 'kit_shaker', notes: [0], d: .25, r: .05 };
+      case 'tamb': return { inst: 'kit_tamb', notes: [0], d: .45, r: .05 };
+      case 'clave': return { inst: 'kit_clave', notes: [0], d: .28, r: .03 };
+      case 'bell': return { inst: 'kit_cowbell', notes: [0], d: .45, r: .05 };
+      case 'wood': return { inst: 'kit_wood', notes: [0], d: .28, r: .03 };
+      case 'rim': return { inst: 'kit_rim', notes: [0], d: .35, r: .05 };
+      case 'conga': return { inst: 'kit_conga', notes: [a[0] >= 220 ? 1 : 0], d: .55, r: .05 };
+      case 'kkw': return { inst: 'kit_kkw', notes: [0], d: .5, r: .1 };   // 꽹과리 대신 밝은 쇳소리(브레이크 드럼)
+      case 'gong': return { inst: 'kit_gong', notes: [0], d: 4.3, r: .2 };
       case 'taiko': return { inst: 'taiko_drum', notes: [Math.max(33, Math.min(63, 45 + 12 * Math.log2(a[0] / 62)))], d: 1.1, r: .25 };   // 실제 큰북
       case 'tom': return { inst: 'melodic_tom', notes: [Math.max(42, Math.min(75, 50 + 12 * Math.log2(a[0] / 80)))], d: .55, r: .15 };
       case 'timp': return { inst: 'timpani', notes: [36 + 12 * Math.log2(a[0] / 55)], d: 1.6, r: .3 };
@@ -842,7 +853,7 @@ async function renderTrack(c, onProg) {
     const sp = SAMP(spec), useS = sp && INST.has(sp.inst);
     const len = Math.max(.05, useS ? sp.d + sp.r + .05 : lenOf(spec)), oc = new OfflineAudioContext(1, Math.ceil(sr * len), sr);
     if (useS) playSamp(oc, sp);
-    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); (K[spec[0]] || (spec[0] === 'mdbl' ? (d, f) => K.lead(d, f, 'saw') : K.taiko))(...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
+    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); (K[spec[0]] || ({ mdbl: (d, f) => K.lead(d, f, 'saw'), conga: (f) => K.tom(f) })[spec[0]] || K.taiko)(...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
     const d = (await oc.startRendering()).getChannelData(0); let n = d.length; while (n > 1 && Math.abs(d[n - 1]) < 1e-5) n--;
     samples.set(k, d.subarray(0, n)); done++; if (onProg && done % 8 === 0) onProg(.05 + .6 * done / list.length);
   };
