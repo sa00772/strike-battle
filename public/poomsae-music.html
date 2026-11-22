@@ -507,17 +507,57 @@ async function renderTrack(c, onProg) {
   if (!secs.length || secs[0].bar > 0) secs.unshift({ name: '준비·인트로', lv: 0, bar: 0 });
   const hits = [...new Set(c.hits.map((h) => Math.round(h.t / spb) * spb).filter((t) => t > spb && t < endT - spb / 2))].sort((a, b) => a - b);
   const secAt = (b) => { let s = secs[0]; for (const x of secs) if (x.bar <= b) s = x; return s; };
-  const motifs = new Map();
-  const motifFor = (s) => {
-    if (motifs.has(s)) return motifs.get(s);
-    const rh = pick([[0, 3, 6, 8, 10, 12, 14], [0, 2, 4, 6, 8, 11, 14], [0, 4, 6, 8, 12], [0, 3, 6, 10, 12, 14], [0, 2, 3, 6, 8, 12]]);
-    const notes = []; let d = SCALE.length + Math.floor(rnd() * 3);
-    for (let half = 0; half < 2; half++) rh.forEach((st, i) => {
-      const nxt = i + 1 < rh.length ? rh[i + 1] : 16; d += pick([-2, -1, -1, 0, 1, 1, 2, 3]); d = Math.max(SCALE.length - 1, Math.min(SCALE.length * 2 + 2, d));
-      notes.push({ st: st + 16 * half, len: nxt - st, d, strong: st % 4 === 0 });
-    });
-    motifs.set(s, notes); return notes;
+  // 멜로디: 같은 이름의 구간은 같은 주제 선율을 씀. 4마디 = 물음 2마디(열린 끝) + 대답 2마디(으뜸음으로 닫힘)
+  // 세기에 따라 음 수가 달라지고(잔잔 → 4분음표 뼈대, 보통 → 8분, 강하게·최고조 → 전부), 두 번째 4마디는 꾸밈 변주
+  const mrnd = rngOf((c.seed * 2654435761 + styleIx * 40503 + 99) >>> 0), mpick = (a) => a[Math.floor(mrnd() * a.length)];
+  const NS = SCALE.length, LO = NS - 1, HI = NS * 2 + 2, clampD = (d) => Math.max(LO, Math.min(HI, d));
+  const RHY = [[0, 3, 6, 8, 10, 12, 14], [0, 2, 4, 6, 8, 11, 14], [0, 4, 6, 8, 12], [0, 3, 6, 10, 12, 14], [0, 2, 3, 6, 8, 12],
+    [0, 4, 7, 8, 12, 15], [0, 2, 4, 8, 10, 12], [0, 6, 8, 10, 12], [0, 3, 4, 8, 11, 12], [0, 1, 2, 4, 8, 12, 14]];
+  const ENDR = [[0, 4, 8], [0, 2, 4, 8], [0, 3, 6, 8], [0, 4, 6, 8], [0, 2, 3, 4, 8]];
+  const barLine = (rh, from, to, arch, off) => { let prev = null; return rh.map((st, k) => {
+    const x = rh.length > 1 ? k / (rh.length - 1) : 1;
+    let d = clampD(Math.round(from + (to - from) * x + arch * Math.sin(Math.PI * x) + mpick([-1, 0, 0, 0, 1])));
+    if (d === prev && mrnd() < .7) d = clampD(d + (mrnd() < .5 ? 1 : -1));   // 같은 음 되풀이는 줄임
+    prev = d; return { st: st + off, d };
+  }); };
+  const themes = new Map();
+  const themeFor = (name) => {
+    if (themes.has(name)) return themes.get(name);
+    const rA = mpick(RHY), rB = mrnd() < .45 ? rA : mpick(RHY), arch = mpick([2, 1, 1, 0, -1]);
+    const start = mpick([NS, NS + 2, NS + 4, NS - 1]), top = NS + 4 + Math.floor(mrnd() * 4), seq = mpick([1, 2, -1, -2, 0]);
+    const q1 = barLine(rA, start, top, arch, 0);                                    // 물음: 올라가서
+    const q2 = barLine(rB, top, mpick([NS + 1, NS + 4, NS + 6]), arch * .5, 16);   // 2도·5도·7도에서 열린 채 멈춤
+    const a1 = q1.map((n) => ({ st: n.st + 32, d: clampD(n.d + seq) }));          // 대답: 첫 마디를 옮겨 되풀이(반복 진행)
+    const a2 = barLine(mpick(ENDR), a1[a1.length - 1].d, NS, 1, 48);               // 마지막은 으뜸음
+    a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true;
+    const notes = [...q1, ...q2, ...a1, ...a2];
+    themes.set(name, notes); return notes;
   };
+  const lines = new Map();
+  const lineFor = (name, L, vari) => {
+    const key = name + '|' + L + '|' + vari; if (lines.has(key)) return lines.get(key);
+    const grid = L <= 1 ? 4 : L === 2 ? 2 : 1;
+    let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end).map((n) => ({ ...n }));
+    if (vari && L >= 2) {   // 변주: 긴 음을 쪼개 이웃음을 넣고, 몇몇 음은 한 옥타브 위로
+      const out = [];
+      ns.forEach((n, i) => {
+        const nxt = i + 1 < ns.length ? ns[i + 1].st : 64;
+        if (!n.end && nxt - n.st >= 4 && mrnd() < .6) { out.push(n); out.push({ st: n.st + 2, d: clampD(n.d + mpick([1, -1, 2])) }); }
+        else out.push(n);
+      });
+      ns = out;
+      if (L >= 3) for (const n of ns) if (n.st >= 32 && n.st < 48 && n.d + NS <= HI + 2) n.d += NS;
+    }
+    if (L >= 3 && !vari) {  // 다음 4마디로 넘어가는 16분음표 3개짜리 올림 꾸밈
+      const last = ns[ns.length - 1];
+      if (last.st <= 57) { const to = themeFor(name)[0].d; for (let k = 0; k < 3; k++) ns.push({ st: 61 + k, d: clampD(to - 3 + k), run: true }); }
+    }
+    ns.sort((x, y) => x.st - y.st);
+    const res = ns.map((n, i) => ({ ...n, len: (i + 1 < ns.length ? ns[i + 1].st : 64) - n.st, strong: n.st % 8 === 0 }));
+    lines.set(key, res); return res;
+  };
+  let lastMel = null;
+  const mainName = (c.sections.find((x) => x.lv >= 2) || c.sections[0] || { name: '주제' }).name;
   const prog = pick(PROGS);
   const chordAt = (b) => { const s = secAt(b); return CH[prog[(b - s.bar) % prog.length]]; };
   const nearestChordTone = (semi, ch) => { let best = semi, bd = 99; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o, dd = Math.abs(x - semi); if (dd < bd) { bd = dd; best = x; } } return best; };
@@ -554,7 +594,9 @@ async function renderTrack(c, onProg) {
     if (O.choir && (L >= 2 || (style === 'epic' && L >= 1))) choir(t0, ch, barEnd - t0, [0, .5, .7, .85][L]);
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
-    const motif = L >= 3 ? motifFor(s) : null;
+    const ph = b - s.bar, vari = Math.floor(ph / 4) % 2, pOff = (ph % 4) * 16;
+    const line = !BRK && L >= 1 ? lineFor(s.name, L, vari) : null;
+    const intro = !BRK && L === 0 && ph >= 2 && (O.bells || O.piano) ? lineFor(mainName, 1, 0) : null;   // 인트로에서 주제를 종·피아노로 살짝 미리 들려줌
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16; if (t >= endT - 1e-4) break;
       const h = nextHit(t), toHit = h == null ? 99 : h - t;
@@ -654,7 +696,7 @@ async function renderTrack(c, onProg) {
       if (O.piano && L >= 1 && (L === 1 ? (i === 0 || i === 8) : [0, 3, 6, 10].includes(i))) for (const sm of ch) piano(t, sm + 12, L === 1 ? .55 : .5);
       if (O.guitar && L >= 2 && !firstOfSec && eighth) guitar(t, ch[0], s16 * 1.4, q ? .85 : .65);
       if (O.bells && ((L === 0 && i === 0) || (L >= 1 && [0, 6, 12].includes(i)))) bells(t, hz(ch[(i / 6) % 3] + 12, 8), L === 0 ? .5 : .6);
-      if (O.flute && (L === 1 || L === 2) && (i === 0 || i === 8)) { const sm = ch[(b + i / 8) % 3]; const d = Math.min(s16 * 7.5, (h != null ? h - t : 99) - s16); if (d > .1) flute(t, d, hz(sm + 12, 8), .8); }
+      if (O.flute && !line && (L === 1 || L === 2) && (i === 0 || i === 8)) { const sm = ch[(b + i / 8) % 3]; const d = Math.min(s16 * 7.5, (h != null ? h - t : 99) - s16); if (d > .1) flute(t, d, hz(sm + 12, 8), .8); }
       if (L >= 1) {
         if (style === 'latin' && (i === 6 || i === 12)) bass(t, i === 6 ? s16 * 5.5 : s16 * 3.5, i === 6 ? ch[0] : ch[2] - 12, .85);
         else if (style === 'edm' && i % 4 === 2) bass(t, s16 * 1.8, ch[0], .9);
@@ -669,13 +711,19 @@ async function renderTrack(c, onProg) {
         else if (style === 'latin') { if ([0, 3, 6, 8, 11, 14].includes(i)) { pluck(t, hz(st, 8), .6, 'square', 2400, 'MU', .18); pluck(t, hz(st, 16), .35, 'triangle', 3000, 'MU', .15); } }
         else pluck(t, hz(st, 8), style === 'hiphop' ? .45 : .55, style === 'epic' ? 'triangle' : 'sawtooth', style === 'epic' ? 2000 : 3400, 'MU');
       }
-      if (motif) {
-        const off = ((b - s.bar) % 2) * 16;
-        for (const n of motif) if (n.st === i + off) {
-          let semi = degSemi(n.d); if (n.strong) semi = nearestChordTone(semi, ch);
-          const d = Math.min(n.len * s16 * .95, (h != null ? h - t : 99) - s16);
-          if (d > .05) { if (O.flute) flute(t, d, hz(semi, 8), .9); else lead(t, d, hz(semi, 8), .85, leadKind); }
-        }
+      if (line) for (const n of line) if (n.st === i + pOff) {
+        let semi = degSemi(n.d); if (n.end) semi = nearestChordTone(semi, [ch[0]]); else if (n.strong) { const raw = semi; semi = nearestChordTone(raw, ch); if (semi === lastMel) semi = nearestChordTone(raw + (raw >= semi ? 3 : -3), ch); }
+        const d = Math.min(n.len * s16 * (L <= 1 ? .98 : .92), (h != null ? h - t : 99) - s16);
+        if (d <= .05) continue;
+        const v = (n.run ? .7 : 1) * [0, .6, .75, .85][L], play = (tt, dd, sm, vv) => { if (O.flute) flute(tt, dd, hz(sm, 8), vv * 1.05); else lead(tt, dd, hz(sm, 8), vv, leadKind); };
+        if (leadKind === 'piri' && n.len >= 4 && t > s16) play(t - s16 * .5, s16 * .45, degSemi(n.d + 1), v * .55);   // 국악: 위에서 떨어지는 꾸밈음
+        play(t, d, semi, v); if (!n.run) lastMel = semi;
+        if (L >= 3 && n.len >= 2 && !n.run) { let hv = null; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o; if (x <= semi - 3 && x >= semi - 9 && (hv == null || x > hv)) hv = x; } if (hv != null) play(t, d, hv, v * .45); }   // 아래에서 받쳐 주는 화음 성부
+        if (O.bells && L >= 2 && n.end) bells(t + s16 * 4, hz(semi + 12, 8), .45);   // 마침에 종으로 메아리
+      }
+      if (intro) for (const n of intro) if (n.st === i + pOff && (n.st < 32)) {
+        const semi = n.strong ? nearestChordTone(degSemi(n.d), ch) : degSemi(n.d);
+        if (O.bells) bells(t, hz(semi, 8), .4); else piano(t, semi + 12, .35);
       }
     }
   }
