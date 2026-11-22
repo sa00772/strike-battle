@@ -1,0 +1,5 @@
+악기 샘플 출처 / Instrument samples
+
+FluidR3_GM SoundFont (Frank Wen), 이 사이트에서 쓰는 음만 골라 모노 MP3로 다시 저장함.
+pre-rendered by Benjamin Gleitzman: https://github.com/gleitz/midi-js-soundfonts
+License: Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/)

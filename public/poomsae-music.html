@@ -145,6 +145,7 @@
     </div>
     <p class="hint" style="margin-top:8px">선수 음원으로 저장하면 이 컴퓨터의 <b>자유품새 대전</b> 화면에서 그 선수 음원으로 바로 쓸 수 있어요. 이름과 소속을 경기 참가 명단과 똑같이 적어 주세요. 다른 컴퓨터에서 쓰려면 WAV 파일을 내려받아 옮기세요.</p>
   </section>
+  <p class="hint" style="text-align:center;opacity:.7">악기 소리: FluidR3_GM 사운드폰트 (CC BY 3.0, <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener" style="color:inherit">gleitz/midi-js-soundfonts</a>)</p>
 </main>
 <div id="toast" role="status"></div>
 
@@ -468,6 +469,32 @@ function makeKit(ctx, out, hz) {
 }
 const SAMPLE_LEN = { akick: .45, asnare: .32, chat: .08, ohat2: .4, tamb: .2, wood: .1, ride: .7, piano: 1.5, bells: 1.4, gong: 3.6, shaker: .08, clave: .12, bell: .25, kick: .5, snare: .35, clap: .3, hat: .1, ohat: .35, tom: .45, taiko: 1, rim: .1, kkw: .35, crash: 1.9, impact: 1.9, brass: .7 };
 
+/* 실제 악기 샘플: audio/inst/<악기>/<MIDI번호>.mp3 (FluidR3_GM, CC BY 3.0). 필요한 악기만 처음 한 번 받아 둠 */
+const INST = new Map(), INST_LOADING = new Map();
+const INST_GAIN = {};   // 합성음과 크기를 맞추는 악기별 배율(아래 표는 샘플을 최고점 1로 맞춘 뒤 적용)
+Object.assign(INST_GAIN, { acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .8, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
+let instIndex = null;
+async function loadInst(names, onProg) {
+  try { if (!instIndex) instIndex = await (await fetch('audio/inst/index.json')).json(); } catch (_) { return; }
+  const todo = names.filter((n) => !INST.has(n) && instIndex[n]); let done = 0;
+  const dec = new OfflineAudioContext(1, 1, 44100);
+  await Promise.all(todo.map((n) => {
+    if (!INST_LOADING.has(n)) INST_LOADING.set(n, (async () => {
+      const bank = new Map();
+      await Promise.all(instIndex[n].map(async (m) => {
+        const ab = await (await fetch(`audio/inst/${n}/${m}.mp3`)).arrayBuffer(), b = await dec.decodeAudioData(ab);
+        const d = new Float32Array(b.getChannelData(0)); let pk = 0; for (const x of d) pk = Math.max(pk, Math.abs(x));
+        let st = 0; while (st < d.length - 1 && Math.abs(d[st]) < pk * .01) st++;   // 앞쪽 무음 잘라 박자에 딱 맞게
+        const out = new AudioBuffer({ length: d.length - st, sampleRate: b.sampleRate, numberOfChannels: 1 }); const o = out.getChannelData(0);
+        for (let i = st; i < d.length; i++) o[i - st] = d[i] / (pk || 1);
+        bank.set(m, out);
+      }));
+      INST.set(n, bank);
+    })().catch(() => {}));
+    return INST_LOADING.get(n).then(() => { done++; if (onProg) onProg(done / todo.length); });
+  }));
+}
+
 async function renderTrack(c, onProg) {
   const sr = 44100, D = c.dur, N = Math.ceil(sr * D);
   const styleIx = Object.keys(STYLES).indexOf(c.style);
@@ -746,14 +773,52 @@ async function renderTrack(c, onProg) {
   if (style === 'epic') { if (!O.brass) brass(endT, [0, 7, 12], 1.2); taiko(endT + spb * .5, .7); }
   if (style === 'gugak') for (let k = 0; k < 6; k++) kkw(endT + k * s16, 1.1 - k * .15);
 
+  // 1.5) 실제 악기 샘플(FluidR3 사운드폰트)로 낼 소리 고르기. 샘플을 못 불러오면 예전 합성음으로 냄
+  const toMidi = (f) => 69 + 12 * Math.log2(f / 440), mOf = (semi, mul = 1) => toMidi(hz(semi, mul));
+  const LEAD_I = { epic: ['french_horn', -12], edm: ['lead_2_sawtooth', 0], gugak: ['shanai', 0], hiphop: ['electric_piano_1', -12], latin: ['trumpet', -12] }[style] || ['lead_2_sawtooth', 0];
+  const BASS_I = style === 'edm' ? 'synth_bass_1' : 'acoustic_bass';
+  const SAMP = ([name, ...a]) => {
+    switch (name) {
+      case 'lead': return { inst: LEAD_I[0], notes: [toMidi(a[1]) + LEAD_I[1]], d: a[0], at: .015, r: .14, sus: true };
+      case 'flute': return { inst: style === 'gugak' ? 'shakuhachi' : 'flute', notes: [toMidi(a[1])], d: a[0], at: .03, r: .15, sus: true };
+      case 'piano': return { inst: 'acoustic_grand_piano', notes: [mOf(a[0], 4)], d: 2.4, r: .3 };
+      case 'bells': return { inst: 'tubular_bells', notes: [toMidi(a[0])], d: 2.6, r: .3 };
+      case 'strings': return { inst: 'string_ensemble_1', notes: a[0].map((x) => mOf(x, 4)), d: a[1], at: .01, r: a[1] < .5 ? .1 : .25, sus: true };
+      case 'choir': return { inst: 'choir_aahs', notes: a[0].map((x) => mOf(x, 4)), d: a[1], at: Math.min(.3, a[1] * .3), r: .4, sus: true };
+      case 'brass': return { inst: 'brass_section', notes: a[0].map((x) => mOf(x, 2)), d: .55, at: .01, r: .25 };
+      case 'guitar': return { inst: 'distortion_guitar', notes: [0, 7, 12].map((m) => mOf(a[0] + m, 2)), d: a[1], r: .06, sus: true };
+      case 'bass': return { inst: BASS_I, notes: [mOf(a[1])], d: a[0], at: .004, r: .07, sus: true };
+      case 'pluck': {
+        const inst = style === 'gugak' ? 'koto' : style === 'epic' ? 'orchestral_harp' : style === 'latin' ? (a[1] === 'square' ? 'acoustic_guitar_nylon' : 'marimba') : null;
+        return inst ? { inst, notes: [toMidi(a[0])], d: Math.max(.4, a[3] * 2.5), r: .2 } : null;
+      }
+      default: return null;
+    }
+  };
+  const need = new Set(); for (const e of events) { const sp = SAMP(e.slice(3)); if (sp) need.add(sp.inst); }
+  await loadInst([...need], onProg ? (x) => onProg(.05 * x) : null);
+  const playSamp = (oc, sp) => {
+    const bank = INST.get(sp.inst), gn = (INST_GAIN[sp.inst] || 1) / Math.sqrt(sp.notes.length);
+    for (const m of sp.notes) {
+      let best = null, bd = 99; for (const k of bank.keys()) { const dd = Math.abs(k - m); if (dd < bd) { bd = dd; best = k; } }
+      const buf = bank.get(best), rate = Math.pow(2, (m - best) / 12), src = oc.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+      if (sp.sus && (sp.d + sp.r) * rate > buf.duration - .15) { src.loop = true; src.loopStart = 1.1; src.loopEnd = Math.min(buf.duration - .1, 2.9); }
+      const g = oc.createGain(), at = sp.at || .003; src.connect(g); g.connect(oc.destination);
+      g.gain.setValueAtTime(0, 0); g.gain.linearRampToValueAtTime(gn, at); g.gain.setValueAtTime(gn, Math.max(at, sp.d)); g.gain.linearRampToValueAtTime(0, Math.max(at, sp.d) + sp.r);
+      src.start(0); src.stop(sp.d + sp.r + .02);
+    }
+  };
+
   // 2) 서로 다른 소리만 한 번씩 합성
   const keyOf = (e) => JSON.stringify(e.slice(3));
   const uniq = new Map(); for (const e of events) { const k = keyOf(e); if (!uniq.has(k)) uniq.set(k, e.slice(3)); }
   const samples = new Map(); const list = [...uniq.entries()]; let done = 0;
   const lenOf = ([name, ...a]) => SAMPLE_LEN[name] ?? (['strings', 'guitar'].includes(name) ? a[1] + .1 : name === 'choir' ? a[1] + .5 : name === 'pluck' ? a[3] + .2 : name === 'riser' ? a[0] + .05 : name === 'down' ? a[0] + .1 : a[0] + .4);
   const one = async ([k, spec]) => {
-    const len = Math.max(.05, lenOf(spec)), oc = new OfflineAudioContext(1, Math.ceil(sr * len), sr);
-    const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); K[spec[0]](...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0)));
+    const sp = SAMP(spec), useS = sp && INST.has(sp.inst);
+    const len = Math.max(.05, useS ? sp.d + sp.r + .05 : lenOf(spec)), oc = new OfflineAudioContext(1, Math.ceil(sr * len), sr);
+    if (useS) playSamp(oc, sp);
+    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); K[spec[0]](...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
     const d = (await oc.startRendering()).getChannelData(0); let n = d.length; while (n > 1 && Math.abs(d[n - 1]) < 1e-5) n--;
     samples.set(k, d.subarray(0, n)); done++; if (onProg && done % 8 === 0) onProg(.05 + .6 * done / list.length);
   };
