@@ -197,7 +197,7 @@ const instFor = (st) => { const o = instOff(); for (const k of STYLE_INST[st] ||
 const KEYS = [['A', 0], ['B', 2], ['C', 3], ['D', 5], ['E', -5], ['F', -4], ['G', -2]];
 const SEC_TYPES = [
   ['준비·인트로', 0, '#46506a'], ['기본동작', 1, '#2f6b8c'], ['뛰어 옆차기', 2, '#8c5a2f'], ['다단계 발차기', 3, '#a33f3f'],
-  ['회전 발차기', 3, '#7a4fa3'], ['연속 발차기', 2, '#2f8a6f'], ['아크로바틱', 3, '#b5532e'], ['쉬어가기', 0, '#3d4a5c'], ['브레이크', 0, '#23262f'], ['마무리', 2, '#6b6f2f'],
+  ['회전 발차기', 3, '#7a4fa3'], ['연속 발차기', 2, '#2f8a6f'], ['아크로바틱', 3, '#b5532e'], ['쉬어가기', 0, '#3d4a5c'], ['브레이크', 0, '#23262f'], ['반전 (밝고 빠르게)', 3, '#c9a227'], ['마무리', 2, '#6b6f2f'],
 ];
 const LEVELS = ['잔잔하게', '보통', '강하게', '최고조'];
 const secColor = (n) => (SEC_TYPES.find((x) => x[0] === n) || [0, 0, '#555'])[2];
@@ -511,8 +511,15 @@ async function loadInst(names, onProg) {
   }));
 }
 
+const FLIP_SPEED = 1.2;
 async function renderTrack(c, onProg) {
-  const sr = 44100, D = c.dur, N = Math.ceil(sr * D);
+  // '반전' 구간부터는 장조로 바뀌고 빠르기가 FLIP_SPEED배가 됨. 곡은 '음악 시간'(원래 빠르기 기준)으로 짠 뒤 실제 시간으로 줄여 맞춤
+  const realDur = c.dur, flipSec = (c.sections || []).filter((x) => String(x.name).startsWith('반전')).sort((a, b) => a.t - b.t)[0];
+  const barLen = 240 / c.bpm, FT = flipSec && flipSec.t > 0 && flipSec.t < c.dur - 2 ? Math.max(barLen, Math.round(flipSec.t / barLen) * barLen) : null, FR = FLIP_SPEED;   // 마디 경계에서 바뀜
+  const toU = (T) => (FT == null || T <= FT ? T : FT + (T - FT) * FR), toT = (u) => (FT == null || u <= FT ? u : FT + (u - FT) / FR);
+  if (FT != null) c = { ...c, dur: toU(c.dur), endHit: toU(c.endHit), sections: c.sections.map((x) => ({ ...x, t: toU(x.t) })), hits: c.hits.map((h) => ({ ...h, t: toU(h.t) })) };
+  const FU = FT == null ? null : toU(FT);
+  const sr = 44100; let D = c.dur, N = Math.ceil(sr * D);
   const styleIx = Object.keys(STYLES).indexOf(c.style);
   const rnd = rngOf(c.seed * 7919 + styleIx * 104729 + 17), pick = (a) => a[Math.floor(rnd() * a.length)];
   const spb = 60 / c.bpm, BAR = spb * 4, s16 = spb / 4;
@@ -538,13 +545,16 @@ async function renderTrack(c, onProg) {
   const gong = (t, v = 1) => P('FX', 'gong', t, v), shaker = (t, v = 1) => P('DR', 'shaker', t, v, Math.floor(rnd() * 3)), choir = (t, semis, d, v = 1) => P('MU', 'choir', t, v, semis, d);
   const lead = (t, d, f, v, kind) => P('LD', 'lead', t, v, d, f, kind), brass = (t, semis, v = 1) => P('MU', 'brass', t, v, semis);
 
-  const CH = { i: [0, 3, 7], iv: [5, 8, 12], v: [7, 10, 14], V: [7, 11, 14], VI: [-4, 0, 3], III: [3, 7, 10], VII: [-2, 2, 5] };
+  const CH = { I: [0, 4, 7], IV: [5, 9, 12], vi: [9, 12, 16], ii: [2, 5, 9], i: [0, 3, 7], iv: [5, 8, 12], v: [7, 10, 14], V: [7, 11, 14], VI: [-4, 0, 3], III: [3, 7, 10], VII: [-2, 2, 5] };
   const PROGS = c.style === 'pro' ? [['i', 'VI', 'iv', 'V'], ['i', 'i', 'VI', 'V'], ['i', 'iv', 'i', 'V'], ['VI', 'iv', 'V', 'i'], ['i', 'VI', 'VII', 'V']]   // 화성단음계: V가 장화음
     : c.style === 'latin' ? [['i', 'iv', 'V', 'i'], ['i', 'VII', 'VI', 'V'], ['iv', 'V', 'i', 'i']]
     : c.style === 'gugak' ? [['i', 'VII', 'i', 'iv'], ['i', 'i', 'VII', 'VII'], ['i', 'iv', 'VII', 'i']]
     : [['i', 'VI', 'III', 'VII'], ['i', 'iv', 'VI', 'V'], ['i', 'VII', 'VI', 'VII'], ['VI', 'VII', 'i', 'i'], ['i', 'VI', 'iv', 'V']];
+  const MPROGS = [['I', 'V', 'vi', 'IV'], ['I', 'IV', 'V', 'I'], ['vi', 'IV', 'I', 'V'], ['I', 'vi', 'IV', 'V'], ['IV', 'V', 'I', 'vi'], ['I', 'ii', 'IV', 'V']];   // 반전 뒤 밝은 장조 진행
+  const SCALE_F = c.style === 'gugak' ? [0, 2, 4, 7, 9] : [0, 2, 4, 5, 7, 9, 11];
+  let curFlip = false;
   const SCALE = c.style === 'gugak' ? [0, 3, 5, 7, 10] : c.style === 'pro' ? [0, 2, 3, 5, 7, 8, 11] : [0, 2, 3, 5, 7, 8, 10];   // 대회곡들: 단조에 이끔음(올린 7음)
-  const degSemi = (d) => { const n = SCALE.length, o = Math.floor(d / n); return SCALE[((d % n) + n) % n] + 12 * o; };
+  const degSemi = (d) => { const sc = curFlip ? SCALE_F : SCALE, n = sc.length, o = Math.floor(d / n); return sc[((d % n) + n) % n] + 12 * o; };
 
   const nBars = Math.ceil(D / BAR);
   const endT = Math.min(D - .8, Math.max(spb, Math.round(c.endHit / spb) * spb));
@@ -621,12 +631,21 @@ async function renderTrack(c, onProg) {
   };
   let lastMel = null;
   const prog = pick(PROGS);
-  const chordAt = (b) => { const s = secAt(b); return CH[prog[(b - s.bar) % prog.length]]; };
+  // 구간마다(긴 구간은 8마디마다) 다른 화음 진행. 바로 앞 진행과 겹치지 않게 고름
+  const secProgs = new Map(); let lastProg = prog;
+  const isFlip = (b) => FU != null && b * BAR >= FU - 1e-3;
+  const progFor = (s, k, fl) => {
+    const key = s.bar + '|' + k;
+    if (!secProgs.has(key)) { const pool = fl ? MPROGS : PROGS; let pg = k === 0 && s.bar === 0 && !fl ? prog : pick(pool), n = 0; while (pg === lastProg && n++ < 6) pg = pick(pool); lastProg = pg; secProgs.set(key, pg); }
+    return secProgs.get(key);
+  };
+  const chordAt = (b) => { const s = secAt(b), k = Math.floor((b - s.bar) / 8), pg = progFor(s, k, isFlip(b)); return CH[pg[(b - s.bar) % pg.length]]; };
   const nearestChordTone = (semi, ch) => { let best = semi, bd = 99; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o, dd = Math.abs(x - semi); if (dd < bd) { bd = dd; best = x; } } return best; };
   const O = c.opts || {};
   const style = c.style;
   const leadName = c.lead && c.lead !== 'auto' && LEADS[c.lead] ? c.lead : O.flute ? (style === 'gugak' ? 'shakuhachi' : 'flute') : STYLE_LEAD[style] || 'lead_2_sawtooth';
   const LEAD_I = [leadName, LEADS[leadName][1]], leadKind = LEADS[leadName][2];
+  const FLEAD_I = ['string_ensemble_1', 'french_horn', 'shakuhachi', 'shanai'].includes(leadName) ? ['trumpet', -12] : LEAD_I;   // 반전 뒤 멜로디는 밝은 트럼펫으로
   const nextHit = (t) => { for (const h of hits) if (h >= t - 1e-4) return h; return null; };
   const prevHit = (h) => { let p = 0; for (const x of hits) if (x < h - 1e-4) p = x; return p; };
   const pumpBeats = [];
@@ -639,14 +658,16 @@ async function renderTrack(c, onProg) {
     break: { k: [[0], [0, 10], [0, 2, 10, 11], [0, 2, 10, 11]], s: [4, 12], g: [7, 9, 15], h: 'e' },
     half:  { k: [[0], [0], [0, 7], [0, 7, 10]], s: [8], g: [14], h: 'e' },
   };
-  const DP = DRUMS[c.drumStyle] || DRUMS.rock;
+  const DP0 = DRUMS[c.drumStyle] || DRUMS.rock;
 
   for (let b = 0; b < nBars; b++) {
     const t0 = b * BAR; if (t0 >= endT) break;
-    const s = secAt(b), BRK = s.name === '브레이크', L = BRK ? 0 : s.lv, ch = chordAt(b), firstOfSec = b === s.bar;   // 브레이크: 비트를 멈추고 다음 타격을 기다림
+    curFlip = isFlip(b); const FL = curFlip;
+    const s = secAt(b), BRK = s.name === '브레이크', L = BRK ? 0 : (FL ? Math.max(2, s.lv) : s.lv), ch = chordAt(b), firstOfSec = b === s.bar;   // 브레이크: 비트를 멈추고 다음 타격을 기다림
     const barEnd = Math.min(t0 + BAR, endT);
     pad(t0, barEnd - t0, ch, BRK ? .035 : [.05, .06, .065, .07][L], BRK ? 550 : [700, 1100, 1700, 2400][L] * (style === 'edm' ? 1.3 : 1), style === 'edm' && L >= 1 ? 'PU' : 'MU');
     if (firstOfSec && b > 0 && L >= 2) crash(t0, .6);
+    if (FL && b > 0 && !isFlip(b - 1)) { impact(t0, 1.1); if (O.brass || style === 'pro' || style === 'epic') brass(t0, ch, 1.1); }   // 반전 순간: 크게 한 방 치고 밝게 전환
     if (style === 'edm' && L >= 1) for (let k = 0; k < 4; k++) pumpBeats.push(t0 + k * spb);
     if ((style === 'epic' || style === 'pro') && L >= 3) brass(t0, ch, .8);
     if (O.brass) {
@@ -659,7 +680,7 @@ async function renderTrack(c, onProg) {
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
     const ph = b - s.bar, vari = Math.floor(ph / 4) % 2, pOff = (ph % 4) * 16;
-    const line = lineFor(s.name, BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
+    const line = lineFor(s.name + (FL ? '|반전' : ''), BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16; if (t >= endT - 1e-4) break;
       const h = nextHit(t), toHit = h == null ? 99 : h - t;
@@ -674,7 +695,7 @@ async function renderTrack(c, onProg) {
         // 사람이 연주하듯: 박자를 아주 조금 흔들고, 센박은 세게·여린박은 약하게, 4마디 프레이즈 가운데가 부풀게
         const tt = Math.max(0, t + (mrnd() - .5) * .018), pos = (pOff + i) / 64;
         const v = (n.run ? .7 : 1) * (BRK ? .4 : [.5, .65, .75, .85][L]) * (.88 + .24 * Math.sin(Math.PI * pos)) * (n.strong ? 1.06 : n.st % 2 ? .86 : .95) * (.93 + mrnd() * .14);
-        const play = (t1, dd, sm, vv) => lead(t1, dd, hz(sm, 8), vv, leadKind), hzL = (sm) => hz(sm, 8) * Math.pow(2, LEAD_I[1] / 12);
+        const play = (t1, dd, sm, vv) => (FL ? P('LD', 'flead', t1, vv, dd, hz(sm, 8), leadKind) : lead(t1, dd, hz(sm, 8), vv, leadKind)), hzL = (sm) => hz(sm, 8) * Math.pow(2, (FL ? FLEAD_I : LEAD_I)[1] / 12);
         if (leadKind === 'piri' && n.len >= 4 && t > s16) play(tt - s16 * .5, s16 * .45, degSemi(n.d + 1), v * .55);   // 국악: 위에서 떨어지는 꾸밈음
         play(tt, d, semi, v); if (!n.run) lastMel = semi;
         if (n.run) continue;
@@ -702,7 +723,14 @@ async function renderTrack(c, onProg) {
       }
       if (BRK) continue;
       const q = i % 4 === 0, eighth = i % 2 === 0;
-      if (style === 'edm') {
+      if (FL && !BRK) {   // 반전: 네 박 모두 킥, 2·4박 스네어+박수, 16분 하이햇과 엇박 오픈 하이햇 → 경쾌하고 빠르게
+        if (q) bk(t, i === 0 ? 1 : .9);
+        if (i === 4 || i === 12) { bs(t, .95); bc(t, .55); }
+        if (i === 14 && L >= 3) bs(t, .35);
+        if (i % 4 === 2) bh(t, .6, true); else bh(t, eighth ? .45 : .28);
+        if (i === 0) taiko(t, .7, 56);
+        if ((b % 4 === 3) && i >= 12) tom(t, [210, 165, 125, 95][i - 12], .8);
+      } else if (style === 'edm') {
         if (q && (L >= 1 || i === 0)) bk(t, L ? 1 : .6);
         if (L >= 2 && (i === 4 || i === 12)) bc(t, .9);
         if (L >= 1 && i % 4 === 2) bh(t, .8, true);
@@ -751,6 +779,7 @@ async function renderTrack(c, onProg) {
         if (L >= 3 && i === 14) for (let r = 1; r < 6; r++) bh(t + r * s16 / 3, .25 + r * .05);
       }
       if (O.clap && (i === 4 || i === 12) && !(style === 'edm' && L >= 2 && !DK)) clap(t, L === 0 ? .8 : .65);
+      const DP = FL ? DRUMS.disco : DP0;
       if (DK) {   // 드럼 세트
         const ph = (b - s.bar) % 4, dfill = L >= 1 && ph === 3 && !O.fills && !(nextHit(t0 + BAR - 1e-3) != null && nextHit(t0 + BAR - 1e-3) - t0 < BAR * 2);
         if (dfill && i >= 12) { (i % 2 ? P('DR', 'asnare', t, .5 + (i - 12) * .12) : tom(t, [180, 0, 120][i - 12] || 150, .8)); }
@@ -773,7 +802,7 @@ async function renderTrack(c, onProg) {
       const fillBar = O.fills && L >= 1 && (b - s.bar) % 4 === 3 && !(nextHit(t0 + BAR - 1e-3) != null && nextHit(t0 + BAR - 1e-3) - t0 < BAR * 2);
       if (fillBar && i >= 12) tom(t, [210, 165, 125, 95][i - 12], .9);
       if (fillBar && i === 10) tom(t, 240, .7);
-      if (O.taikoL) {
+      if (O.taikoL && !FL) {
         const pat = [[0], [0, 8], [0, 3, 8, 11], [0, 3, 6, 8, 10, 12, 14]][L];
         if (pat.includes(i) && !(fillBar && i >= 10)) taiko(t, i === 0 || i === 8 ? .95 : .7, i === 0 || i === 8 ? 52 : 74);
       }
@@ -789,15 +818,20 @@ async function renderTrack(c, onProg) {
       if (O.tamb && L >= 1) { if (i % 4 === 2) tamb(t, .7); else if (L >= 3) tamb(t, .3); }
       if (O.wood && L >= 1) { if ((L === 1 ? [3, 10] : [0, 3, 6, 10, 12]).includes(i)) wood(t, .6); }
       if (O.cymbal && L >= 1) { if (i === 0 && (b - s.bar) % 4 === 0 && b !== s.bar) crash(t, .45); if (L >= 3 ? eighth : L >= 2 && q) ride(t, q ? .7 : .45); }
-      if (O.strings && style === 'pro' && L >= 1) {   // 낮은 현악 16분 리프: 근음 연타에 강세 자리(3+3+2)에서 5도·옥타브·4도로 뛰기
+      if (O.strings && FL && L >= 1) {   // 반전: 엇박에 짧게 끊는 현악 화음(스타카토)과 16분 두 개씩
+        if ([2, 6, 10, 14].includes(i)) strings(t, [ch[0], ch[1], ch[2]], s16 * .8, .85);
+        if ([3, 11].includes(i)) strings(t, [ch[1] + 12], s16 * .6, .5);
+      } else if (O.strings && style === 'pro' && L >= 1) {   // 낮은 현악 16분 리프: 근음 연타에 강세 자리(3+3+2)에서 5도·옥타브·4도로 뛰기
         const acc = [0, 3, 6, 8, 11, 14], jump = { 3: 7, 6: 12, 11: 5, 14: 7 }, sm = ch[0] + (jump[i] || 0) - 12;
         if (L >= 2 || eighth) strings(t, L >= 3 && acc.includes(i) ? [sm, sm + 12] : [sm], s16 * .9, (acc.includes(i) ? 1 : .6) * [0, .75, .85, 1][L]);
       } else if (O.strings && L >= 1 && eighth) { const pat = [0, 0, 2, 0, 1, 0, 2, 1], sm = ch[pat[(i / 2) % 8]]; strings(t, L >= 3 ? [sm, sm + 12] : [sm], s16 * 1.6, [0, .7, .85, 1][L]); }
       if (O.piano && L >= 1 && (L === 1 ? (i === 0 || i === 8) : [0, 3, 6, 10].includes(i))) for (const sm of ch) piano(t, sm + 12, L === 1 ? .55 : .5);
       if (O.guitar && L >= 2 && !firstOfSec && eighth) guitar(t, ch[0], s16 * 1.4, q ? .85 : .65);
+      if (FL && !O.bells && L >= 1 && [0, 6, 12].includes(i) && b % 2 === 0) bells(t, hz(ch[(i / 6) % 3] + 12, 8), .45);   // 반전 뒤 반짝이는 종
       if (O.bells && ((L === 0 && i === 0) || (L >= 1 && [0, 6, 12].includes(i)))) bells(t, hz(ch[(i / 6) % 3] + 12, 8), L === 0 ? .5 : .6);
       if (L >= 1) {
-        if (style === 'latin' && (i === 6 || i === 12)) bass(t, i === 6 ? s16 * 5.5 : s16 * 3.5, i === 6 ? ch[0] : ch[2] - 12, .85);
+        if (FL) { if (eighth) bass(t, s16 * 1.5, ch[0] - (i % 4 === 2 ? 0 : 12), i % 4 === 2 ? .7 : .85); }   // 옥타브를 오가는 경쾌한 베이스
+        else if (style === 'latin' && (i === 6 || i === 12)) bass(t, i === 6 ? s16 * 5.5 : s16 * 3.5, i === 6 ? ch[0] : ch[2] - 12, .85);
         else if (style === 'edm' && i % 4 === 2) bass(t, s16 * 1.8, ch[0], .9);
         else if (style === 'epic' && (i === 0 || i === 8)) bass(t, spb * 1.9, ch[0], .8);
         else if (style === 'pro' && [0, 3, 6, 8, 11, 14].includes(i)) bass(t, s16 * (i === 0 || i === 8 ? 2.6 : 1.8), ch[0] - (i === 6 || i === 14 ? 0 : 12), i === 0 || i === 8 ? .85 : .65);   // 묵직한 저음(곡들의 저음 비중이 큼)
@@ -819,17 +853,21 @@ async function renderTrack(c, onProg) {
   riser(Math.max(0, endT - BAR), endT, 1.1); impact(endT, O.endBig ? 1.6 : 1.25);
   if (O.endBig) { taiko(endT, 1, 45); crash(endT + .02, .8); kick(endT, 1); }
   if (O.brass || style === 'latin') brass(endT, [0, 7, 12], 1.3);
-  if (O.gong) gong(endT, 1.1); if (O.choir) choir(endT, [0, 7, 12], Math.max(.6, D - endT - 1.0), 1); if (O.guitar) guitar(endT, 0, Math.min(2.4, D - endT - .4), 1); if (O.bells) bells(endT, hz(12, 8), .8); if (O.piano) for (const sm of [0, 3, 7, 12]) piano(endT, sm, .7);
-  pad(endT, Math.max(.6, D - endT - 1.0), [0, 3, 7, 12], .08, 1600);
+  if (O.gong) gong(endT, 1.1); if (O.choir) choir(endT, [0, 7, 12], Math.max(.6, D - endT - 1.0), 1); if (O.guitar) guitar(endT, 0, Math.min(2.4, D - endT - .4), 1); if (O.bells) bells(endT, hz(12, 8), .8); if (O.piano) for (const sm of (FU != null ? [0, 4, 7, 12] : [0, 3, 7, 12])) piano(endT, sm, .7);
+  pad(endT, Math.max(.6, D - endT - 1.0), (FU != null ? [0, 4, 7, 12] : [0, 3, 7, 12]), .08, 1600);
   bass(endT, Math.min(2.5, D - endT - .3), 0, .9);
   if (style === 'epic' || style === 'pro') { if (!O.brass) brass(endT, [0, 7, 12], 1.2); taiko(endT + spb * .5, .7); }
   if (style === 'gugak') for (let k = 0; k < 6; k++) kkw(endT + k * s16, 1.1 - k * .15);
 
+  // 반전 뒤는 실제 시간으로 줄여 빠르게
+  const hitsOut = hits.map(toT), endOut = toT(endT);
+  if (FT != null) { for (const e of events) e[1] = r3(toT(e[1])); for (let k = 0; k < pumpBeats.length; k++) pumpBeats[k] = toT(pumpBeats[k]); D = realDur; N = Math.ceil(sr * D); for (let k = events.length - 1; k >= 0; k--) if (events[k][1] >= D) events.splice(k, 1); }
   // 1.5) 실제 악기 샘플(FluidR3 사운드폰트)로 낼 소리 고르기. 샘플을 못 불러오면 예전 합성음으로 냄
   const toMidi = (f) => 69 + 12 * Math.log2(f / 440), mOf = (semi, mul = 1) => toMidi(hz(semi, mul));
   const BASS_I = style === 'edm' ? 'synth_bass_1' : 'acoustic_bass';
   const SAMP = ([name, ...a]) => {
     switch (name) {
+      case 'flead': return { inst: FLEAD_I[0], notes: [toMidi(a[1]) + FLEAD_I[1]], d: a[0], at: .012, r: .12, sus: true };
       case 'lead': return { inst: LEAD_I[0], notes: [toMidi(a[1]) + LEAD_I[1]], d: a[0], at: .015, r: .18, sus: !['acoustic_grand_piano', 'electric_piano_1'].includes(LEAD_I[0]) };
       case 'flute': return { inst: style === 'gugak' ? 'shakuhachi' : 'flute', notes: [toMidi(a[1])], d: a[0], at: .03, r: .15, sus: true };
       case 'piano': return { inst: 'acoustic_grand_piano', notes: [mOf(a[0], 4)], d: 2.4, r: .3 };
@@ -889,7 +927,7 @@ async function renderTrack(c, onProg) {
     const sp = SAMP(spec), useS = sp && INST.has(sp.inst);
     const len = Math.max(.05, useS ? sp.d + sp.r + .05 : lenOf(spec)), oc = new OfflineAudioContext(1, Math.ceil(sr * len), sr);
     if (useS) playSamp(oc, sp);
-    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); (K[spec[0]] || ({ mdbl: (d, f) => K.lead(d, f, 'saw'), conga: (f) => K.tom(f) })[spec[0]] || K.taiko)(...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
+    else { const g = oc.createGain(); g.connect(oc.destination); const K = makeKit(oc, g, hz); (K[spec[0]] || ({ flead: (d, f) => K.lead(d, f, 'saw'), mdbl: (d, f) => K.lead(d, f, 'saw'), conga: (f) => K.tom(f) })[spec[0]] || K.taiko)(...spec.slice(1).filter((x, i) => !(['hat', 'ohat', 'snare', 'shaker'].includes(spec[0]) && i === 0))); }
     const d = (await oc.startRendering()).getChannelData(0); let n = d.length; while (n > 1 && Math.abs(d[n - 1]) < 1e-5) n--;
     samples.set(k, d.subarray(0, n)); done++; if (onProg && done % 8 === 0) onProg(.05 + .6 * done / list.length);
   };
@@ -919,7 +957,7 @@ async function renderTrack(c, onProg) {
   let peak = 0; for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; } }
   if (peak > 0) { const g = .89 / peak; for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < d.length; i++) d[i] *= g; } }
   if (onProg) onProg(1);
-  return { buf, hits, endT, nSamples: list.length, nEvents: events.length };
+  return { buf, hits: hitsOut, endT: endOut, nSamples: list.length, nEvents: events.length };
 }
 
 function toWav(buf) {
