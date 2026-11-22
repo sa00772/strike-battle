@@ -631,7 +631,7 @@ async function renderTrack(c, onProg) {
   };
   let lastMel = null;
   const prog = pick(PROGS);
-  // 구간마다(긴 구간은 8마디마다) 다른 화음 진행. 바로 앞 진행과 겹치지 않게 고름
+  // 구간마다, 그리고 4마디마다 다른 화음 진행. 바로 앞 진행과 겹치지 않게 고름
   const secProgs = new Map(); let lastProg = prog;
   const isFlip = (b) => FU != null && b * BAR >= FU - 1e-3;
   const progFor = (s, k, fl) => {
@@ -639,7 +639,7 @@ async function renderTrack(c, onProg) {
     if (!secProgs.has(key)) { const pool = fl ? MPROGS : PROGS; let pg = k === 0 && s.bar === 0 && !fl ? prog : pick(pool), n = 0; while (pg === lastProg && n++ < 6) pg = pick(pool); lastProg = pg; secProgs.set(key, pg); }
     return secProgs.get(key);
   };
-  const chordAt = (b) => { const s = secAt(b), k = Math.floor((b - s.bar) / 8), pg = progFor(s, k, isFlip(b)); return CH[pg[(b - s.bar) % pg.length]]; };
+  const chordAt = (b) => { const s = secAt(b), k = Math.floor((b - s.bar) / 4), pg = progFor(s, k, isFlip(b)); return CH[pg[(b - s.bar) % pg.length]]; };
   const nearestChordTone = (semi, ch) => { let best = semi, bd = 99; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o, dd = Math.abs(x - semi); if (dd < bd) { bd = dd; best = x; } } return best; };
   const O = c.opts || {};
   const style = c.style;
@@ -680,8 +680,8 @@ async function renderTrack(c, onProg) {
     if (O.choir && (L >= 2 || ((style === 'epic' || style === 'pro') && L >= 1))) choir(t0, ch, barEnd - t0, [0, .5, .7, .85][L]);
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
-    const ph = b - s.bar, vari = Math.floor(ph / 4) % 2, pOff = (ph % 4) * 16;
-    const line = lineFor(s.name + (FL ? '|반전' : ''), BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
+    const ph = b - s.bar, blk = Math.floor(ph / 4), vari = blk % 2, pOff = (ph % 4) * 16;   // 4마디 묶음마다 멜로디가 달라짐: 주제 → 꾸밈 변주 → 새 주제 → 그 변주 …
+    const line = lineFor(s.name + (FL ? '|반전' : '') + (blk >= 2 ? '#' + (blk >> 1) : ''), BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16; if (t >= endT - 1e-4) break;
       const h = nextHit(t), toHit = h == null ? 99 : h - t;
@@ -712,7 +712,7 @@ async function renderTrack(c, onProg) {
       if (Math.abs(toHit) < 1e-4) continue;                      // 타격 순간은 아래 큰북이 맡음 (직전 북 몰아치기는 없음: 반주가 그대로 이어짐)
       if (BRK) continue;
       const q = i % 4 === 0, eighth = i % 2 === 0;
-      const p4 = (b - s.bar) % 4, vs = (s.bar + c.seed) % 3;   // 4마디 안 위치, 구간별 변형 번호: 마디마다·구간마다 비트를 조금씩 다르게
+      const p4 = (b - s.bar) % 4, vs = (s.bar + c.seed + blk) % 3;   // 4마디 묶음마다 타악 변형도 바뀜   // 4마디 안 위치, 구간별 변형 번호: 마디마다·구간마다 비트를 조금씩 다르게
       if (FL && !BRK) {   // 반전(전투): 1·3박 큰북+킥, 박마다 '둥-다다' 톰 말발굽, 2·4박 무거운 스네어, 마디마다 다른 킥과 필인
         const fillB = p4 === 3;
         if (i === 0 || i === 8) { bk(t, 1); taiko(t, 1, 50); }
@@ -774,6 +774,11 @@ async function renderTrack(c, onProg) {
         if (L >= 2 && !eighth) bh(t, .3);
         if (L >= 3 && i === 14) for (let r = 1; r < 6; r++) bh(t + r * s16 / 3, .25 + r * .05);
       }
+      if (!FL && style !== 'pro' && L >= 1) {   // 다른 분위기도 4마디 안에서 조금씩 다르게: 2번째 마디 킥 하나, 4번째 마디 끝 스네어 픽업
+        if (p4 === 1 && i === [7, 11, 3][vs]) bk(t, .55);
+        if (p4 === 3 && i >= 14 - vs) bs(t, .3 + (i - 13) * .15);
+        if (p4 === 2 && vs === 2 && i === 15) bk(t, .5);
+      }
       if (O.clap && (i === 4 || i === 12) && !(style === 'edm' && L >= 2 && !DK)) clap(t, L === 0 ? .8 : .65);
       const DP = FL ? DRUMS.rock : DP0;
       if (DK) {   // 드럼 세트
@@ -817,7 +822,7 @@ async function renderTrack(c, onProg) {
       if (O.strings && FL && L >= 1) {   // 반전: 낮은 현악이 '둥-다다' 말발굽 리듬(갤럽)으로 몰아침
         if (i % 4 !== 1) { const sm = ch[0] - 12 + (i === 8 ? 7 : i === 14 || i === 15 ? (b % 2 ? 3 : 5) : 0); strings(t, i % 4 === 0 ? [sm, sm + 12] : [sm], s16 * .85, i % 4 === 0 ? 1 : .7); }
       } else if (O.strings && style === 'pro' && L >= 1) {   // 낮은 현악 16분 리프: 근음 연타에 강세 자리(3+3+2)에서 5도·옥타브·4도로 뛰기
-        const acc = [0, 3, 6, 8, 11, 14], jump = { 3: 7, 6: 12, 11: 5, 14: 7 }, sm = ch[0] + (jump[i] || 0) - 12;
+        const acc = [0, 3, 6, 8, 11, 14], jump = [{ 3: 7, 6: 12, 11: 5, 14: 7 }, { 3: 5, 6: 7, 11: 12, 14: 3 }, { 6: 7, 8: 12, 11: 5, 14: 10 }][blk % 3], sm = ch[0] + (jump[i] || 0) - 12;
         if (L >= 2 || eighth) strings(t, L >= 3 && acc.includes(i) ? [sm, sm + 12] : [sm], s16 * .9, (acc.includes(i) ? 1 : .6) * [0, .75, .85, 1][L]);
       } else if (O.strings && L >= 1 && eighth) { const pat = [0, 0, 2, 0, 1, 0, 2, 1], sm = ch[pat[(i / 2) % 8]]; strings(t, L >= 3 ? [sm, sm + 12] : [sm], s16 * 1.6, [0, .7, .85, 1][L]); }
       if (O.piano && L >= 1 && (L === 1 ? (i === 0 || i === 8) : [0, 3, 6, 10].includes(i))) for (const sm of ch) piano(t, sm + 12, L === 1 ? .55 : .5);
