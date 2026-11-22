@@ -186,7 +186,7 @@ const INSTR = [
   ['tamb', '🪇 탬버린', /탬버린|탐부린/, 'perc'],
   ['wood', '🪵 우드블록', /우드블록|목탁|클라베|딱딱이/, 'perc'],
 ];
-const STYLE_INST = { pro: ['strings', 'choir', 'brass', 'taikoL', 'fills', 'cymbal', 'gong'], epic: ['strings', 'choir', 'gong', 'brass', 'taikoL', 'fills', 'cymbal'], edm: ['bells', 'clap', 'tamb', 'cymbal'], gugak: ['gong', 'janggu', 'kkwaeng', 'taikoL'], hiphop: ['piano', 'bells', 'msnare', 'wood'], latin: ['piano', 'brass', 'shaker', 'conga', 'cowbell', 'tamb', 'wood'] };
+const STYLE_INST = { pro: ['strings', 'choir', 'brass', 'cymbal', 'gong'], epic: ['strings', 'choir', 'gong', 'brass', 'taikoL', 'fills', 'cymbal'], edm: ['bells', 'clap', 'tamb', 'cymbal'], gugak: ['gong', 'janggu', 'kkwaeng', 'taikoL'], hiphop: ['piano', 'bells', 'msnare', 'wood'], latin: ['piano', 'brass', 'shaker', 'conga', 'cowbell', 'tamb', 'wood'] };
 // 멜로디 악기: [이름, 옥타브 옮김(반음), 샘플이 없을 때 합성음 종류]
 const LEADS = { auto: ['자동 (분위기에 맞춰)'], french_horn: ['📯 호른', -12, 'saw'], trumpet: ['🎺 트럼펫', -12, 'saw'], flute: ['🪈 플루트', 0, 'saw'], shakuhachi: ['🎋 대금', 0, 'piri'], shanai: ['🎷 피리·태평소', 0, 'piri'],
   string_ensemble_1: ['🎻 현악', -12, 'saw'], acoustic_grand_piano: ['🎹 피아노', -12, 'saw'], electric_piano_1: ['🎹 일렉 피아노', -12, 'saw'], lead_2_sawtooth: ['🎛️ 신스 리드', 0, 'saw'] };
@@ -741,22 +741,20 @@ async function renderTrack(c, onProg) {
         if (L >= 2 && (i === 4 || i === 12)) bc(t, .9);
         if (L >= 1 && i % 4 === 2) bh(t, .8, true);
         if (L >= 3 && !q && i % 4 !== 2) bh(t, .5);
-      } else if (style === 'pro') {   // 보내 주신 5곡의 평균 비트: 1·3박에 큰 타격, 3박 스네어(하프타임)와 그 뒤 8분 강세, 4박 끝 16분 킥
-        if (L === 0 && (i === 0 || (i === 8 && b % 2))) taiko(t, .6, 58);
-        if (L >= 1 && (i === 0 || i === 8)) { bk(t, 1); if (!O.taikoL) taiko(t, .9, 52); }
+      } else if (style === 'pro') {   // 대회곡들의 하프타임 비트를 큰북 대신 킥·스네어로: 1·3박 킥, 3박 스네어와 그 뒤 8분 강세, 4박 끝 16분 킥, 스네어 잔타로 채움
+        if (L === 0 && (i === 0 || (i === 8 && b % 2))) bk(t, .55);
+        if (L >= 1 && (i === 0 || i === 8)) bk(t, 1);
         if (L >= 1 && i === 14) bk(t, .8);
         if (L >= 2 && (i === 2 || i === 11)) bk(t, .65);
-        if (L >= 1 && i === 8) bs(t, .95);
+        if (L >= 1 && i === 8) bs(t, 1);
         if (L >= 2 && i === 10) bs(t, .6);
-        if (L >= 3 && (i === 13 || i === 15)) bs(t, .35);
-        if (L >= 2 && (i === 4 || i === 11 || i === 14)) tom(t, i === 4 ? 105 : 88, .7);
-        if (L >= 3 && (i === 6 || i === 12)) taiko(t, .55, 74);
+        if (L >= 2 && [3, 6, 13, 15].includes(i)) bs(t, .22);   // 작은 스네어 잔타
+        if (L >= 3 && [1, 5, 9, 12].includes(i)) bs(t, .16);
         if (L >= 1 && eighth) bh(t, [2, 6, 10, 14].includes(i) ? .55 : .32);
         if (L >= 3 && !eighth) bh(t, .2);
-        if (L >= 1 && p4 === 1 && vs !== 1 && (i === 6 || i === 7)) taiko(t, .6, 70);   // 2번째 마디: 북 두 번 더
+        if (L >= 1 && p4 === 1 && vs !== 1 && i === 7) bs(t, .45);                         // 2번째 마디: 스네어 하나 더
         if (L >= 1 && p4 === 2 && i === (vs === 2 ? 5 : 3)) bk(t, .6);                     // 3번째 마디: 킥 하나 더
-        if (L >= 1 && vs === 2 && (i === 5 || i === 13)) tom(t, 130, .4);                   // 이 구간만 톰 잔타
-        if (L >= 2 && p4 === 3 && i >= 12 && !O.fills) [() => tom(t, [200, 160, 125, 95][i - 12], .85), () => bs(t, .45 + (i - 12) * .15), () => taiko(t, .7 + (i - 12) * .08, [80, 70, 62, 55][i - 12])][vs]();
+        if (L >= 2 && p4 === 3 && i >= 12) [() => { bs(t, .45 + (i - 12) * .15); bs(t + s16 / 2, .35 + (i - 12) * .12); }, () => { bs(t, .5 + (i - 12) * .14); if (i === 15) bk(t, .8); }, () => (i % 2 ? bs(t, .8) : bk(t, .8))][vs]();   // 마디 끝 스네어 필인 3종
       } else if (style === 'epic') {
         if (L === 0 && i === 0 && b % 2 === 0) taiko(t, .55);
         if (L >= 1 && [0, 6, 8].includes(i)) taiko(t, i === 0 ? .9 : .65);
