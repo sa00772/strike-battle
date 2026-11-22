@@ -62,11 +62,23 @@
   #tap { background:#6b4e12; } #tap:hover:not(:disabled) { background:#86621a; }
   .dirty { margin-top:10px; padding:.6em .8em; border-radius:10px; background:#3a3520; color:#ffe9a6; font-size:.85rem; display:none; }
   .prog { height:8px; background:#0d0f14; border-radius:99px; margin-top:10px; overflow:hidden; display:none; } .prog i { display:block; height:100%; width:0; background:var(--green); transition:width .2s; }
-  textarea.ask { font:inherit; width:100%; min-height:110px; resize:vertical; background:#12141b; color:var(--ink); border:2px solid #3a4152; border-radius:12px; padding:.7em .8em; line-height:1.55; }
+  textarea.ask { font:inherit; width:100%; min-height:72px; resize:vertical; background:#12141b; color:var(--ink); border:2px solid #3a4152; border-radius:12px; padding:.7em .8em; line-height:1.55; }
   .applied { margin-top:10px; font-size:.85rem; line-height:1.6; display:none; background:var(--panel2); border-radius:10px; padding:.6em .8em; }
   .applied b { color:var(--gold); } .applied .miss { color:var(--muted); }
   .opts { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:.9rem; } .opts label { display:flex; gap:6px; align-items:center; cursor:pointer; } .opts input { width:auto; }
   .lenhint { margin-top:8px; padding:.55em .8em; border-radius:10px; background:#1d2a3a; color:#cfe0f5; font-size:.85rem; }
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .h2row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; } .h2row h2 { margin:0; }
+  .card h2 small { font-size:.75rem; font-weight:500; }
+  .glabel { font-weight:800; font-size:.9rem; min-width:92px; }
+  .leadrow, .drow { display:flex; align-items:center; gap:10px; } .leadrow select, .drow select { width:auto; flex:1; max-width:280px; }
+  .drow { margin-top:10px; display:none; }
+  .igroup { margin-top:12px; } .igroup .gh { display:flex; gap:8px; align-items:baseline; margin-bottom:6px; } .igroup .gh small { color:var(--muted); font-size:.78rem; }
+  .chip::before { content:''; display:inline-block; width:.9em; } .chip.on::before { content:'✓'; color:var(--gold); }
+  .endrow { margin-top:12px; flex-direction:row !important; align-items:center; gap:10px; } .endrow input { width:110px; }
+  button.big { font-size:1.05rem; padding:.75em 1.4em; }
+  .save { display:grid; grid-template-columns:1fr 1fr auto auto; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  @media (max-width:640px) { .grid4 { grid-template-columns:1fr 1fr; } .save { grid-template-columns:1fr 1fr; } .styles { grid-template-columns:1fr 1fr; } .style-btn small { display:none; } }
   #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#000d; color:#fff; padding:.7em 1.1em; border-radius:12px; font-weight:700; display:none; z-index:50; max-width:90vw; text-align:center; }
   @media (max-width:560px) { .tl .seg { font-size:.58rem; padding:3px 2px; word-break:keep-all; } .tl .seg .lv { display:none; } .item { grid-template-columns:66px 1fr 78px 36px 30px; gap:4px; } .item input, .item select { padding:.4em .35em; font-size:.85rem; } .item.h { grid-template-columns:64px 1fr 32px; } }
 </style>
@@ -76,76 +88,63 @@
 
 <main class="wrap">
   <section class="card">
-    <h2>✨ 말로 설명하기</h2>
-    <p class="hint" style="margin-bottom:8px">원하는 분위기와 리듬, 강조할 기술이나 마지막 자세를 적어 주세요. 적은 대로 아래 설정을 채우고 바로 음원을 만들어요.</p>
-    <textarea class="ask" id="ask" placeholder="예시. 120 BPM의 95초 살사풍 자유품새 음악. 트럼펫과 박수로 시작하고 연속 발차기에 짧은 북소리를, 마지막 자세에 강한 타격을 넣어주세요."></textarea>
+    <h2>✨ 말로 설명하기 <small class="muted">선택</small></h2>
+    <textarea class="ask" id="ask" placeholder="예: 120 BPM 95초 살사풍 음악. 트럼펫과 박수로 시작하고, 연속 발차기에 북소리, 마지막 자세에 강한 타격."></textarea>
     <div class="row" style="margin-top:8px"><button class="primary" id="ask-go">✨ 설명대로 만들기</button><button class="small" id="ask-ex">예시 넣기</button></div>
     <div class="applied" id="applied"></div>
   </section>
 
   <section class="card">
-    <h2>1. 분위기와 길이</h2>
+    <h2>1. 분위기</h2>
     <div class="styles" id="styles"></div>
-    <div class="grid">
-      <label class="f">음원 길이 (초)<input type="number" id="dur" min="30" max="180" step="1"></label>
-      <label class="f">빠르기 (BPM)<input type="number" id="bpm" min="70" max="180" step="1"></label>
+    <div class="grid4">
+      <label class="f">길이(초)<input type="number" id="dur" min="30" max="180" step="1" title="WT 자유품새 경기 시간은 90~100초예요"></label>
+      <label class="f">빠르기(BPM)<input type="number" id="bpm" min="70" max="180" step="1"></label>
       <label class="f">조성<select id="key"></select></label>
-      <label class="f">변주 번호<span class="seed"><input type="number" id="seed" min="1" max="9999"><button id="dice" title="다른 변주" aria-label="다른 변주로 바꾸기">🎲</button></span></label>
+      <label class="f">변주 번호<span class="seed"><input type="number" id="seed" min="1" max="9999" title="번호를 바꾸면 화음 진행과 멜로디가 달라져요. 같은 번호면 똑같이 다시 만들어져요."><button id="dice" title="다른 변주" aria-label="다른 변주로 바꾸기">🎲</button></span></label>
     </div>
-    <div class="lenhint">기본 길이는 95초입니다. WT 자유품새 경기 시간은 90~100초입니다. 참가 대회 요강을 확인하세요.</div>
-    <div class="ihead"><b>악기</b><small>분위기를 고르면 어울리는 악기가 켜져요. 눌러서 더하거나 뺄 수 있어요.</small></div>
-    <div class="inst" id="inst"></div>
-    <div class="ihead"><b>타악기</b><small>여러 개를 켤수록 리듬이 촘촘해져요.</small></div>
-    <label class="f" style="margin-top:6px;flex-direction:row;align-items:center;gap:8px">🥁 드럼 세트 리듬<select id="dstyle" style="width:auto;flex:1;max-width:260px"><option value="rock">록 (쿵-짝 기본)</option><option value="funk">펑크 (통통 튀는)</option><option value="disco">디스코 (네 박 쿵쿵)</option><option value="break">브레이크비트 (쪼개진)</option><option value="half">하프타임 (묵직하게)</option></select></label>
-    <div class="inst" id="perc"></div>
-    <p class="hint" style="margin-top:8px">변주 번호를 바꾸면 같은 설정에서 화음 진행과 멜로디가 달라져요. 마음에 드는 번호를 적어 두면 똑같이 다시 만들 수 있어요.</p>
   </section>
 
   <section class="card">
-    <h2>2. 구간과 타격 포인트</h2>
-    <p class="hint">구간마다 음악의 세기를 정하고, 발차기가 터지는 순간을 <b style="color:var(--gold)">타격 포인트</b>로 찍으면 그 직전에 북 소리가 몰아치고 정확히 그 순간 큰 타격음이 나요. 시간은 박자에 맞춰 자동으로 조금씩 맞춰져요.</p>
+    <div class="h2row"><h2>2. 악기</h2><button class="small" id="inst-reset">분위기 기본값으로</button></div>
+    <div class="leadrow"><span class="glabel">🎵 멜로디</span><select id="lead" aria-label="멜로디 악기"></select></div>
+    <div id="inst"></div>
+    <div class="drow" id="drow"><span class="glabel">🥁 드럼 리듬</span><select id="dstyle" aria-label="드럼 세트 리듬"><option value="rock">록 (쿵-짝 기본)</option><option value="funk">펑크 (통통 튀는)</option><option value="disco">디스코 (네 박 쿵쿵)</option><option value="break">브레이크비트 (쪼개진)</option><option value="half">하프타임 (묵직하게)</option></select></div>
+  </section>
+
+  <section class="card">
+    <h2>3. 구간과 타격</h2>
     <div class="tl" id="tl" aria-label="음원 타임라인 (눌러서 이동)"><div class="ph" id="ph"></div></div>
     <div class="ticks" id="ticks"></div>
-    <div class="legend"><span><i style="background:var(--gold)"></i>타격 포인트</span><span><i style="background:#ff5a4a"></i>마지막 동작</span></div>
+    <div class="legend"><span><i style="background:var(--gold)"></i>타격 포인트 (직전에 북이 몰아치고 그 순간 큰 타격음)</span><span><i style="background:#ff5a4a"></i>마지막 동작</span></div>
 
-    <div class="lhead"><h3>구간</h3><div class="row"><button class="small" id="add-sec">+ 구간 추가</button><select id="preset" style="width:auto;padding:.35em .5em;font-size:.85rem" aria-label="구성 틀"><option value="">구성 틀 고르기…</option></select></div></div>
-    <p class="hint" style="margin-top:4px">구성 틀은 실제 대회 자유품새 곡의 흐름(빠르기, 멈췄다 터지는 지점, 타격 간격)을 본떠 만든 시작점이에요. 고른 뒤 선수 동작에 맞게 시간을 고치세요.</p>
+    <div class="lhead"><h3>구간</h3><div class="row"><select id="preset" style="width:auto;padding:.35em .5em;font-size:.85rem" aria-label="구성 틀" title="실제 대회 곡의 흐름을 본뜬 시작 구성이에요"><option value="">구성 틀 고르기…</option></select><button class="small" id="add-sec">+ 구간</button></div></div>
     <div class="list" id="secs"></div>
 
-    <div class="lhead"><h3>타격 포인트</h3><button class="small" id="add-hit">+ 타격 추가</button></div>
+    <div class="lhead"><h3>타격 포인트</h3><button class="small" id="add-hit">+ 타격</button></div>
     <div class="list" id="hits"></div>
-    <div class="grid" style="margin-top:12px">
-      <label class="f">마지막 동작 (초) — 가장 큰 타격 뒤 음악이 끝나요<input type="number" id="endhit" min="5" step="0.5"></label>
-    </div>
+    <label class="f endrow">마지막 동작(초)<input type="number" id="endhit" min="5" step="0.5"></label>
   </section>
 
   <section class="card">
-    <h2>3. 만들고 듣기</h2>
-    <div class="row"><button class="primary" id="make">🎼 음원 만들기</button><span class="hint" id="make-info"></span></div>
+    <h2>4. 만들고 저장하기</h2>
+    <div class="row"><button class="primary big" id="make">🎼 음원 만들기</button><span class="hint" id="make-info"></span></div>
     <div class="prog" id="prog"><i></i></div>
-    <div class="dirty" id="dirty">설정이 바뀌었어요. <b>음원 만들기</b>를 다시 눌러야 반영돼요.</div>
+    <div class="dirty" id="dirty">설정이 바뀌었어요. <b>음원 만들기</b>를 다시 눌러 주세요.</div>
     <div class="player">
       <button id="play" disabled>▶ 재생</button>
       <button id="stop" disabled>■ 처음으로</button>
       <span class="time" id="time">0.0 / 0.0초</span>
-      <button id="tap" disabled title="재생 중에 누르면 그 시점에 타격 포인트가 생겨요">⚡ 지금 타격 찍기</button>
+      <button id="tap" disabled title="재생하면서 발차기 순간에 누르면(스페이스바도 돼요) 그 시점에 타격 포인트가 생겨요">⚡ 지금 타격 찍기</button>
     </div>
-    <p class="hint" style="margin-top:8px">선수가 연기하는 영상이나 연습에 맞춰 재생하면서 발차기 순간에 <b>⚡ 지금 타격 찍기</b>를 누르면 타격 포인트가 들어가요. 다 찍은 뒤 다시 만들면 음악이 그 순간에 맞춰져요.</p>
+    <div class="save">
+      <input id="ath-name" placeholder="선수 이름" aria-label="선수 이름">
+      <input id="ath-team" placeholder="소속 (경기에 적은 그대로)" aria-label="소속">
+      <button class="primary" id="save-ath" disabled title="이 컴퓨터의 자유품새 대전에서 그 선수 음원으로 바로 쓰여요">선수 음원으로 저장</button>
+      <button id="dl" disabled>WAV 내려받기</button>
+    </div>
   </section>
-
-  <section class="card">
-    <h2>4. 저장</h2>
-    <div class="grid">
-      <label class="f">선수 이름<input id="ath-name" placeholder="홍길동"></label>
-      <label class="f">소속 (경기에 적은 그대로)<input id="ath-team" placeholder="한빛도장"></label>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <button class="primary" id="save-ath" disabled>선수 음원으로 저장</button>
-      <button id="dl" disabled>WAV 파일 내려받기</button>
-    </div>
-    <p class="hint" style="margin-top:8px">선수 음원으로 저장하면 이 컴퓨터의 <b>자유품새 대전</b> 화면에서 그 선수 음원으로 바로 쓸 수 있어요. 이름과 소속을 경기 참가 명단과 똑같이 적어 주세요. 다른 컴퓨터에서 쓰려면 WAV 파일을 내려받아 옮기세요.</p>
-  </section>
-  <p class="hint" style="text-align:center;opacity:.7">악기 소리: FluidR3_GM 사운드폰트 (CC BY 3.0, <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener" style="color:inherit">gleitz/midi-js-soundfonts</a>)</p>
+  <p class="hint" style="text-align:center;opacity:.6">악기 소리: FluidR3_GM 사운드폰트 (CC BY 3.0, <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener">gleitz/midi-js-soundfonts</a>)</p>
 </main>
 <div id="toast" role="status"></div>
 
@@ -169,7 +168,7 @@ const INSTR = [
   ['choir', '🎤 합창', /합창|코러스|콰이어|성가|아~/],
   ['piano', '🎹 피아노', /피아노|건반/],
   ['guitar', '🎸 일렉기타', /일렉|기타|록풍|락풍|록 음악|메탈|rock/i],
-  ['flute', '🪈 대금·피리', /대금|피리|플루트|플룻|단소|소금|퉁소/],
+  ['flute', '🪈 대금·피리', /대금|피리|태평소|플루트|플룻|단소|소금|퉁소/],
   ['bells', '🔔 종소리', /종소리|벨소리|차임|글로켄|실로폰|오르골/],
   ['gong', '🌕 징', /징|gong/i],
   ['shaker', '🪇 셰이커', /셰이커|쉐이커|마라카스/],
@@ -186,7 +185,11 @@ const INSTR = [
   ['tamb', '🪇 탬버린', /탬버린|탐부린/, 'perc'],
   ['wood', '🪵 우드블록', /우드블록|목탁|클라베|딱딱이/, 'perc'],
 ];
-const STYLE_INST = { epic: ['strings', 'choir', 'gong', 'brass', 'taikoL', 'fills', 'cymbal'], edm: ['bells', 'clap', 'tamb', 'cymbal'], gugak: ['flute', 'gong', 'janggu', 'kkwaeng', 'taikoL'], hiphop: ['piano', 'bells', 'msnare', 'wood'], latin: ['piano', 'brass', 'shaker', 'conga', 'cowbell', 'tamb', 'wood'] };
+const STYLE_INST = { epic: ['strings', 'choir', 'gong', 'brass', 'taikoL', 'fills', 'cymbal'], edm: ['bells', 'clap', 'tamb', 'cymbal'], gugak: ['gong', 'janggu', 'kkwaeng', 'taikoL'], hiphop: ['piano', 'bells', 'msnare', 'wood'], latin: ['piano', 'brass', 'shaker', 'conga', 'cowbell', 'tamb', 'wood'] };
+// 멜로디 악기: [이름, 옥타브 옮김(반음), 샘플이 없을 때 합성음 종류]
+const LEADS = { auto: ['자동 (분위기에 맞춰)'], french_horn: ['📯 호른', -12, 'saw'], trumpet: ['🎺 트럼펫', -12, 'saw'], flute: ['🪈 플루트', 0, 'saw'], shakuhachi: ['🎋 대금', 0, 'piri'], shanai: ['🎷 피리·태평소', 0, 'piri'],
+  string_ensemble_1: ['🎻 현악', -12, 'saw'], acoustic_grand_piano: ['🎹 피아노', -12, 'saw'], electric_piano_1: ['🎹 일렉 피아노', -12, 'saw'], lead_2_sawtooth: ['🎛️ 신스 리드', 0, 'saw'] };
+const STYLE_LEAD = { epic: 'french_horn', edm: 'lead_2_sawtooth', gugak: 'shanai', hiphop: 'electric_piano_1', latin: 'trumpet' };
 const PERC_SET = ['taikoL', 'fills', 'cymbal', 'msnare', 'conga', 'tamb'];
 const instOff = () => Object.fromEntries(INSTR.map(([k]) => [k, false]));
 const instFor = (st) => { const o = instOff(); for (const k of STYLE_INST[st] || []) o[k] = true; return o; };
@@ -212,6 +215,7 @@ const LS = 'pl-fs-composer-v3';
 let cfg; try { cfg = JSON.parse(localStorage.getItem(LS)) || defaults(); } catch (_) { cfg = defaults(); }
 if (cfg.opts && !('taikoL' in cfg.opts)) { const rec = instFor(cfg.style); for (const [k, , , g] of INSTR) if (g === 'perc') cfg.opts[k] = rec[k]; }   // 타악기가 생기기 전 저장된 설정
 cfg.opts = { ...instOff(), endBig: false, ...(cfg.opts || {}) }; cfg.drumStyle = cfg.drumStyle || 'rock';
+if (!cfg.lead) cfg.lead = cfg.opts.flute ? (cfg.style === 'gugak' ? 'shakuhachi' : 'flute') : 'auto'; cfg.opts.flute = false;   // 대금·피리 칩은 멜로디 악기 고르기로 옮김
 const persist = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (_) {} };
 
 /* ------------ 화면 ------------ */
@@ -222,12 +226,20 @@ function renderStyles() {
   $('styles').innerHTML = Object.entries(STYLES).map(([k, s]) => `<button class="style-btn${cfg.style === k ? ' on' : ''}" data-s="${k}"><b>${s.name}</b><small>${s.desc}</small></button>`).join('');
   $('styles').querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => { cfg.style = b.dataset.s; cfg.bpm = STYLES[cfg.style].bpm; $('bpm').value = cfg.bpm; cfg.opts = { ...cfg.opts, ...instFor(cfg.style) }; changed(); renderStyles(); renderInst(); }));
 }
+const INST_GROUPS = [['화음·반주', ['strings', 'choir', 'brass', 'piano', 'guitar', 'bells']], ['효과', ['gong', 'clap', 'shaker']],
+  ['타악기', ['drumkit', 'taikoL', 'msnare', 'fills', 'cymbal', 'janggu', 'kkwaeng', 'conga', 'cowbell', 'tamb', 'wood'], '많이 켤수록 리듬이 촘촘해져요']];
 function renderInst() {
-  const chip = ([k, l]) => `<button class="chip${cfg.opts[k] ? ' on' : ''}" data-in="${k}" aria-pressed="${!!cfg.opts[k]}">${l}</button>`;
-  $('inst').innerHTML = INSTR.filter((x) => !x[3]).map(chip).join('');
-  $('perc').innerHTML = INSTR.filter((x) => x[3] === 'perc').map(chip).join('');
-  document.querySelectorAll('[data-in]').forEach((b) => b.addEventListener('click', () => { cfg.opts[b.dataset.in] = !cfg.opts[b.dataset.in]; renderInst(); changed(); }));
+  const lab = Object.fromEntries(INSTR.map(([k, l]) => [k, l]));
+  const chip = (k) => `<button class="chip${cfg.opts[k] ? ' on' : ''}" data-in="${k}" aria-pressed="${!!cfg.opts[k]}">${lab[k]}</button>`;
+  $('inst').innerHTML = INST_GROUPS.map(([g, ks, tip]) => `<div class="igroup"><div class="gh"><span class="glabel">${g}</span><small>${ks.filter((k) => cfg.opts[k]).length}개 켬${tip ? ' · ' + tip : ''}</small></div><div class="inst">${ks.map(chip).join('')}</div></div>`).join('');
+  $('inst').querySelectorAll('[data-in]').forEach((b) => b.addEventListener('click', () => { cfg.opts[b.dataset.in] = !cfg.opts[b.dataset.in]; renderInst(); changed(); }));
+  $('drow').style.display = cfg.opts.drumkit ? 'flex' : 'none';
+  const auto = LEADS[STYLE_LEAD[cfg.style]][0].replace(/^\S+\s/, '');
+  $('lead').innerHTML = Object.entries(LEADS).map(([k, [l]]) => `<option value="${k}">${k === 'auto' ? `자동 (${auto})` : l}</option>`).join('');
+  $('lead').value = LEADS[cfg.lead] ? cfg.lead : 'auto';
 }
+$('lead').addEventListener('change', () => { cfg.lead = $('lead').value; changed(); });
+$('inst-reset').addEventListener('click', () => { cfg.opts = { ...cfg.opts, ...instOff(), ...instFor(cfg.style) }; cfg.lead = 'auto'; renderInst(); changed(); });
 function fillInputs() { renderInst(); $('dstyle').value = cfg.drumStyle; $('ask').value = cfg.prompt || ''; $('dur').value = cfg.dur; $('bpm').value = cfg.bpm; $('key').value = cfg.key; $('seed').value = cfg.seed; $('endhit').value = cfg.endHit; }
 const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 
@@ -345,6 +357,9 @@ function parsePrompt(text) {
     const c = T.slice(m.index, end);
     if (noRe.test(c)) { cfg.opts[k] = false; done.push(`${l} 빼기`); } else { cfg.opts[k] = true; done.push(l); }
   }
+  cfg.lead = 'auto';
+  if (cfg.opts.flute) { cfg.opts.flute = false; cfg.lead = /피리|태평소/.test(T) ? 'shanai' : /대금|단소|퉁소|소금/.test(T) || cfg.style === 'gugak' ? 'shakuhachi' : 'flute'; }
+  else if (/호른/.test(T)) cfg.lead = 'french_horn';
   const pm = T.match(/대회형\s*([ABCabc])/); if (pm) { const p = PRESETS.find((x) => x.id === pm[1].toUpperCase()); Object.assign(cfg, p.make(cfg)); done.push(p.name.split(' · ')[0] + ' 구성'); }
   // 마지막 자세
   const clauses = T.split(/[,.，。!\n]|그리고|하고\s|하며|이고|다음에?/).map((x) => x.trim()).filter(Boolean);
@@ -563,7 +578,7 @@ async function renderTrack(c, onProg) {
   const lines = new Map();
   const lineFor = (name, L, vari) => {
     const key = name + '|' + L + '|' + vari; if (lines.has(key)) return lines.get(key);
-    const grid = L <= 1 ? 4 : L === 2 ? 2 : 1;
+    const grid = L < 0 ? 16 : L === 0 ? 8 : L === 1 ? 4 : L === 2 ? 2 : 1;
     let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end).map((n) => ({ ...n }));
     if (vari && L >= 2) {   // 변주: 긴 음을 쪼개 이웃음을 넣고, 몇몇 음은 한 옥타브 위로
       const out = [];
@@ -584,12 +599,13 @@ async function renderTrack(c, onProg) {
     lines.set(key, res); return res;
   };
   let lastMel = null;
-  const mainName = (c.sections.find((x) => x.lv >= 2) || c.sections[0] || { name: '주제' }).name;
   const prog = pick(PROGS);
   const chordAt = (b) => { const s = secAt(b); return CH[prog[(b - s.bar) % prog.length]]; };
   const nearestChordTone = (semi, ch) => { let best = semi, bd = 99; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o, dd = Math.abs(x - semi); if (dd < bd) { bd = dd; best = x; } } return best; };
   const O = c.opts || {};
-  const style = c.style, leadKind = style === 'gugak' ? 'piri' : 'saw';
+  const style = c.style;
+  const leadName = c.lead && c.lead !== 'auto' && LEADS[c.lead] ? c.lead : O.flute ? (style === 'gugak' ? 'shakuhachi' : 'flute') : STYLE_LEAD[style] || 'lead_2_sawtooth';
+  const LEAD_I = [leadName, LEADS[leadName][1]], leadKind = LEADS[leadName][2];
   const nextHit = (t) => { for (const h of hits) if (h >= t - 1e-4) return h; return null; };
   const prevHit = (h) => { let p = 0; for (const x of hits) if (x < h - 1e-4) p = x; return p; };
   const pumpBeats = [];
@@ -622,11 +638,20 @@ async function renderTrack(c, onProg) {
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
     const ph = b - s.bar, vari = Math.floor(ph / 4) % 2, pOff = (ph % 4) * 16;
-    const line = !BRK && L >= 1 ? lineFor(s.name, L, vari) : null;
-    const intro = !BRK && L === 0 && ph >= 2 && (O.bells || O.piano) ? lineFor(mainName, 1, 0) : null;   // 인트로에서 주제를 종·피아노로 살짝 미리 들려줌
+    const line = lineFor(s.name, BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16; if (t >= endT - 1e-4) break;
       const h = nextHit(t), toHit = h == null ? 99 : h - t;
+      if (line) for (const n of line) if (n.st === i + pOff) {
+        let semi = degSemi(n.d); if (n.end) semi = nearestChordTone(semi, [ch[0]]); else if (n.strong) { const raw = semi; semi = nearestChordTone(raw, ch); if (semi === lastMel) semi = nearestChordTone(raw + (raw >= semi ? 3 : -3), ch); }
+        const d = Math.min(n.len * s16 * .99, endT - t + s16 * 2);   // 타격·몰아치기 구간에도 끊지 않고 이어서
+        if (d <= .05) continue;
+        const v = (n.run ? .7 : 1) * (BRK ? .4 : [.5, .65, .75, .85][L]), play = (tt, dd, sm, vv) => lead(tt, dd, hz(sm, 8), vv, leadKind);
+        if (leadKind === 'piri' && n.len >= 4 && t > s16) play(t - s16 * .5, s16 * .45, degSemi(n.d + 1), v * .55);   // 국악: 위에서 떨어지는 꾸밈음
+        play(t, d, semi, v); if (!n.run) lastMel = semi;
+        if (L >= 3 && n.len >= 2 && !n.run) { let hv = null; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o; if (x <= semi - 3 && x >= semi - 9 && (hv == null || x > hv)) hv = x; } if (hv != null) play(t, d, hv, v * .45); }   // 아래에서 받쳐 주는 화음 성부
+        if (O.bells && L >= 2 && n.end) bells(t + s16 * 4, hz(semi + 12, 8), .45);   // 마침에 종으로 메아리
+      }
       const buildLen = h == null ? 0 : Math.min(BAR, Math.max(spb, (h - prevHit(h)) * .5));
       if (Math.abs(toHit) < 1e-4) continue;                      // 타격 순간은 impact가 맡음
       if (toHit < buildLen) {                                     // 타격 직전 몰아치기
@@ -723,7 +748,6 @@ async function renderTrack(c, onProg) {
       if (O.piano && L >= 1 && (L === 1 ? (i === 0 || i === 8) : [0, 3, 6, 10].includes(i))) for (const sm of ch) piano(t, sm + 12, L === 1 ? .55 : .5);
       if (O.guitar && L >= 2 && !firstOfSec && eighth) guitar(t, ch[0], s16 * 1.4, q ? .85 : .65);
       if (O.bells && ((L === 0 && i === 0) || (L >= 1 && [0, 6, 12].includes(i)))) bells(t, hz(ch[(i / 6) % 3] + 12, 8), L === 0 ? .5 : .6);
-      if (O.flute && !line && (L === 1 || L === 2) && (i === 0 || i === 8)) { const sm = ch[(b + i / 8) % 3]; const d = Math.min(s16 * 7.5, (h != null ? h - t : 99) - s16); if (d > .1) flute(t, d, hz(sm + 12, 8), .8); }
       if (L >= 1) {
         if (style === 'latin' && (i === 6 || i === 12)) bass(t, i === 6 ? s16 * 5.5 : s16 * 3.5, i === 6 ? ch[0] : ch[2] - 12, .85);
         else if (style === 'edm' && i % 4 === 2) bass(t, s16 * 1.8, ch[0], .9);
@@ -737,20 +761,6 @@ async function renderTrack(c, onProg) {
         if (style === 'gugak') { if (eighth) pluck(t, hz(st, 8), .7, 'triangle', 2600, 'LD', .35); }
         else if (style === 'latin') { if ([0, 3, 6, 8, 11, 14].includes(i)) { pluck(t, hz(st, 8), .6, 'square', 2400, 'MU', .18); pluck(t, hz(st, 16), .35, 'triangle', 3000, 'MU', .15); } }
         else pluck(t, hz(st, 8), style === 'hiphop' ? .45 : .55, style === 'epic' ? 'triangle' : 'sawtooth', style === 'epic' ? 2000 : 3400, 'MU');
-      }
-      if (line) for (const n of line) if (n.st === i + pOff) {
-        let semi = degSemi(n.d); if (n.end) semi = nearestChordTone(semi, [ch[0]]); else if (n.strong) { const raw = semi; semi = nearestChordTone(raw, ch); if (semi === lastMel) semi = nearestChordTone(raw + (raw >= semi ? 3 : -3), ch); }
-        const d = Math.min(n.len * s16 * (L <= 1 ? .98 : .92), (h != null ? h - t : 99) - s16);
-        if (d <= .05) continue;
-        const v = (n.run ? .7 : 1) * [0, .6, .75, .85][L], play = (tt, dd, sm, vv) => { if (O.flute) flute(tt, dd, hz(sm, 8), vv * 1.05); else lead(tt, dd, hz(sm, 8), vv, leadKind); };
-        if (leadKind === 'piri' && n.len >= 4 && t > s16) play(t - s16 * .5, s16 * .45, degSemi(n.d + 1), v * .55);   // 국악: 위에서 떨어지는 꾸밈음
-        play(t, d, semi, v); if (!n.run) lastMel = semi;
-        if (L >= 3 && n.len >= 2 && !n.run) { let hv = null; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o; if (x <= semi - 3 && x >= semi - 9 && (hv == null || x > hv)) hv = x; } if (hv != null) play(t, d, hv, v * .45); }   // 아래에서 받쳐 주는 화음 성부
-        if (O.bells && L >= 2 && n.end) bells(t + s16 * 4, hz(semi + 12, 8), .45);   // 마침에 종으로 메아리
-      }
-      if (intro) for (const n of intro) if (n.st === i + pOff && (n.st < 32)) {
-        const semi = n.strong ? nearestChordTone(degSemi(n.d), ch) : degSemi(n.d);
-        if (O.bells) bells(t, hz(semi, 8), .4); else piano(t, semi + 12, .35);
       }
     }
   }
@@ -775,11 +785,10 @@ async function renderTrack(c, onProg) {
 
   // 1.5) 실제 악기 샘플(FluidR3 사운드폰트)로 낼 소리 고르기. 샘플을 못 불러오면 예전 합성음으로 냄
   const toMidi = (f) => 69 + 12 * Math.log2(f / 440), mOf = (semi, mul = 1) => toMidi(hz(semi, mul));
-  const LEAD_I = { epic: ['french_horn', -12], edm: ['lead_2_sawtooth', 0], gugak: ['shanai', 0], hiphop: ['electric_piano_1', -12], latin: ['trumpet', -12] }[style] || ['lead_2_sawtooth', 0];
   const BASS_I = style === 'edm' ? 'synth_bass_1' : 'acoustic_bass';
   const SAMP = ([name, ...a]) => {
     switch (name) {
-      case 'lead': return { inst: LEAD_I[0], notes: [toMidi(a[1]) + LEAD_I[1]], d: a[0], at: .015, r: .14, sus: true };
+      case 'lead': return { inst: LEAD_I[0], notes: [toMidi(a[1]) + LEAD_I[1]], d: a[0], at: .015, r: .18, sus: !['acoustic_grand_piano', 'electric_piano_1'].includes(LEAD_I[0]) };
       case 'flute': return { inst: style === 'gugak' ? 'shakuhachi' : 'flute', notes: [toMidi(a[1])], d: a[0], at: .03, r: .15, sus: true };
       case 'piano': return { inst: 'acoustic_grand_piano', notes: [mOf(a[0], 4)], d: 2.4, r: .3 };
       case 'bells': return { inst: 'tubular_bells', notes: [toMidi(a[0])], d: 2.6, r: .3 };
