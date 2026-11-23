@@ -568,7 +568,12 @@ async function renderTrack(c, onProg) {
   const NS = SCALE.length, LO = NS - 1, HI = NS * 2 + 2, clampD = (d) => Math.max(LO, Math.min(HI, d));
   const RHY = [[0, 3, 6, 8, 10, 12, 14], [0, 2, 4, 6, 8, 11, 14], [0, 4, 6, 8, 12], [0, 3, 6, 10, 12, 14], [0, 2, 3, 6, 8, 12],
     [0, 4, 7, 8, 12, 15], [0, 2, 4, 8, 10, 12], [0, 6, 8, 10, 12], [0, 3, 4, 8, 11, 12], [0, 1, 2, 4, 8, 12, 14],
-    [0, 2, 3, 4, 6, 8, 10, 11, 12, 14], [0, 3, 6, 8, 9, 10, 11, 14], [0, 1, 2, 3, 6, 8, 12, 14]];
+    [0, 2, 3, 4, 6, 8, 10, 11, 12, 14], [0, 3, 6, 8, 9, 10, 11, 14], [0, 1, 2, 3, 6, 8, 12, 14],
+    [0, 2, 6, 8, 10, 14], [0, 3, 5, 8, 11, 13], [0, 4, 5, 6, 8, 12, 14], [0, 2, 4, 6, 7, 10, 12], [0, 6, 7, 8, 14], [0, 1, 4, 8, 9, 12]];
+  const SPARSE = [[0, 6, 10], [0, 3, 10], [0, 8, 11], [0, 6, 8, 14], [0, 10, 12]], SYNC = [[0, 3, 6, 10, 12], [0, 3, 7, 10, 14], [0, 2, 5, 8, 11, 14], [0, 3, 6, 9, 12, 14]];
+  const HOOKR = [[0, 2, 3, 6], [0, 3, 6, 8, 10], [0, 1, 2, 4, 6], [0, 4, 6, 7], [0, 3, 4, 7, 10], [0, 2, 4, 6, 10]];
+  // 분위기마다 즐겨 쓰는 멜로디 모양: qa 물음·대답, hook 짧은 동기 되풀이, arp 화음 분산, desc 내려오는 반복 진행, call 같은 선율 옥타브 위로, sparse 띄엄띄엄, sync 엇박
+  const MTYPES = { edm: ['hook', 'arp', 'hook', 'qa', 'sync'], hiphop: ['sparse', 'hook', 'sync', 'qa'], latin: ['sync', 'qa', 'hook', 'arp'], gugak: ['qa', 'desc', 'qa', 'call'], epic: ['qa', 'call', 'desc', 'arp'] };
   const ENDR = [[0, 4, 8], [0, 2, 4, 8], [0, 3, 6, 8], [0, 4, 6, 8], [0, 2, 3, 4, 8]];
   const barLine = (rh, from, to, arch, off) => { let prev = null; return rh.map((st, k) => {
     const x = rh.length > 1 ? k / (rh.length - 1) : 1;
@@ -578,14 +583,14 @@ async function renderTrack(c, onProg) {
   }); };
   const themes = new Map();
   // 대회 하이브리드: 보내 주신 곡들처럼 1박짜리 리듬 조각을 되풀이하는 리프. 같은 음 연타가 많고(약 30%), 4도 도약이 잦음
-  const CELLS = [[0, 1, 2, 3], [0, 2, 3], [0, 3], [0, 1, 2], [0, 2], [0, 1, 3], [0, 2, 3], [0]];
+  const CELLS = [[0, 1, 2, 3], [0, 2, 3], [0, 3], [0, 1, 2], [0, 2], [0, 1, 3], [0, 2, 3], [0], [0, 1], [1, 2, 3], [0, 1, 2, 3], [1, 3], [0, 2]];
   const riffBar = (cells, d0, off, drift) => { const out = []; let d = d0;
     cells.forEach((cl, bt) => cl.forEach((st, k) => {
       if (bt + k > 0) { const r = mrnd(); d = clampD(d + (r < .32 ? 0 : r < .47 ? (mrnd() < .5 ? 3 : -3) : r < .62 ? drift : mpick([1, -1, 2, -2]))); }
       out.push({ st: off + bt * 4 + st, d });
     })); return out; };
   const proTheme = () => {
-    const A = mpick(CELLS), B = mpick(CELLS), C = mpick(CELLS.slice(0, 6)), seq = mpick([1, 2, -1, 3]);
+    const A = mpick(CELLS), B = mpick(CELLS), C = mpick(CELLS.slice(0, 6)), seq = mpick([1, 2, -1, 3, -2, 4]);
     const top = NS + 3 + Math.floor(mrnd() * 3), start = mpick([NS, NS - 1, NS + 2]);
     const b1 = riffBar([A, B, A, C], start, 0, 1);                        // 리프
     const b2 = riffBar([A, B, A, mpick(CELLS.slice(0, 4))], start, 16, 1).map((n, k, arr) => ({ ...n, d: k === arr.length - 1 ? top : n.d }));   // 같은 리프, 끝만 위로
@@ -596,7 +601,24 @@ async function renderTrack(c, onProg) {
   const themeFor = (name) => {
     if (themes.has(name)) return themes.get(name);
     if (style === 'pro') { const t = proTheme(); themes.set(name, t); return t; }
-    const rA = mpick(RHY), rB = mrnd() < .45 ? rA : mpick(RHY), arch = mpick([2, 1, 1, 0, -1]);
+    const kind = mpick(MTYPES[style] || ['qa']), seqv = mpick([1, 2, -1, -2, 3]);
+    const close = (from) => { const a2 = barLine(mpick(ENDR), from, NS, 1, 48); a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true; return a2; };
+    if (kind === 'hook' || kind === 'arp') {
+      let m;
+      if (kind === 'hook') { const rh = mpick(HOOKR), st0 = mpick([NS, NS + 2, NS + 4]); let d = st0; m = rh.map((x, k) => { if (k) d = clampD(d + mpick([1, -1, 2, -2, 0, 3])); return { st: x, d }; }); if (rh[rh.length - 1] < 8) m = [...m, ...m.map((n) => ({ st: n.st + 8, d: clampD(n.d + mpick([0, 0, 1, -1])) }))]; }
+      else { const shp = mpick([[0, 2, 4, 7], [0, 2, 4, 2], [7, 4, 2, 0], [0, 4, 2, 4], [0, 2, 4, 6]]), st0 = mpick([NS - 1, NS, NS + 2]), step = mpick([2, 4]); m = []; for (let x = 0; x < 16; x += step) m.push({ st: x, d: clampD(st0 + shp[(x / step) % shp.length]) }); }
+      const notes = [...m, ...m.map((n) => ({ st: n.st + 16, d: n.d })), ...m.map((n) => ({ st: n.st + 32, d: clampD(n.d + seqv) })), ...close(clampD(m[m.length - 1].d + seqv))];
+      themes.set(name, notes); return notes;
+    }
+    if (kind === 'desc' || kind === 'call') {
+      const rA = mpick(RHY), top = NS + 5 + Math.floor(mrnd() * 3), q1 = barLine(rA, kind === 'desc' ? top : NS, kind === 'desc' ? top - 3 : NS + 4, kind === 'desc' ? 0 : 1, 0);
+      const up = kind === 'call' && Math.max(...q1.map((n) => n.d)) + NS <= HI + 2 ? NS : 0;
+      const q2 = q1.map((n) => ({ st: n.st + 16, d: clampD(n.d + (kind === 'desc' ? -2 : up)) }));
+      const a1 = kind === 'desc' ? q1.map((n) => ({ st: n.st + 32, d: clampD(n.d - 4) })) : barLine(mpick(RHY), q2[q2.length - 1].d, NS + 2, 1, 32);
+      const notes = [...q1, ...q2, ...a1, ...close(a1[a1.length - 1].d)];
+      themes.set(name, notes); return notes;
+    }
+    const RP = kind === 'sparse' ? SPARSE : kind === 'sync' ? SYNC : RHY, rA = mpick(RP), rB = mrnd() < .45 ? rA : mpick(RP), arch = mpick([2, 1, 1, 0, -1, -2]);
     const start = mpick([NS, NS + 2, NS + 4, NS - 1]), top = NS + 4 + Math.floor(mrnd() * 4), seq = mpick([1, 2, -1, -2, 0]);
     const q1 = barLine(rA, start, top, arch, 0);                                    // 물음: 올라가서
     const q2 = barLine(rB, top, mpick([NS + 1, NS + 4, NS + 6]), arch * .5, 16);   // 2도·5도·7도에서 열린 채 멈춤
@@ -659,6 +681,22 @@ async function renderTrack(c, onProg) {
     half:  { k: [[0], [0], [0, 7], [0, 7, 10]], s: [8], g: [14], h: 'e' },
   };
   const DP0 = DRUMS[c.drumStyle] || DRUMS.rock;
+  // 분위기별 리듬 그루브: k 킥(또는 큰북·덩), s 스네어·박수(또는 덕), g 잔타, x 추가 타악, h 하이햇 방식, roll 하이햇 굴리기 자리, cl 클라베
+  const GROOVES = {
+    pro: [{ k: [2, 11], g: [3, 6, 13, 15] }, { k: [3, 10], g: [2, 7, 13, 15] }, { k: [6, 11], g: [3, 5, 13, 14] }, { k: [2, 7, 11], g: [4, 13, 15] }, { k: [3, 6, 10], g: [1, 13, 15] }],
+    edm: [{ k: [0, 4, 8, 12], s: [4, 12], h: 'o' }, { k: [0, 10], s: [8], g: [14], h: 'e' }, { k: [0, 6, 10], s: [4, 12], g: [7, 15], h: 's' }, { k: [0, 3, 8, 11], s: [4, 12], h: 'o' }, { k: [0, 4, 8, 12], s: [4, 12], x: [2, 6, 10, 14], h: 's' }, { k: [0, 4, 8, 12, 14], s: [4, 12], g: [15], h: 'o', roll: 14 }],
+    epic: [{ k: [0, 6, 8], s: [4, 12], x: [10, 14], g: [3, 11, 13] }, { k: [0, 8], s: [4, 12], x: [2, 3, 10, 11], g: [14, 15] }, { k: [0, 3, 6, 8, 11, 14], s: [4, 12], g: [15] }, { k: [0, 1, 8, 9], s: [12], x: [14, 15], g: [4, 6] }, { k: [0, 3, 6, 10, 12], s: [4], x: [8, 14], g: [9, 15] }],
+    gugak: [{ k: [0], s: [3, 8, 11], x: [6, 10], g: [14, 15] }, { k: [0, 8], s: [4, 6, 12, 14], x: [10], g: [3] }, { k: [0, 4, 8, 12], s: [2, 6, 10, 14], g: [15] }, { k: [0, 6, 12], s: [3, 9, 15], x: [8], g: [5, 11] }, { k: [0, 10], s: [3, 6, 12], x: [8, 14], g: [15] }],
+    latin: [{ k: [0, 8], s: [4, 12], x: [6, 14, 15], cl: 'son32' }, { k: [0, 6, 8, 14], s: [4, 12], x: [3, 7, 11, 15], cl: 'son23' }, { k: [0, 4, 8, 12], s: [3, 6, 11, 14], x: [], cl: 'son32', bell: false }, { k: [0, 10], s: [4, 12], x: [4, 6, 7, 12, 14, 15], g: [2, 10], cl: 'rumba' }, { k: [0, 8], s: [12], x: [2, 6, 10, 14], cl: 'son23' }],
+    hiphop: [{ k: [0, 7, 10], s: [8], h: 'e', roll: 14 }, { k: [0, 6, 10], s: [4, 12], g: [15], h: 'e' }, { k: [0, 3, 10, 11], s: [8], h: 's', roll: 6 }, { k: [0, 7, 9, 14], s: [8], g: [3, 13], h: 's', roll: 14 }, { k: [0, 11], s: [8], g: [15], h: 'q' }, { k: [0, 2, 7, 10], s: [8], g: [6], h: 'e', roll: 12 }],
+  };
+  const CLAVE = { son32: [[0, 6, 12], [4, 8]], son23: [[4, 8], [0, 6, 12]], rumba: [[0, 6, 14], [4, 8]] };
+  const grng = rngOf(c.seed * 977 + styleIx * 31 + 3), grooves = new Map(); let lastG = -1;
+  const grooveOf = (sec, bk) => {   // 같은 이름의 구간은 같은 그루브, 8마디마다·구간이 바뀌면 다른 그루브(바로 앞과 겹치지 않게)
+    const list = GROOVES[style] || GROOVES.hiphop, key = sec.name + '|' + (bk >> 1);
+    if (!grooves.has(key)) { let g = Math.floor(grng() * list.length), n = 0; while (g === lastG && n++ < 6) g = Math.floor(grng() * list.length); lastG = g; grooves.set(key, g); }
+    return list[grooves.get(key)];
+  };
 
   for (let b = 0; b < nBars; b++) {
     const t0 = b * BAR; if (t0 >= endT) break;
@@ -724,55 +762,45 @@ async function renderTrack(c, onProg) {
           if (L >= 3 && eighth && !(i === 4 || i === 12)) bh(t, .28);
         } else [() => tom(t, [210, 165, 125, 95][i - 12], .9), () => { bs(t, .5 + (i - 12) * .15); bs(t + s16 / 2, .4 + (i - 12) * .12); }, () => (i % 2 ? tom(t, 140, .8) : taiko(t, .9, 60))][(vs + (b >> 2)) % 3]();
         if (i === 0 && p4 === 0) crash(t, .7);
-            } else if (style === 'edm') {
-        if (q && (L >= 1 || i === 0)) bk(t, L ? 1 : .6);
-        if (L >= 2 && (i === 4 || i === 12)) bc(t, .9);
-        if (L >= 1 && i % 4 === 2) bh(t, .8, true);
-        if (L >= 3 && !q && i % 4 !== 2) bh(t, .5);
-      } else if (style === 'pro') {   // 대회곡들의 하프타임 비트를 큰북 대신 킥·스네어로: 1·3박 킥, 3박 스네어와 그 뒤 8분 강세, 4박 끝 16분 킥, 스네어 잔타로 채움
+            } else if (style === 'pro') {   // 대회곡들의 하프타임 비트를 큰북 대신 킥·스네어로: 1·3박 킥, 3박 스네어와 그 뒤 8분 강세, 4박 끝 16분 킥, 스네어 잔타로 채움
         if (L === 0 && (i === 0 || (i === 8 && b % 2))) bk(t, .55);
         if (L >= 1 && (i === 0 || i === 8)) bk(t, 1);
         if (L >= 1 && i === 14) bk(t, .8);
-        if (L >= 2 && (i === 2 || i === 11)) bk(t, .65);
+        const PG = grooveOf(s, blk);
+        if (L >= 2 && PG.k.includes(i)) bk(t, .65);
         if (L >= 1 && i === 8) bs(t, 1);
         if (L >= 2 && i === 10) bs(t, .6);
-        if (L >= 2 && [3, 6, 13, 15].includes(i)) bs(t, .22);   // 작은 스네어 잔타
+        if (L >= 2 && PG.g.includes(i)) bs(t, .22);   // 작은 스네어 잔타
         if (L >= 3 && [1, 5, 9, 12].includes(i)) bs(t, .16);
         if (L >= 1 && eighth) bh(t, [2, 6, 10, 14].includes(i) ? .55 : .32);
         if (L >= 3 && !eighth) bh(t, .2);
         if (L >= 1 && p4 === 1 && vs !== 1 && i === 7) bs(t, .45);                         // 2번째 마디: 스네어 하나 더
         if (L >= 1 && p4 === 2 && i === (vs === 2 ? 5 : 3)) bk(t, .6);                     // 3번째 마디: 킥 하나 더
         if (L >= 2 && p4 === 3 && i >= 12) [() => { bs(t, .45 + (i - 12) * .15); bs(t + s16 / 2, .35 + (i - 12) * .12); }, () => { bs(t, .5 + (i - 12) * .14); if (i === 15) bk(t, .8); }, () => (i % 2 ? bs(t, .8) : bk(t, .8))][vs]();   // 마디 끝 스네어 필인 3종
-      } else if (style === 'epic') {
-        if (L === 0 && i === 0 && b % 2 === 0) taiko(t, .55);
-        if (L >= 1 && [0, 6, 8].includes(i)) taiko(t, i === 0 ? .9 : .65);
-        if (L >= 1 && [10, 14].includes(i)) tom(t, 95, .6);
-        if (L >= 2 && (i === 0 || i === 8)) bk(t, .9);
-        if (L >= 2 && (i === 4 || i === 12)) bs(t, .7);
-        if (L >= 3 && [3, 11, 13].includes(i)) taiko(t, .6, 80);
-        if (L >= 3 && eighth) bh(t, .45);
-      } else if (style === 'gugak') {
-        if (L === 0 && i === 0) { tom(t, 80, .6); rim(t, .5); }
-        if (L >= 1) { if (i === 0) { tom(t, 80, .8); rim(t, .7); } if ([3, 8, 11].includes(i)) rim(t, .6); if ([6, 10].includes(i)) tom(t, 85, .6); if (i === 14 || i === 15) rim(t, .35); }
-        if (L >= 2 && (i === 0 || i === 8 || i === 10)) bk(t, .85);
-        if (L >= 2 && (i === 4 || i === 12)) bs(t, .55);
-        if (L >= 3 && eighth) kkw(t, q ? 1 : .55);
-      } else if (style === 'latin') {
-        const clv = (b - s.bar) % 2 === 0 ? [0, 6, 12] : [4, 8];        // 3-2 손 클라베
-        if (clv.includes(i)) clave(t, L ? .8 : .6);
-        if (L >= 1 && (i === 14 || i === 15)) conga(t, 190, .55);
-        if (L >= 1 && (i === 4 || i === 12)) rim(t, .45);
-        if (L >= 1 && i === 6) conga(t, 235, .45);
-        if (L >= 2 && q) bell(t, i === 0 ? .7 : .5);
-        if (L >= 2 && (i === 0 || i === 8)) bk(t, .75);
-        if (L >= 3 && !eighth) bh(t, .3);
-      } else {
-        if (L >= 1 && [0, 7, 10].includes(i)) bk(t, .95);
-        if (L === 0 && i === 0) bk(t, .5);
-        if (L >= 1 && i === 8) { bs(t, .9); bc(t, .5); }
-        if (L >= 1 && eighth) bh(t, .55);
-        if (L >= 2 && !eighth) bh(t, .3);
-        if (L >= 3 && i === 14) for (let r = 1; r < 6; r++) bh(t + r * s16 / 3, .25 + r * .05);
+      } else if (style !== 'pro') {   // 그루브 표에서 고른 리듬(구간마다·8마디마다 바뀜)
+        const G = grooveOf(s, blk), kk = L === 1 ? G.k.filter((x) => x === 0 || x === 8) : G.k, x = (a) => a && a.includes(i);
+        if (L === 0) {
+          if (style === 'edm' && i === 0) bk(t, .6);
+          else if (style === 'epic' && i === 0 && b % 2 === 0) taiko(t, .55);
+          else if (style === 'gugak' && i === 0) { tom(t, 80, .6); rim(t, .5); }
+          else if (style !== 'edm' && style !== 'epic' && style !== 'gugak' && style !== 'latin' && i === 0) bk(t, .5);
+        } else {
+          const kv = i === 0 ? 1 : .8, sv = L === 1 ? .75 : .9;
+          if (style === 'edm') { if (kk.includes(i)) bk(t, kv); if (x(G.s)) bc(t, sv); if (L >= 2 && x(G.s)) bs(t, .45); if (L >= 2 && x(G.g)) bs(t, .2); if (L >= 2 && x(G.x)) bc(t, .45); }
+          else if (style === 'epic') { if (kk.includes(i)) taiko(t, i === 0 ? .95 : .7); if (x(G.s)) { if (L >= 2) bs(t, .7); taiko(t, .5, 76); } if (L >= 2 && (i === 0 || i === 8)) bk(t, .9); if (x(G.x)) tom(t, 95 + (i % 3) * 10, .6); if (L >= 3 && x(G.g)) taiko(t, .55, 80); }
+          else if (style === 'gugak') { if (kk.includes(i)) { tom(t, 80, i === 0 ? .85 : .7); rim(t, .7); } if (x(G.s)) rim(t, .6); if (x(G.x)) tom(t, 86, .55); if (L >= 2 && x(G.g)) rim(t, .3); if (L >= 2 && (i === 0 || i === 8)) bk(t, .85); if (L >= 2 && (i === 4 || i === 12)) bs(t, .5); }
+          else if (style === 'latin') { if (L >= 2 && kk.includes(i)) bk(t, .75); if (x(G.s)) rim(t, .45); if (x(G.x)) conga(t, i % 4 === 3 || i >= 14 ? 190 : 235, .5); if (L >= 2 && x(G.g)) conga(t, 190, .3); if (L >= 2 && q && G.bell !== false) bell(t, i === 0 ? .7 : .5); }
+          else { if (kk.includes(i)) bk(t, i === 0 ? .95 : .85); if (x(G.s)) { bs(t, .9); bc(t, .5); } if (L >= 2 && x(G.g)) bs(t, .22); }
+          // 하이햇: e 8분, s 16분, o 뒷박 열린 햇, q 4분
+          const hm = L >= 3 && G.h === 'e' ? 's' : G.h;
+          if (style === 'edm' || style === 'hiphop' || (L >= 3 && style !== 'gugak')) {
+            if (hm === 'o') { if (i % 4 === 2) bh(t, .75, true); else if (L >= 3 && !eighth) bh(t, .35); }
+            else if (hm === 's') bh(t, eighth ? .5 : .28); else if (hm === 'q') { if (q) bh(t, .55); } else if (eighth) bh(t, .55);
+          }
+          if (L >= 2 && G.roll != null && i === G.roll && (b - s.bar) % 2 === 1) for (let r = 1; r < 6; r++) bh(t + r * s16 / 3, .2 + r * .05);   // 트랩식 하이햇 굴리기
+        }
+        if (style === 'latin') { const cl = CLAVE[G.cl || 'son32'][(b - s.bar) % 2]; if (cl.includes(i)) clave(t, L ? .8 : .6); }
+        if (style === 'gugak' && L >= 3 && eighth) kkw(t, q ? 1 : .55);
       }
       if (!FL && style !== 'pro' && L >= 1) {   // 다른 분위기도 4마디 안에서 조금씩 다르게: 2번째 마디 킥 하나, 4번째 마디 끝 스네어 픽업
         if (p4 === 1 && i === [7, 11, 3][vs]) bk(t, .55);
