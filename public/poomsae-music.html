@@ -188,8 +188,8 @@ const INSTR = [
 ];
 const STYLE_INST = { pro: ['strings', 'choir', 'brass', 'cymbal', 'gong'], epic: ['strings', 'choir', 'gong', 'brass', 'taikoL', 'fills', 'cymbal'], edm: ['bells', 'clap', 'tamb', 'cymbal'], gugak: ['gong', 'janggu', 'kkwaeng', 'taikoL'], hiphop: ['piano', 'bells', 'msnare', 'wood'], latin: ['piano', 'brass', 'shaker', 'conga', 'cowbell', 'tamb', 'wood'] };
 // 멜로디 악기: [이름, 옥타브 옮김(반음), 샘플이 없을 때 합성음 종류]
-const LEADS = { auto: ['자동 (분위기에 맞춰)'], french_horn: ['📯 호른', -12, 'saw'], trumpet: ['🎺 트럼펫', -12, 'saw'], flute: ['🪈 플루트', 0, 'saw'], shakuhachi: ['🎋 대금', 0, 'piri'], shanai: ['🎷 피리·태평소', 0, 'piri'],
-  string_ensemble_1: ['🎻 현악', -12, 'saw'], acoustic_grand_piano: ['🎹 피아노', -12, 'saw'], electric_piano_1: ['🎹 일렉 피아노', -12, 'saw'], lead_2_sawtooth: ['🎛️ 신스 리드', 0, 'saw'] };
+const LEADS = { auto: ['자동 (분위기에 맞춰)'], french_horn: ['📯 호른', -12, 'saw'], trumpet: ['🎺 트럼펫', -12, 'saw'], flute: ['🪈 플루트', -12, 'saw'], shakuhachi: ['🎋 대금', -12, 'piri'], shanai: ['🎷 피리·태평소', -12, 'piri'],
+  string_ensemble_1: ['🎻 현악', -12, 'saw'], acoustic_grand_piano: ['🎹 피아노', -12, 'saw'], electric_piano_1: ['🎹 일렉 피아노', -12, 'saw'], lead_2_sawtooth: ['🎛️ 신스 리드', -12, 'saw'] };
 const STYLE_LEAD = { pro: 'string_ensemble_1', epic: 'french_horn', edm: 'lead_2_sawtooth', gugak: 'shanai', hiphop: 'electric_piano_1', latin: 'trumpet' };
 const PERC_SET = ['taikoL', 'fills', 'cymbal', 'msnare', 'conga', 'tamb'];
 const instOff = () => Object.fromEntries(INSTR.map(([k]) => [k, false]));
@@ -488,7 +488,7 @@ const SAMPLE_LEN = { timp: 1, akick: .45, asnare: .32, chat: .08, ohat2: .4, tam
 /* 실제 악기 샘플: audio/inst/<악기>/<MIDI번호>.mp3 (FluidR3_GM, CC BY 3.0). 필요한 악기만 처음 한 번 받아 둠 */
 const INST = new Map(), INST_LOADING = new Map();
 const INST_GAIN = {};   // 합성음과 크기를 맞추는 악기별 배율(아래 표는 샘플을 최고점 1로 맞춘 뒤 적용)
-Object.assign(INST_GAIN, { kit_shaker: .12, kit_tamb: .2, kit_clave: 1.8, kit_cowbell: .45, kit_wood: .57, kit_rim: .45, kit_conga: .7, kit_kkw: .45, kit_gong: 1.1, string_ensemble_2: 4, pad_2_warm: 3.2, kit_kick: .85, kit_snare: .75, kit_hat: .5, kit_ohat: .5, kit_crash: .45, kit_ride: .75, taiko_drum: .85, melodic_tom: 1, timpani: 1.1, acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .8, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
+Object.assign(INST_GAIN, { kit_shaker: .12, kit_tamb: .2, kit_clave: 1.8, kit_cowbell: .45, kit_wood: .57, kit_rim: .45, kit_conga: .7, kit_kkw: .45, kit_gong: 1.1, string_ensemble_2: 4, pad_2_warm: 3.2, kit_kick: .85, kit_snare: .75, kit_hat: .5, kit_ohat: .5, kit_crash: .45, kit_ride: .75, taiko_drum: .85, melodic_tom: 1, timpani: 1.1, acoustic_grand_piano: .45, string_ensemble_1: .28, choir_aahs: .9, brass_section: .68, distortion_guitar: .49, flute: .5, shakuhachi: .53, french_horn: .67, trumpet: 1, electric_piano_1: .43, lead_2_sawtooth: .55, shanai: .5, tubular_bells: .38, acoustic_bass: 1.3, synth_bass_1: 1.04, koto: .3, orchestral_harp: .25, acoustic_guitar_nylon: .3, marimba: .2 });
 let instIndex = null;
 async function loadInst(names, onProg) {
   try { if (!instIndex) instIndex = await (await fetch('audio/inst/index.json')).json(); } catch (_) { return; }
@@ -864,6 +864,7 @@ async function renderTrack(c, onProg) {
   // 1.5) 실제 악기 샘플(FluidR3 사운드폰트)로 낼 소리 고르기. 샘플을 못 불러오면 예전 합성음으로 냄
   const toMidi = (f) => 69 + 12 * Math.log2(f / 440), mOf = (semi, mul = 1) => toMidi(hz(semi, mul));
   const BASS_I = style === 'edm' ? 'synth_bass_1' : 'acoustic_bass';
+  const MDBL = { edm: 'pad_2_warm', hiphop: 'electric_piano_1', gugak: 'koto', latin: 'acoustic_guitar_nylon' };
   const SAMP = ([name, ...a]) => {
     switch (name) {
       case 'flead': return { inst: FLEAD_I[0], notes: [toMidi(a[1]) + FLEAD_I[1]], d: a[0], at: .012, r: .12, sus: true };
@@ -880,7 +881,10 @@ async function renderTrack(c, onProg) {
         const inst = style === 'gugak' ? 'koto' : style === 'epic' ? 'orchestral_harp' : style === 'latin' ? (a[1] === 'square' ? 'acoustic_guitar_nylon' : 'marimba') : style === 'hiphop' ? 'electric_piano_1' : 'lead_2_sawtooth';
         return inst ? { inst, notes: [toMidi(a[0])], d: Math.max(.4, a[3] * 2.5), r: .2 } : null;
       }
-      case 'mdbl': return { inst: LEAD_I[0] === 'string_ensemble_1' ? 'french_horn' : 'string_ensemble_1', notes: [toMidi(a[1])], d: a[0], at: .05, r: .3, sus: true };   // 멜로디 겹침·화음
+      case 'mdbl': {   // 멜로디 겹침·화음: 분위기마다 다른 악기로 받쳐서 곡 색깔이 갈리게
+        const inst = MDBL[style] && MDBL[style] !== LEAD_I[0] ? MDBL[style] : LEAD_I[0] === 'string_ensemble_1' ? 'french_horn' : 'string_ensemble_1';
+        return { inst, notes: [toMidi(a[1])], d: a[0], at: .05, r: .3, sus: !['electric_piano_1', 'koto', 'acoustic_guitar_nylon'].includes(inst) };
+      }
       case 'kick': case 'akick': return { inst: 'kit_kick', notes: [name === 'akick' ? 1 : 0], d: .8, r: .08 };   // 실제 드럼(Virtuosity Drums)
       case 'snare': case 'asnare': return { inst: 'kit_snare', notes: [name === 'asnare' ? 1 : [0, 1, 2][a[0] || 0] ?? 2], d: .7, r: .08 };
       case 'hat': case 'chat': return { inst: 'kit_hat', notes: [(a[0] || 0) % 2], d: .28, r: .05 };
@@ -940,15 +944,38 @@ async function renderTrack(c, onProg) {
     const o = Math.round(t * sr), m = Math.min(s.length, N - o); for (let i = 0; i < m; i++) out[o + i] += s[i] * v;
   }
   if (onProg) onProg(.75);
-  const comp = main.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 8; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .18;
-  const master = main.createGain(); master.connect(comp); comp.connect(main.destination);
+  // 압축은 살짝만(예전엔 세게 눌러서 처음부터 끝까지 음량이 같았음)
+  const comp = main.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 2.5; comp.attack.value = .012; comp.release.value = .25;
+  // 귀를 찌르는 2~4kHz를 조금 낮추고, 아주 높은 쇳소리는 부드럽게
+  const deHarsh = main.createBiquadFilter(); deHarsh.type = 'peaking'; deHarsh.frequency.value = 3000; deHarsh.Q.value = .9; deHarsh.gain.value = -2.5;
+  const air = main.createBiquadFilter(); air.type = 'highshelf'; air.frequency.value = 9000; air.gain.value = -1.5;
+  const master = main.createGain(), shape = main.createGain(); master.connect(deHarsh); deHarsh.connect(air); air.connect(comp); 
+  const lim = main.createDynamicsCompressor(); lim.threshold.value = -3; lim.knee.value = 3; lim.ratio.value = 12; lim.attack.value = .002; lim.release.value = .12;   // 튀는 북소리 끝만 눌러 둠
+  comp.connect(lim); lim.connect(shape); shape.connect(main.destination);   // 구간 음량 흐름은 압축이 끝난 뒤에 걸어야 살아남음
   master.gain.setValueAtTime(1, 0); master.gain.setValueAtTime(1, Math.max(0, D - 1.0)); master.gain.linearRampToValueAtTime(0, D - .01);
+  // 구간 세기에 따른 음량 흐름: 잔잔 -6dB, 보통 -3.3dB, 강하게 -1.5dB, 최고조 0dB, 브레이크 -7.5dB.
+  // 커질 때는 앞 마디부터 서서히 올리고(빌드업), 작아질 때는 구간이 바뀌는 순간 뚝 떨어뜨림
+  { const LG = [.56, .7, .85, 1], gOf = (x) => x.name === '브레이크' ? .42 : LG[isFlip(x.bar) ? Math.max(2, x.lv) : Math.max(0, Math.min(3, x.lv))];
+    const pts = secs.map((x) => ({ t: toT(x.bar * BAR), g: gOf(x) })).filter((x, i, a) => i === 0 || x.t > a[i - 1].t + .05);
+    const endRT = toT(endT); pts.push({ t: Math.max(0, endRT - 120 / c.bpm), g: 1 });
+    pts.sort((x, y) => x.t - y.t);
+    const sg = shape.gain; sg.setValueAtTime(pts[0].g, 0); let cur = pts[0].g;
+    for (let i = 1; i < pts.length; i++) { const { t, g } = pts[i]; if (t >= D || Math.abs(g - cur) < .01) continue;
+      const prev = pts[i - 1].t, rise = Math.min(240 / c.bpm, Math.max(.2, t - prev - .1));
+      if (g > cur) { sg.setValueAtTime(cur, Math.max(prev, t - rise)); sg.linearRampToValueAtTime(g, t); } else { sg.setValueAtTime(cur, Math.max(0, t - .06)); sg.linearRampToValueAtTime(g, t + .06); }
+      cur = g; }
+  }
   const rev = main.createConvolver(); { const n = Math.floor(sr * 2.4), b = main.createBuffer(2, n, sr); for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2); } rev.buffer = b; }
   const revOut = main.createGain(); revOut.gain.value = .32; rev.connect(revOut); revOut.connect(master);
-  const BUS = { GT: [.5, .1], DR: [.85, .12], FX: [.8, .35], MU: [.5, .45], PU: [.5, .45], BA: [.62, 0], LD: [.42, .5] };
+  // [음량, 잔향, 좌우 위치(-1 왼쪽 ~ 1 오른쪽), 좌우 퍼짐]: 예전엔 모든 소리가 가운데 한 점에 몰려 있었음
+  const BUS = { GT: [.5, .1, -.35, 0], DR: [.85, .12, 0, .12], FX: [.8, .35, 0, .5], MU: [.5, .45, 0, .55], PU: [.5, .45, 0, .55], BA: [.62, 0, 0, 0], LD: [.4, .45, .08, .3] };
+  const toneLD = main.createBiquadFilter(); toneLD.type = 'lowpass'; toneLD.frequency.value = 6500; toneLD.Q.value = .5; toneLD.connect(master);
   for (const [name, buf] of Object.entries(stems)) {
-    const src = main.createBufferSource(); src.buffer = buf; const g = main.createGain(); g.gain.value = BUS[name][0]; src.connect(g); g.connect(master);
-    if (BUS[name][1]) { const sg = main.createGain(); sg.gain.value = BUS[name][1]; g.connect(sg); sg.connect(rev); }
+    const [vol, wet, pan, wide] = BUS[name], out = name === 'LD' ? toneLD : master;
+    const src = main.createBufferSource(); src.buffer = buf; const g = main.createGain(); g.gain.value = vol; src.connect(g);
+    const pn = main.createStereoPanner(); pn.pan.value = pan; g.connect(pn); pn.connect(out);
+    if (wide) [[-1, .011], [1, .017]].forEach(([side, dt]) => { const dl = main.createDelay(.05); dl.delayTime.value = dt; const w = main.createGain(); w.gain.value = wide; const sp = main.createStereoPanner(); sp.pan.value = side; g.connect(dl); dl.connect(w); w.connect(sp); sp.connect(out); });
+    if (wet) { const sg = main.createGain(); sg.gain.value = wet; g.connect(sg); sg.connect(rev); }
     if (name === 'PU') { for (const t of pumpBeats) { g.gain.setValueAtTime(.5 * .35, t); g.gain.linearRampToValueAtTime(.5, t + spb * .6); } }
     src.start(0);
   }
