@@ -74,7 +74,7 @@
   .h2row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; } .h2row h2 { margin:0; }
   .card h2 small { font-size:.75rem; font-weight:500; }
   .glabel { font-weight:800; font-size:.9rem; min-width:92px; }
-  .leadrow, .drow { display:flex; align-items:center; gap:10px; } .mymel { margin-top:8px; flex-wrap:wrap; } .fileb { display:inline-block; cursor:pointer; padding:.35em .8em; border:1px solid var(--line, #3a4150); border-radius:8px; } .leadrow select, .drow select { width:auto; flex:1; max-width:280px; }
+  .leadrow, .drow { display:flex; align-items:center; gap:10px; } .leadrow select, .drow select { width:auto; flex:1; max-width:280px; }
   .drow { margin-top:10px; display:none; }
   .igroup { margin-top:12px; } .igroup .gh { display:flex; gap:8px; align-items:baseline; margin-bottom:6px; } .igroup .gh small { color:var(--muted); font-size:.78rem; }
   .chip::before { content:''; display:inline-block; width:.9em; } .chip.on::before { content:'✓'; color:var(--gold); }
@@ -111,7 +111,6 @@
   <section class="card">
     <div class="h2row"><h2>2. 악기</h2><button class="small" id="inst-reset">분위기 기본값으로</button></div>
     <div class="leadrow"><span class="glabel">🎵 멜로디</span><select id="lead" aria-label="멜로디 악기"></select></div>
-    <div class="leadrow mymel"><span class="glabel">🎼 내 멜로디</span><label class="small fileb">MIDI 넣기<input type="file" id="mymel-file" accept=".mid,.midi,audio/midi" hidden></label><span class="hint" id="mymel-info">없음 · 자동으로 지어요</span><button class="small" id="mymel-clear" hidden>지우기</button></div>
     <div id="inst"></div>
     <div class="drow" id="drow"><span class="glabel">🥁 드럼 리듬</span><select id="dstyle" aria-label="드럼 세트 리듬"><option value="rock">록 (쿵-짝 기본)</option><option value="funk">펑크 (통통 튀는)</option><option value="disco">디스코 (네 박 쿵쿵)</option><option value="break">브레이크비트 (쪼개진)</option><option value="half">하프타임 (묵직하게)</option></select></div>
   </section>
@@ -238,54 +237,7 @@ let cfg; try { cfg = JSON.parse(localStorage.getItem(LS)) || defaults(); } catch
 if (cfg.opts && !('taikoL' in cfg.opts)) { const rec = instFor(cfg.style); for (const [k, , , g] of INSTR) if (g === 'perc') cfg.opts[k] = rec[k]; }   // 타악기가 생기기 전 저장된 설정
 cfg.opts = { ...instOff(), endBig: false, ...(cfg.opts || {}) }; cfg.drumStyle = cfg.drumStyle || 'rock';
 if (!cfg.lead) cfg.lead = cfg.opts.flute ? (cfg.style === 'gugak' ? 'shakuhachi' : 'flute') : 'auto'; cfg.opts.flute = false;   // 대금·피리 칩은 멜로디 악기 고르기로 옮김
-cfg.knobs = { ...KNOB_DEF, ...(cfg.knobs || {}) };
-/* ------------ 내 멜로디(MIDI) ------------ */
-// MIDI 파일에서 멜로디(가장 높은 음역의 성부)를 골라 16분 격자로 맞추고, 4마디씩 프레이즈로 나눠 단조 으뜸음 기준 반음 값으로 저장
-function parseMidi(buf) {
-  const u = new Uint8Array(buf); let p = 0; const rd = (n) => { let v = 0; for (let i = 0; i < n; i++) v = v * 256 + u[p++]; return v; };
-  const vlq = () => { let v = 0, b; do { b = u[p++]; v = v * 128 + (b & 127); } while (b & 128); return v; };
-  if (String.fromCharCode(...u.slice(0, 4)) !== 'MThd') throw new Error('MIDI 파일이 아니에요');
-  p = 8; rd(2); const ntr = rd(2), div = rd(2); p = 8 + rd(0) + 6; p = 14;
-  const groups = new Map();
-  for (let ti = 0; ti < ntr && p < u.length; ti++) {
-    while (p < u.length && String.fromCharCode(...u.slice(p, p + 4)) !== 'MTrk') p++;
-    p += 4; const len = rd(4), end = p + len; let tick = 0, rs = 0; const on = new Map();
-    while (p < end) {
-      tick += vlq(); let st = u[p]; if (st & 128) p++; else st = rs;
-      if (st === 0xFF) { p++; const l = vlq(); p += l; continue; }
-      if (st === 0xF0 || st === 0xF7) { const l = vlq(); p += l; continue; }
-      rs = st; const ty = st & 0xF0, ch = st & 15, a = u[p++], b = ty === 0xC0 || ty === 0xD0 ? 0 : u[p++];
-      if (ch === 9) continue;
-      const key = ti + ':' + ch;
-      if (ty === 0x90 && b > 0) on.set(key + ':' + a, tick);
-      else if (ty === 0x80 || (ty === 0x90 && b === 0)) { const t0 = on.get(key + ':' + a); if (t0 != null) { on.delete(key + ':' + a); if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ t: t0, d: tick - t0, m: a }); } }
-    }
-    p = end;
-  }
-  if (!groups.size) throw new Error('음표가 없어요');
-  const best = [...groups.values()].filter((g) => g.length >= 8).sort((x, y) => (y.reduce((q, n) => q + n.m, 0) / y.length) * Math.min(1, y.length / 40) - (x.reduce((q, n) => q + n.m, 0) / x.length) * Math.min(1, x.length / 40))[0] || [...groups.values()][0];
-  const q = div / 4, steps = new Map();
-  for (const n of best) { const st = Math.round(n.t / q), ln = Math.max(1, Math.round(n.d / q)); const o = steps.get(st); if (!o || n.m > o.m) steps.set(st, { st, len: ln, m: n.m }); }   // 같은 순간 여러 음이면 가장 높은 음
-  return [...steps.values()].sort((a, b) => a.st - b.st);
-}
-function melodyFromNotes(ns, name) {
-  // 조성: 단조 프로필에 가장 잘 맞는 으뜸음(장조로 들리면 나란한조 단조 으뜸음)
-  const MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88], MIN = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
-  const pc = new Array(12).fill(0); for (const n of ns) pc[n.m % 12] += n.len;
-  const corr = (prof, k) => { let a = 0; for (let i = 0; i < 12; i++) a += prof[(i - k + 12) % 12] * pc[i]; return a; };
-  let tonic = 0, bs = -1; for (let k = 0; k < 12; k++) { const mn = corr(MIN, k), mj = corr(MAJ, k); if (mn > bs) { bs = mn; tonic = k; } if (mj > bs) { bs = mj; tonic = (k + 9) % 12; } }
-  for (let i = 1; i < ns.length; i++) ns[i - 1].len = Math.min(ns[i - 1].len, ns[i].st - ns[i - 1].st);
-  const first = Math.floor(ns[0].st / 16) * 16, phrases = [];
-  for (let a = first; a <= ns[ns.length - 1].st; a += 64) {
-    const ph = ns.filter((n) => n.st >= a && n.st < a + 64).map((n) => ({ st: n.st - a, len: Math.min(n.len, 64 - (n.st - a)), semi: n.m - tonic }));
-    if (ph.length >= 6) phrases.push(ph);
-  }
-  // 같은 프레이즈 되풀이는 하나만
-  const sig = (ph) => ph.map((n) => n.st + ':' + n.semi).join(','), seen = new Set(), uniq = phrases.filter((ph) => { const k = sig(ph); if (seen.has(k)) return false; seen.add(k); return true; });
-  // 음역: 가운데 음이 자동 멜로디와 비슷한 높이(으뜸음 위 12~22반음)에 오게 옥타브 맞춤
-  for (const ph of uniq) { const med = ph.map((n) => n.semi).sort((a, b) => a - b)[ph.length >> 1]; const sh = 12 * Math.round((17 - med) / 12); ph.forEach((n) => (n.semi += sh)); }
-  return { name, tonic, bars: Math.round((ns[ns.length - 1].st - first) / 16) + 1, phrases: uniq.slice(0, 12) };
-}
+cfg.knobs = { ...KNOB_DEF, ...(cfg.knobs || {}) }; delete cfg.myMel;
 const persist = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (_) {} };
 
 /* ------------ 화면 ------------ */
@@ -319,19 +271,7 @@ function renderKnobs() {
   });
 }
 $('knob-reset').addEventListener('click', () => { cfg.knobs = { ...KNOB_DEF }; renderKnobs(); changed(); });
-function renderMyMel() {
-  const m = cfg.myMel; $('mymel-clear').hidden = !m;
-  $('mymel-info').textContent = m ? `${m.name} · 4마디 프레이즈 ${m.phrases.length}개를 주제로 써요` : '없음 · 자동으로 지어요';
-}
-$('mymel-file').addEventListener('change', async (e) => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try { const ns = parseMidi(await f.arrayBuffer()); if (ns.length < 8) throw new Error('멜로디 음이 너무 적어요');
-    cfg.myMel = melodyFromNotes(ns, f.name.replace(/\.midi?$/i, '')); if (!cfg.myMel.phrases.length) { cfg.myMel = null; throw new Error('4마디 안에 6음 이상인 부분이 없어요'); }
-    renderMyMel(); changed(); toast(`내 멜로디를 불러왔어요: 프레이즈 ${cfg.myMel.phrases.length}개`); }
-  catch (err) { toast('MIDI를 읽지 못했어요: ' + err.message); }
-});
-$('mymel-clear').addEventListener('click', () => { cfg.myMel = null; renderMyMel(); changed(); });
-function fillInputs() { renderMyMel(); renderKnobs(); renderInst(); $('dstyle').value = cfg.drumStyle; $('ask').value = cfg.prompt || ''; $('dur').value = cfg.dur; $('bpm').value = cfg.bpm; $('key').value = cfg.key; $('seed').value = cfg.seed; $('endhit').value = cfg.endHit; }
+function fillInputs() { renderKnobs(); renderInst(); $('dstyle').value = cfg.drumStyle; $('ask').value = cfg.prompt || ''; $('dur').value = cfg.dur; $('bpm').value = cfg.bpm; $('key').value = cfg.key; $('seed').value = cfg.seed; $('endhit').value = cfg.endHit; }
 const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 
 function renderTimeline() {
@@ -730,16 +670,30 @@ async function renderTrack(c, onProg) {
     }
     return out.sort((a, b) => a.st - b.st);
   };
+  // 레퍼런스 대회곡에서 배운 선율 버릇: 한 박 안 리듬 조각(엇박 16분 시작이 많음)과 음계 단계 움직임(같은 음 17%, 2도 ±1이 가장 많고, 5도 ±4도 잦음)
+  const LCELL = [[[0], 26], [[2], 29], [[1], 30], [[1, 2], 21], [[0, 2], 23], [[3], 25], [[0, 1], 13], [[0, 1, 3], 5], [[1, 3], 12], [[1, 2, 3], 3], [[2, 3], 6], [[0, 2, 3], 6], [[0, 1, 2, 3], 4], [[], 18]];
+  const LSTEP = [[-5, 4], [-4, 7.5], [-3, 7], [-2, 8.5], [-1, 13], [0, 17], [1, 18], [2, 8], [3, 4], [4, 8.5], [5, 4.5]];
+  const wpick = (arr) => { let r = mrnd() * arr.reduce((q, x) => q + x[1], 0); for (const [v, w] of arr) { r -= w; if (r <= 0) return v; } return arr[arr.length - 1][0]; };
+  const learnBar = (d0, off, first) => { const out = []; let d = d0;
+    for (let bt = 0; bt < 4; bt++) { let cell = wpick(LCELL); if (bt === 0 && first && !cell.includes(0)) cell = [0, ...cell];
+      for (const st of cell) { if (out.length) { let dl = wpick(LSTEP); if (d > HI - 2 && dl > 0) dl = -dl; if (d < LO + 2 && dl < 0) dl = -dl; d = clampD(d + dl); } out.push({ st: off + bt * 4 + st, d }); } }
+    if (!out.length) out.push({ st: off, d }); return out; };
+  const learnTheme = () => {
+    const start = mpick([NS, NS + 2, NS + 4]), seq = mpick([1, 2, -1, -2, 0]);
+    const q1 = learnBar(start, 0, true), q2 = learnBar(q1[q1.length - 1].d, 16, false);
+    const a1 = q1.map((n) => ({ st: n.st + 32, d: clampD(n.d + seq) }));   // 첫 마디를 옮겨 되풀이(배운 곡들도 동기 되풀이가 많음)
+    const a2 = barLine(mpick(ENDR), a1[a1.length - 1].d, NS, 1, 48); a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true;
+    return [...q1, ...q2, ...a1, ...a2];
+  };
   const themeFor = (name) => {
     if (themes.has(name)) return themes.get(name);
-    const t0 = themeFor0(name), t = t0.some((n) => n.my) ? t0.map((n) => ({ ...n, f16: n.st % 2 === 1 })) : style === 'pro' ? t0.map((n) => ({ ...n, f16: n.st % 2 === 1 })) : add16(t0);
+    const t0 = themeFor0(name), t = style === 'pro' ? t0.map((n) => ({ ...n, f16: n.st % 2 === 1 })) : add16(t0);
     themes.set(name, t); return t;
   };
-  const degOf = (semi) => { let best = 0, bd = 99; for (let d = LO - NS; d <= HI + NS; d++) { const x = Math.abs(degSemi(d) - semi); if (x < bd) { bd = x; best = d; } } return best; };
   const themeFor0 = (name) => {
     if (themes.has(name)) return themes.get(name);
-    if (MY && name.startsWith('MY')) { const ph = MY[Number(name.slice(2))]; const ns = ph.map((n) => ({ st: n.st, d: degOf(n.semi), semi: n.semi, my: true })); if (ns.length) ns[ns.length - 1].end = true; return ns; }
-    if (style === 'pro') { const t = proTheme(); themes.set(name, t); return t; }
+    if (style === 'pro') { const t = mrnd() < .45 ? learnTheme() : proTheme(); themes.set(name, t); return t; }
+    if (mrnd() < .35) { const t = learnTheme(); themes.set(name, t); return t; }
     const kind = mpick(MTYPES[style] || ['qa']), seqv = mpick([1, 2, -1, -2, 3]);
     const close = (from) => { const a2 = barLine(mpick(ENDR), from, NS, 1, 48); a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true; return a2; };
     if (kind === 'hook' || kind === 'arp') {
@@ -771,7 +725,10 @@ async function renderTrack(c, onProg) {
   const lineFor = (name, L, vari) => {
     const key = name + '|' + L + '|' + vari; if (lines.has(key)) return lines.get(key);
     const grid = L < 0 ? 16 : L === 0 ? 8 : L === 1 ? (r16 >= .6 ? 2 : 4) : L === 2 ? 2 : 1;
-    let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end || (n.f16 && L >= 2 && (style !== 'pro' || r16 >= .3)) || (n.f16 && L === 1 && r16 >= .8) || (n.my && L >= 1)).map((n) => ({ ...n }));
+    let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end || (n.f16 && L >= 2 && (style !== 'pro' || r16 >= .3)) || (n.f16 && L === 1 && r16 >= .8)).map((n) => ({ ...n }));
+    if (L <= 1) for (let bar = 0; bar < 4; bar++) if (!ns.some((n) => n.st >= bar * 16 && n.st < bar * 16 + 16)) {   // 걸러내다 한 마디가 통째로 비면 그 마디 첫 음을 마디 첫 박으로 당겨 둠(긴 공백 방지)
+      const src = themeFor(name).find((n) => n.st >= bar * 16 && n.st < bar * 16 + 16); if (src) ns.push({ ...src, st: bar * 16, f16: false }); }
+    ns.sort((x, y) => x.st - y.st);
     if (vari && L >= (km >= .5 ? 1 : 2)) {   // 변주: 긴 음을 쪼개 이웃음을 넣고, 몇몇 음은 한 옥타브 위로
       const out = [];
       ns.forEach((n, i) => {
@@ -780,28 +737,17 @@ async function renderTrack(c, onProg) {
         else out.push(n);
       });
       ns = out;
-      if (L >= 3) for (const n of ns) if (n.st >= 32 && n.st < 48 && n.d + NS <= HI + 2) { n.d += NS; if (n.semi != null) n.semi += 12; }
+      if (L >= 3) for (const n of ns) if (n.st >= 32 && n.st < 48 && n.d + NS <= HI + 2) n.d += NS;
     }
     if ((L >= 3 || (L >= 2 && km >= .6)) && !vari) {  // 다음 4마디로 넘어가는 16분음표 3개짜리 올림 꾸밈
       const last = ns[ns.length - 1];
       if (last.st <= 57) { const to = themeFor(name)[0].d; for (let k = 0; k < 3; k++) ns.push({ st: 61 + k, d: clampD(to - 3 + k), run: true }); }
     }
     ns.sort((x, y) => x.st - y.st);
-    const res = ns.map((n, i) => { const len = (i + 1 < ns.length ? ns[i + 1].st : 64) - n.st; return { ...n, len, strong: !n.run && (n.st % 8 === 0 || (n.st % 4 === 0 && len >= 3) || len >= 6) && !(n.st % 8 && mrnd() < .12) }; });
+    const res = ns.map((n, i) => { const len = (i + 1 < ns.length ? ns[i + 1].st : 64) - n.st; return { ...n, len, strong: !n.run && (n.st % 8 === 0 || (n.st % 4 === 0 && len >= 3) || len >= 5) && !(n.st % 8 && mrnd() < .12) }; });
     lines.set(key, res); return res;
   };
   let lastMel = null;
-  const MY = c.myMel && c.myMel.phrases && c.myMel.phrases.length ? c.myMel.phrases : null;
-  const myIx = (s, blk) => { const base = { H: 0, K: 1, V: 2, I: 0 }[roleOf(s)] ?? 0; return (base + ((blk >> 1) % 2) * 3 + (isFlip(s.bar) ? 1 : 0)) % MY.length; };
-  const myChords = MY ? MY.map((ph) => {   // 마디마다 선율 음이 가장 많이(길게) 들어가는 화음을 고름
-    const vocab = [...new Set(PROGS.flat().concat(['i', 'iv', 'VI', 'VII', 'III', c.style === 'pro' || c.style === 'latin' ? 'V' : 'v']))].filter((x) => CH[x]);
-    let prev = null; return [0, 1, 2, 3].map((bar) => {
-      const ns = ph.filter((n) => n.st >= bar * 16 && n.st < bar * 16 + 16); let best = prev || 'i', bs = -1e9;
-      for (const nm of vocab) { const pcs = CH[nm].map((x) => ((x % 12) + 12) % 12); let sc = 0;
-        for (const n of ns) { const w = Math.min(n.len, 8) * (n.st % 4 === 0 ? 1.4 : 1); sc += pcs.includes(((n.semi % 12) + 12) % 12) ? w : -.7 * w; }
-        if (nm === prev) sc -= .8; if (nm === 'i' && (bar === 0 || bar === 3)) sc += .6;
-        if (sc > bs) { bs = sc; best = nm; } }
-      prev = best; return best; }); }) : null;
   const prog = pick(PROGS);
   // 구간마다, 그리고 4마디마다 다른 화음 진행. 바로 앞 진행과 겹치지 않게 고름
   const secProgs = new Map(); let lastProg = prog;
@@ -811,7 +757,6 @@ async function renderTrack(c, onProg) {
     roles.set(x.name, /인트로|쉬어|브레이크/.test(x.name) ? 'I' : x.name === '마무리' ? 'H' : x.lv >= 2 ? (hk++ % 2 ? 'K' : 'H') : 'V'); } }
   const roleOf = (x) => roles.get(x.name) || 'V';
   const progFor = (s, k, fl) => {
-    if (MY) return myChords[myIx(s, k * 2)];
     const key = km >= .75 ? s.bar + '|' + k : (fl ? 'F' : '') + roleOf(s) + '|' + (k % 2);   // 같은 역할 구간은 같은 화음 진행(후렴이 돌아오면 화음도 돌아옴)
     if (!secProgs.has(key)) { const pool = fl ? MPROGS : PROGS; let pg = k === 0 && s.bar === 0 && !fl ? prog : pick(pool), n = 0; while (pg === lastProg && n++ < 6) pg = pick(pool); lastProg = pg; secProgs.set(key, pg); }
     return secProgs.get(key);
@@ -904,7 +849,7 @@ async function renderTrack(c, onProg) {
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
     const ph = b - s.bar, blk = Math.floor(ph / 4), vari = blk % 2, pOff = (ph % 4) * 16;   // 4마디 묶음마다 멜로디가 달라짐: 주제 → 꾸밈 변주 → 새 주제 → 그 변주 …
-    const line = MY ? lineFor('MY' + myIx(s, blk), BRK ? -1 : L, vari) : lineFor((km >= .75 ? s.name : roleOf(s)) + (FL ? '|반전' : '') + (km >= .75 ? (blk >= 1 ? '#' + blk : '') : km >= .35 && (blk >> 1) % 2 ? '#b' : ''), BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
+    const line = lineFor((km >= .75 ? s.name : roleOf(s)) + (FL ? '|반전' : '') + (km >= .75 ? (blk >= 1 ? '#' + blk : '') : km >= .35 && (blk >> 1) % 2 ? '#b' : ''), BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16 + (i % 2 ? KN.swing / 100 * s16 * .38 : 0); if (t >= endT - 1e-4) break;
       if (i === 0 && line && !BRK && L >= 1 && KN.counter > 0) {   // 대선율: 멜로디가 길게 끌거나 쉬는 틈에 다른 악기가 짧게 받아침
@@ -920,7 +865,7 @@ async function renderTrack(c, onProg) {
         if (bd > .1) for (const x of [ch[0] - 12, ch[0] - 5, ch[1]]) P('LD', 'mdbl', t, [.2, .28, .34, .4][L], bd, hz(x, 4));
       }
       if (line) for (const n of line) if (n.st === i + pOff) {
-        let semi = n.semi != null ? n.semi : degSemi(n.d); if (n.semi != null) { /* 내 멜로디: 그대로 */ } else if (n.end) semi = nearestChordTone(semi, [ch[0]]); else if (n.strong) { const raw = semi; semi = nearestChordTone(raw, ch); if (semi === lastMel) semi = nearestChordTone(raw + (raw >= semi ? 3 : -3), ch); }
+        let semi = degSemi(n.d); if (n.end) semi = nearestChordTone(semi, [ch[0]]); else if (n.strong) { const raw = semi; semi = nearestChordTone(raw, ch); if (semi === lastMel) semi = nearestChordTone(raw + (raw >= semi ? 3 : -3), ch); }
         const d = Math.min(n.len * s16 * 1.03, endT - t + s16 * 2);   // 음끼리 살짝 겹쳐 레가토로, 타격 구간에도 끊지 않음
         if (d <= .05) continue;
         // 사람이 연주하듯: 박자를 아주 조금 흔들고, 센박은 세게·여린박은 약하게, 4마디 프레이즈 가운데가 부풀게
