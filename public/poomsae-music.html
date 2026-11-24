@@ -226,6 +226,7 @@ const KNOBS = [
   ['perc', '🥁 타악 화려함', '단순하게', '화려하게', 60, '사이사이 잔타(콩가·림·톰 등)가 늘고 리듬이 더 자주 바뀌어요.'],
   ['fill', '🌀 필인', '거의 없음', '자주·길게', 55, '프레이즈 끝에 북이 몰아치는 필인이 얼마나 자주, 길게 나올지.'],
   ['mel', '🎵 멜로디 변화', '되풀이', '계속 새롭게', 65, '새 주제가 나오는 간격, 꾸밈음·달음질음 양.'],
+  ['r16', '🎼 16분음표 섞기', '8분 위주', '16분 많이', 55, '멜로디 마디 중간중간 한 박을 16분음표로 잘게 쪼개요(대회곡처럼 8분·16분이 섞인 리듬).'],
   ['swap', '🎻 멜로디 악기 바꾸기', '한 악기로', '구간마다', 45, '구간마다 멜로디 악기가 바뀔 확률(멜로디 악기가 자동일 때).'],
   ['counter', '🎶 대선율', '없음', '많이', 50, '멜로디가 쉬는 틈에 다른 악기가 받아치는 두 번째 선율.'],
   ['swing', '💃 스윙', '곧게', '출렁이게', 0, '엇박을 살짝 늦춰서 튀는 느낌을 줘요.'],
@@ -395,6 +396,7 @@ function parsePrompt(text) {
   if (/화려|다채|풍성|다양/.test(T)) { Object.assign(cfg.knobs, { perc: 85, mel: 85, counter: 70, fill: 70, swap: 65 }); done.push('🎛️ 화려하게'); }
   else if (/단순|심플|담백/.test(T)) { Object.assign(cfg.knobs, { perc: 25, mel: 30, counter: 15, fill: 30, swap: 10 }); done.push('🎛️ 단순하게'); }
   if (/묵직|무겁|무거운|웅장한\s*북|헤비/.test(T)) { cfg.knobs.weight = 95; done.push('🪨 타악 묵직하게'); } else if (/가볍|경쾌/.test(T)) { cfg.knobs.weight = 30; done.push('🪶 타악 가볍게'); }
+  if (/16분|잘게|촘촘|빠른\s*음표/.test(T)) { cfg.knobs.r16 = 85; done.push('🎼 16분음표 많이'); } else if (/8분\s*위주|느긋|여유/.test(T)) { cfg.knobs.r16 = 20; done.push('🎼 8분 위주'); }
   if (/스윙|셔플|출렁/.test(T)) { cfg.knobs.swing = 45; done.push('💃 스윙'); }
   // 마지막 자세
   const clauses = T.split(/[,.，。!\n]|그리고|하고\s|하며|이고|다음에?/).map((x) => x.trim()).filter(Boolean);
@@ -554,7 +556,7 @@ async function renderTrack(c, onProg) {
   if (FT != null) c = { ...c, dur: toU(c.dur), endHit: toU(c.endHit), sections: c.sections.map((x) => ({ ...x, t: toU(x.t) })), hits: c.hits.map((h) => ({ ...h, t: toU(h.t) })) };
   const FU = FT == null ? null : toU(FT);
   const sr = 44100; let D = c.dur, N = Math.ceil(sr * D);
-  const KN = { ...KNOB_DEF, ...(c.knobs || {}) }, kw = KN.weight / 100, kp = KN.perc / 100, kf = KN.fill / 100, km = KN.mel / 100;
+  const KN = { ...KNOB_DEF, ...(c.knobs || {}) }, kw = KN.weight / 100, kp = KN.perc / 100, kf = KN.fill / 100, km = KN.mel / 100, r16 = KN.r16 / 100;
   const styleIx = Object.keys(STYLES).indexOf(c.style);
   const rnd = rngOf(c.seed * 7919 + styleIx * 104729 + 17), pick = (a) => a[Math.floor(rnd() * a.length)];
   const spb = 60 / c.bpm, BAR = spb * 4, s16 = spb / 4;
@@ -647,7 +649,33 @@ async function renderTrack(c, onProg) {
     const b4 = riffBar([A, mpick(CELLS)], b3[b3.length - 1].d, 48, -1); b4.push({ st: 56, d: NS, end: true });   // 마지막 두 박은 으뜸음으로 길게
     return [...b1, ...b2, ...b3, ...b4];
   };
+  // 16분 무늬: 레퍼런스 대회곡 분석(마디 대부분이 8분+16분+긴 음 섞임, 16분 자리 시작이 음의 절반 가까이, 같은 음 되풀이·4도 도약 잦음)
+  const CELL16 = [[0, 1, 2, 3], [0, 1, 2], [0, 2, 3], [0, 1, 3], [0, 1], [0, 3], [0, 2, 3], [0, 1, 2, 3]];
+  const SHAPE16 = { 4: [[0, 1, 2, 3], [0, -1, -2, -3], [0, 1, 0, -1], [0, 0, 3, 0], [0, -1, 0, 3], [3, 2, 1, 0], [0, 0, -1, 1]], 3: [[0, 1, 2], [0, -1, -2], [0, 0, 3], [0, 1, 0], [2, 1, 0], [0, 3, 2]], 2: [[0, 1], [0, -1], [0, 3], [0, 0], [1, 0]] };
+  const add16 = (notes) => {
+    if (r16 <= .05) return notes;
+    let out = notes.map((n) => ({ ...n }));
+    for (let bar = 0; bar < 4; bar++) {
+      if (mrnd() > .2 + .7 * r16) continue;
+      const beats = [1, 3, 2, 0].filter((k) => { const p = bar * 16 + k * 4; const n = out.find((x) => x.st === p); return n && !n.end && p < 56 && !out.some((x) => x.st > p && x.st < p + 4 && x.st % 2 === 1); });
+      const howMany = r16 > .7 && mrnd() < .5 ? 2 : 1;
+      for (const k of beats.slice(0, howMany).map((x, i, a) => (i === 0 && mrnd() < .35 && a.length > 1 ? a[1] : x))) {
+        const p = bar * 16 + k * 4, n = out.find((x) => x.st === p); if (!n) continue;
+        const nxt = out.filter((x) => x.st >= p + 4).sort((a, b) => a.st - b.st)[0];
+        out = out.filter((x) => !(x.st > p && x.st < p + 4));
+        const cell = mpick(CELL16); let shp = mpick(SHAPE16[cell.length]);
+        if (nxt && ((nxt.d < n.d && shp[shp.length - 1] > 0) || (nxt.d > n.d && shp[shp.length - 1] < 0))) shp = shp.map((x) => -x);   // 다음 음 쪽으로 흘러가게
+        cell.forEach((o, i) => { if (o === 0) return; out.push({ st: p + o, d: clampD(n.d + shp[i]), f16: true }); });
+      }
+    }
+    return out.sort((a, b) => a.st - b.st);
+  };
   const themeFor = (name) => {
+    if (themes.has(name)) return themes.get(name);
+    const t0 = themeFor0(name), t = style === 'pro' ? t0.map((n) => ({ ...n, f16: n.st % 2 === 1 })) : add16(t0);
+    themes.set(name, t); return t;
+  };
+  const themeFor0 = (name) => {
     if (themes.has(name)) return themes.get(name);
     if (style === 'pro') { const t = proTheme(); themes.set(name, t); return t; }
     const kind = mpick(MTYPES[style] || ['qa']), seqv = mpick([1, 2, -1, -2, 3]);
@@ -680,8 +708,8 @@ async function renderTrack(c, onProg) {
   const lines = new Map();
   const lineFor = (name, L, vari) => {
     const key = name + '|' + L + '|' + vari; if (lines.has(key)) return lines.get(key);
-    const grid = L < 0 ? 16 : L === 0 ? 8 : L === 1 ? 4 : L === 2 ? 2 : 1;
-    let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end).map((n) => ({ ...n }));
+    const grid = L < 0 ? 16 : L === 0 ? 8 : L === 1 ? (r16 >= .6 ? 2 : 4) : L === 2 ? 2 : 1;
+    let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end || (n.f16 && L >= 2 && (style !== 'pro' || r16 >= .3)) || (n.f16 && L === 1 && r16 >= .8)).map((n) => ({ ...n }));
     if (vari && L >= (km >= .5 ? 1 : 2)) {   // 변주: 긴 음을 쪼개 이웃음을 넣고, 몇몇 음은 한 옥타브 위로
       const out = [];
       ns.forEach((n, i) => {
