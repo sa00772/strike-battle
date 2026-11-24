@@ -48,6 +48,10 @@
   .list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
   .item { display:grid; grid-template-columns:76px 1fr 104px 44px 36px; gap:6px; align-items:center; }
   .item.h { grid-template-columns:76px 1fr 36px; }
+  .item.s6 { grid-template-columns:76px 1fr 104px 44px 44px 36px; }
+  .item .ib { padding:.35em 0; background:none; border:1px solid #3a4152; font-size:.85rem; } .item .ib.on { border-color:var(--gold); background:#3a3520; }
+  .ipanel { margin:-2px 0 8px; padding:8px; border:1px dashed #3a4152; border-radius:8px; } .ipanel .inst { display:flex; flex-wrap:wrap; gap:6px; }
+  .ipanel .chip { font-size:.8rem; padding:.4em .55em; } .ipanel .chip.ch { border-style:dashed; } .ipanel .ph { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:.82rem; color:var(--muted); }
   .item input, .item select { padding:.4em .5em; font-size:.9rem; }
   .item .x { padding:.35em 0; background:none; border:1px solid #3a4152; color:var(--muted); }
   .item .acc { padding:.35em 0; background:none; border:1px solid #3a4152; filter:grayscale(1); opacity:.45; } .item .acc.on { filter:none; opacity:1; border-color:var(--gold); background:#3a3520; }
@@ -83,7 +87,7 @@
   .save { display:grid; grid-template-columns:1fr 1fr auto auto; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   @media (max-width:640px) { .grid4 { grid-template-columns:1fr 1fr; } .save { grid-template-columns:1fr 1fr; } .styles { grid-template-columns:1fr 1fr; } .style-btn small { display:none; } }
   #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#000d; color:#fff; padding:.7em 1.1em; border-radius:12px; font-weight:700; display:none; z-index:50; max-width:90vw; text-align:center; }
-  @media (max-width:560px) { .tl .seg { font-size:.58rem; padding:3px 2px; word-break:keep-all; } .tl .seg .lv { display:none; } .item { grid-template-columns:66px 1fr 78px 36px 30px; gap:4px; } .item input, .item select { padding:.4em .35em; font-size:.85rem; } .item.h { grid-template-columns:64px 1fr 32px; } }
+  @media (max-width:560px) { .tl .seg { font-size:.58rem; padding:3px 2px; word-break:keep-all; } .tl .seg .lv { display:none; } .item { grid-template-columns:66px 1fr 78px 36px 30px; gap:4px; } .item input, .item select { padding:.4em .35em; font-size:.85rem; } .item.h { grid-template-columns:64px 1fr 32px; } .item.s6 { grid-template-columns:62px 1fr 70px 32px 34px 28px; } }
 </style>
 </head>
 <body>
@@ -200,6 +204,9 @@ const LEADS = { auto: ['자동 (분위기에 맞춰)'], french_horn: ['📯 호�
   string_ensemble_1: ['🎻 현악', -12, 'saw'], acoustic_grand_piano: ['🎹 피아노', -12, 'saw'], electric_piano_1: ['🎹 일렉 피아노', -12, 'saw'], lead_2_sawtooth: ['🎛️ 신스 리드', -12, 'saw'] };
 const STYLE_LEAD = { pro: 'string_ensemble_1', epic: 'french_horn', edm: 'lead_2_sawtooth', gugak: 'shanai', hiphop: 'electric_piano_1', latin: 'trumpet' };
 const PERC_SET = ['taikoL', 'fills', 'cymbal', 'msnare', 'conga', 'tamb'];
+// 구간마다 켜고 끌 수 있는 큰 덩어리(기본은 모두 켬). 악기 칩은 위 '2. 악기' 설정이 기본값
+const SEC_PARTS = [['melody', '🎵 멜로디', /멜로디|선율/], ['bass', '🎸 베이스', /베이스|저음/], ['beat', '🥁 타악 전체', /타악\s*전체|북\s*전부|비트\s*전체|드럼\s*전부/]];
+const secOn = (s, k) => (s.inst && k in s.inst ? s.inst[k] : SEC_PARTS.some(([x]) => x === k) ? true : !!cfg.opts[k]);
 const instOff = () => Object.fromEntries(INSTR.map(([k]) => [k, false]));
 const instFor = (st) => { const o = instOff(); for (const k of STYLE_INST[st] || []) o[k] = true; return o; };
 const KEYS = [['A', 0], ['B', 2], ['C', 3], ['D', 5], ['E', -5], ['F', -4], ['G', -2]];
@@ -292,12 +299,18 @@ function renderTimeline() {
   for (let t = 0; t <= D; t += step) h += `<span style="left:${t / D * 100}%">${t}</span>`;
   $('ticks').innerHTML = h;
 }
+const openSec = new Set();
 function renderLists() {
-  $('secs').innerHTML = cfg.sections.map((s, i) => `<div class="item"><input type="number" step="0.5" min="0" value="${s.t}" data-st="${i}" aria-label="시작(초)">
+  const labOf = Object.fromEntries([...SEC_PARTS, ...INSTR].map(([k, l]) => [k, l]));
+  const nOv = (s) => Object.keys(s.inst || {}).length;
+  $('secs').innerHTML = cfg.sections.map((s, i) => `<div class="item s6"><input type="number" step="0.5" min="0" value="${s.t}" data-st="${i}" aria-label="시작(초)">
     <select data-sn="${i}" aria-label="구간 이름">${SEC_TYPES.map(([n]) => `<option${n === s.name ? ' selected' : ''}>${n}</option>`).join('')}</select>
     <select data-sl="${i}" aria-label="세기">${LEVELS.map((l, k) => `<option value="${k}"${k === s.lv ? ' selected' : ''}>${l}</option>`).join('')}</select>
     <button class="acc${s.accent ? ' on' : ''}" data-sa="${i}" title="짧은 북소리 더하기" aria-label="짧은 북소리" aria-pressed="${!!s.accent}">🥁</button>
-    <button class="x" data-sx="${i}" aria-label="구간 삭제">✕</button></div>`).join('') || '<div class="hint">구간이 없어요.</div>';
+    <button class="ib${nOv(s) ? ' on' : ''}" data-si="${i}" title="이 구간에 넣고 뺄 악기" aria-label="이 구간 악기" aria-expanded="${openSec.has(i)}">🎛${nOv(s) ? nOv(s) : ''}</button>
+    <button class="x" data-sx="${i}" aria-label="구간 삭제">✕</button></div>${openSec.has(i) ? `<div class="ipanel"><div class="ph"><span>${esc(s.name)} 구간에서 켤 악기 · 점선은 기본과 다르게 바꾼 것</span><button class="small" data-sr="${i}">기본대로</button></div>
+    <div class="inst">${[...SEC_PARTS.map(([k]) => k), ...INSTR.map(([k]) => k).filter((k) => cfg.opts[k] || (s.inst && k in s.inst))].map((k) => `<button class="chip${secOn(s, k) ? ' on' : ''}${s.inst && k in s.inst ? ' ch' : ''}" data-sk="${i}:${k}" aria-pressed="${secOn(s, k)}">${labOf[k]}</button>`).join('')}</div>
+    <div class="hint" style="margin-top:6px">위 '2. 악기'에서 켠 악기만 보여요. 꺼 둔 악기를 이 구간에만 넣으려면 위에서 켠 다음 다른 구간에서 빼 주세요.</div></div>` : ''}`).join('') || '<div class="hint">구간이 없어요.</div>';
   $('hits').innerHTML = cfg.hits.map((h, i) => `<div class="item h"><input type="number" step="0.5" min="0" value="${h.t}" data-ht="${i}" aria-label="타격 시간(초)">
     <input value="${esc(h.label)}" data-hl="${i}" placeholder="메모 (예: 540 회전)" aria-label="메모">
     <button class="x" data-hx="${i}" aria-label="타격 삭제">✕</button></div>`).join('') || '<div class="hint">타격 포인트가 없어요.</div>';
@@ -306,12 +319,16 @@ function renderLists() {
   on('[data-sn]', 'change', (el) => { const s = cfg.sections[el.dataset.sn]; s.name = el.value; s.lv = SEC_TYPES.find((x) => x[0] === el.value)[1]; renderLists(); });
   on('[data-sl]', 'change', (el) => { cfg.sections[el.dataset.sl].lv = Number(el.value); });
   on('[data-sa]', 'click', (el) => { const s = cfg.sections[el.dataset.sa]; s.accent = !s.accent; renderLists(); });
-  on('[data-sx]', 'click', (el) => { cfg.sections.splice(Number(el.dataset.sx), 1); renderLists(); });
+  on('[data-sx]', 'click', (el) => { cfg.sections.splice(Number(el.dataset.sx), 1); openSec.clear(); renderLists(); });
+  on('[data-si]', 'click', (el) => { const i = Number(el.dataset.si); if (openSec.has(i)) openSec.delete(i); else openSec.add(i); renderLists(); });
+  on('[data-sr]', 'click', (el) => { delete cfg.sections[el.dataset.sr].inst; renderLists(); });
+  on('[data-sk]', 'click', (el) => { const [i, k] = el.dataset.sk.split(':'); const s = cfg.sections[i]; const nv = !secOn(s, k); const base = SEC_PARTS.some(([x]) => x === k) ? true : !!cfg.opts[k];
+    s.inst = { ...(s.inst || {}) }; if (nv === base) delete s.inst[k]; else s.inst[k] = nv; if (!Object.keys(s.inst).length) delete s.inst; renderLists(); });
   on('[data-ht]', 'change', (el) => { cfg.hits[el.dataset.ht].t = num(el.value, 0, cfg.dur, 0); sortAll(); });
   on('[data-hl]', 'input', (el) => { cfg.hits[el.dataset.hl].label = el.value.slice(0, 40); });
   on('[data-hx]', 'click', (el) => { cfg.hits.splice(Number(el.dataset.hx), 1); renderLists(); });
 }
-function sortAll() { cfg.sections.sort((a, b) => a.t - b.t); cfg.hits.sort((a, b) => a.t - b.t); renderLists(); }
+function sortAll() { openSec.clear(); cfg.sections.sort((a, b) => a.t - b.t); cfg.hits.sort((a, b) => a.t - b.t); renderLists(); }
 let dirty = false;
 function changed() { persist(); renderTimeline(); if (rendered) { dirty = true; $('dirty').style.display = 'block'; } }
 
@@ -361,7 +378,7 @@ const TECH = [
 function parsePrompt(text) {
   const T = String(text || ''), done = [], miss = [];
   cfg.opts = { ...instFor(cfg.style), endBig: false };                      // 새 설명은 처음부터 다시 적용
-  cfg.sections.forEach((x) => { x.accent = false; x.lv = (SEC_TYPES.find((y) => y[0] === x.name) || [0, 1])[1]; });
+  cfg.sections.forEach((x) => { x.accent = false; delete x.inst; x.lv = (SEC_TYPES.find((y) => y[0] === x.name) || [0, 1])[1]; });
   const has = (re) => re.test(T);
   // 분위기
   const styleRules = [['pro', /대회(?!형)|하이브리드|트레일러|시합/], ['latin', /살사|라틴|맘보|삼바|룸바|차차/], ['gugak', /국악|장구|꽹과리|사물놀이|전통|피리|가야금|아리랑/], ['hiphop', /힙합|트랩|랩|붐뱁/], ['edm', /edm|EDM|전자|일렉|댄스|클럽|테크노|하우스/], ['epic', /웅장|오케스트라|에픽|영화|장엄|태고|시범/]];
@@ -381,11 +398,12 @@ function parsePrompt(text) {
   const ds = [['funk', /펑크|펑키|funk/i], ['disco', /디스코|four|포비트/i], ['break', /브레이크\s*비트|브레이크비트|브레익/], ['half', /하프\s*타임|묵직한\s*드럼/], ['rock', /록|락|rock/i]].find(([, re]) => re.test(T));
   if (ds) { cfg.drumStyle = ds[0]; cfg.opts.drumkit = true; done.push('🥁 드럼 ' + $('dstyle').querySelector(`[value=${ds[0]}]`).textContent.split(' ')[0]); }
   if (/타악기|퍼커션|리듬\s*(?:악기|많이|강하게)|북\s*많이/.test(T) && !/타악기\s*(?:는|은)?\s*(?:빼|없이)/.test(T)) { for (const k of PERC_SET) cfg.opts[k] = true; done.push('🥁 타악기 더하기'); }
+  const TG = T.split(/[,.，。!\n]|그리고|하고\s|하며|이고|다음에?/).filter((x) => !TECH.some(([, r]) => r.test(x))).join(', ');   // 기술 이름이 든 문장은 그 구간에만 적용(아래)
   for (const [k, l, re] of INSTR) {
-    const m = T.match(re); if (!m) continue;
-    let end = T.length; const pm = T.slice(m.index).search(/[,.\n]/); if (pm > 0) end = m.index + pm;
-    for (const [, , r2] of INSTR) { const g = new RegExp(r2.source, 'g' + r2.flags.replace('g', '')); let mm; while ((mm = g.exec(T))) if (mm.index > m.index && mm.index < end) end = mm.index; }
-    const c = T.slice(m.index, end);
+    const m = TG.match(re); if (!m) continue;
+    let end = TG.length; const pm = TG.slice(m.index).search(/[,.\n]/); if (pm > 0) end = m.index + pm;
+    for (const [, , r2] of INSTR) { const g = new RegExp(r2.source, 'g' + r2.flags.replace('g', '')); let mm; while ((mm = g.exec(TG))) if (mm.index > m.index && mm.index < end) end = mm.index; }
+    const c = TG.slice(m.index, end);
     if (noRe.test(c)) { cfg.opts[k] = false; done.push(`${l} 빼기`); } else { cfg.opts[k] = true; done.push(l); }
   }
   cfg.lead = 'auto';
@@ -412,13 +430,15 @@ function parsePrompt(text) {
     const s = cfg.sections.find((x) => x.name === name);
     if (!s) { miss.push(`${name} 구간이 없어요`); continue; }
     const what = [];
-    if (/북|드럼|타악|둥둥|둥/.test(c)) { s.accent = true; what.push('짧은 북소리'); }
+    if (/북|드럼|타악|둥둥|둥/.test(c) && !/(타악|북|드럼|비트)[^,.]{0,8}(빼|없이|말고|제외)/.test(c)) { s.accent = true; what.push('짧은 북소리'); }
     if (/강|크게|세게|타격|쾅|터지|임팩트|최고|하이라이트/.test(c)) {
       s.lv = 3; what.push('최고조');
       const i = cfg.sections.indexOf(s), end = i + 1 < cfg.sections.length ? cfg.sections[i + 1].t : cfg.endHit;
       if (!cfg.hits.some((h) => h.t >= s.t && h.t < end)) { cfg.hits.push({ t: Math.round((s.t + (end - s.t) * .6) * 2) / 2, label: name }); what.push('타격 포인트 추가'); }
     }
     if (/잔잔|조용|부드럽|약하게/.test(c)) { s.lv = 0; what.push('잔잔하게'); }
+    for (const [k, l, re] of [...SEC_PARTS, ...INSTR]) { if (k === 'flute' || !re.test(c)) continue;   // 이 구간에만 악기 넣기·빼기
+      const m = c.match(re), tail = c.slice(m.index, m.index + 14), on = !noRe.test(tail); s.inst = { ...(s.inst || {}), [k]: on }; if (on && !SEC_PARTS.some(([x]) => x === k)) cfg.opts[k] = cfg.opts[k] || false; what.push(`${l} ${on ? '넣기' : '빼기'}`); }
     if (what.length) done.push(`${name}: ${what.join(', ')}`);
   }
   cfg.sections.sort((a, b) => a.t - b.t); cfg.hits.sort((a, b) => a.t - b.t);
@@ -778,7 +798,7 @@ async function renderTrack(c, onProg) {
   };
   const chordAt = (b) => { const s = secAt(b), k = Math.floor((b - s.bar) / 4), pg = progFor(s, k, isFlip(b)); return CH[pg[(b - s.bar) % pg.length]]; };
   const nearestChordTone = (semi, ch) => { let best = semi, bd = 99; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o, dd = Math.abs(x - semi); if (dd < bd) { bd = dd; best = x; } } return best; };
-  const O = c.opts || {};
+  const O0 = { ...(c.opts || {}) }, O = { ...O0 };   // O는 마디마다 그 구간 설정으로 바뀜(원래 설정은 O0)
   const style = c.style;
   const leadName = c.lead && c.lead !== 'auto' && LEADS[c.lead] ? c.lead : O.flute ? (style === 'gugak' ? 'shakuhachi' : 'flute') : STYLE_LEAD[style] || 'lead_2_sawtooth';
   const LEAD_I = [leadName, LEADS[leadName][1]], leadKind = LEADS[leadName][2];
@@ -846,7 +866,8 @@ async function renderTrack(c, onProg) {
   for (let b = 0; b < nBars; b++) {
     const t0 = b * BAR; if (t0 >= endT) break;
     curFlip = isFlip(b); const FL = curFlip;
-    const s = secAt(b), BRK = s.name === '브레이크', L = BRK ? 0 : (FL ? Math.max(2, s.lv) : s.lv), ch = chordAt(b), firstOfSec = b === s.bar;   // 브레이크: 비트를 멈추고 다음 타격을 기다림
+    const s = secAt(b); for (const k in O0) O[k] = s.inst && k in s.inst ? s.inst[k] : O0[k]; if (s.inst) for (const k in s.inst) if (!(k in O0)) O[k] = s.inst[k];
+    const BRK = s.name === '브레이크', L = BRK ? 0 : (FL ? Math.max(2, s.lv) : s.lv), ch = chordAt(b), firstOfSec = b === s.bar;   // 브레이크: 비트를 멈추고 다음 타격을 기다림
     const barEnd = Math.min(t0 + BAR, endT);
     pad(t0, barEnd - t0, ch, BRK ? .035 : [.05, .06, .065, .07][L], BRK ? 550 : [700, 1100, 1700, 2400][L] * (style === 'edm' ? 1.3 : 1), style === 'edm' && L >= 1 ? 'PU' : 'MU');
     if (firstOfSec && b > 0 && L >= 2) crash(t0, .6);
@@ -1053,6 +1074,10 @@ async function renderTrack(c, onProg) {
 
   // 반전 뒤는 실제 시간으로 줄여 빠르게
   const hitsOut = hits.map(toT), endOut = toT(endT);
+  { const BUSOF = { melody: ['LD', 'CT'], bass: ['BA'], beat: ['DR'] }, cuts = [];
+    secs.forEach((x, i) => { if (!x.inst) return; const a = x.bar * BAR, z = i + 1 < secs.length ? secs[i + 1].bar * BAR : endT - 1e-3;
+      for (const [k, buses] of Object.entries(BUSOF)) if (x.inst[k] === false) cuts.push([a, z, buses]); });
+    if (cuts.length) { const keep = events.filter((e) => !cuts.some(([a, z, bs]) => e[1] >= a - 1e-3 && e[1] < z - 1e-3 && bs.includes(e[0]) && !hits.some((h) => Math.abs(h - e[1]) < .06))); events.length = 0; events.push(...keep); } }
   if (FT != null) { for (const e of events) e[1] = r3(toT(e[1])); for (let k = 0; k < pumpBeats.length; k++) pumpBeats[k] = toT(pumpBeats[k]); D = realDur; N = Math.ceil(sr * D); for (let k = events.length - 1; k >= 0; k--) if (events[k][1] >= D) events.splice(k, 1); }
   { const ld = events.filter((e) => e[0] === 'LD' && (e[3] === 'lead' || e[3] === 'flead')).sort((x, y) => x[1] - y[1]);
     for (let k = 0; k + 1 < ld.length; k++) { const gap = ld[k + 1][1] - ld[k][1]; if (gap > .005 && ld[k][4] > gap + .012) ld[k][4] = r3(gap + .012); } }
