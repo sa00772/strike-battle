@@ -224,7 +224,7 @@ function defaults(dur = 95) {
     sections: [[0, '준비·인트로'], [8, '기본동작'], [22, '뛰어 옆차기'], [34, '다단계 발차기'], [46, '회전 발차기'], [58, '연속 발차기'], [70, '아크로바틱'], [84, '마무리']]
       .map(([t, n]) => ({ t: r(t), name: n, lv: SEC_TYPES.find((x) => x[0] === n)[1] })),
     hits: [[29, '뛰어 옆차기'], [41, '다단계'], [53, '회전'], [65, '연속'], [78, '아크로바틱']].map(([t, l]) => ({ t: r(t), label: l })),
-    endHit: r(96),
+    endHit: dur - 1.5,
   };
 }
 // 다채로움 노브: [키, 이름, 왼쪽 끝, 오른쪽 끝, 기본값, 설명]
@@ -246,10 +246,11 @@ cfg.opts = { ...instOff(), endBig: false, ...(cfg.opts || {}) }; cfg.drumStyle =
 if (!cfg.lead) cfg.lead = cfg.opts.flute ? (cfg.style === 'gugak' ? 'shakuhachi' : 'flute') : 'auto'; cfg.opts.flute = false;   // 대금·피리 칩은 멜로디 악기 고르기로 옮김
 cfg.knobs = { ...KNOB_DEF, ...(cfg.knobs || {}) }; delete cfg.myMel;
 if (cfg.sections && cfg.hits) fixShrunk();
+if (cfg.sections && !cfg.v95) { Object.assign(cfg, fitDur({ dur: cfg.dur, sections: cfg.sections, hits: cfg.hits, endHit: cfg.endHit }, 95)); cfg.v95 = true; }
 function fixShrunk() {
   if (!(cfg.endHit < cfg.dur * .6)) return false;
-  const k = (cfg.dur - 4) / Math.max(5, cfg.endHit);
-  cfg.sections.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.hits.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.endHit = cfg.dur - 4;
+  const k = (cfg.dur - 1.5) / Math.max(5, cfg.endHit);
+  cfg.sections.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.hits.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.endHit = cfg.dur - 1.5;
   setTimeout(() => toast('구간·타격 시간이 곡 앞쪽에 몰려 있어서 곡 길이에 맞게 다시 늘렸어요'), 300); return true;
 }
 const persist = () => { try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (_) {} };
@@ -340,7 +341,7 @@ let dirty = false;
 function changed() { persist(); renderTimeline(); if (rendered) { dirty = true; $('dirty').style.display = 'block'; } }
 
 $('dur').addEventListener('change', () => { const old = cfg.dur; cfg.dur = num($('dur').value, 30, 180, 100); $('dur').value = cfg.dur;
-  if (cfg.endHit > cfg.dur - 1 || old - cfg.endHit <= 6 || cfg.endHit < cfg.dur * .6) cfg.endHit = Math.max(5, cfg.dur - Math.min(6, Math.max(1, old - cfg.endHit))); $('endhit').value = cfg.endHit; fixShrunk(); changed(); });
+  if (cfg.endHit > cfg.dur - 1 || old - cfg.endHit <= 6 || cfg.endHit < cfg.dur * .6) cfg.endHit = Math.max(5, cfg.dur - Math.min(6, Math.max(1.5, old - cfg.endHit))); $('endhit').value = cfg.endHit; fixShrunk(); changed(); });
 $('bpm').addEventListener('change', () => { cfg.bpm = num($('bpm').value, 70, 180, 120); $('bpm').value = cfg.bpm; changed(); });
 $('key').addEventListener('change', () => { cfg.key = $('key').value; changed(); });
 $('dstyle').addEventListener('change', () => { cfg.drumStyle = $('dstyle').value; if (!cfg.opts.drumkit) { cfg.opts.drumkit = true; renderInst(); } changed(); });
@@ -353,15 +354,20 @@ $('add-hit').addEventListener('click', () => { const last = cfg.hits[cfg.hits.le
 // 구성 틀: 실제 대회 곡들의 흐름을 분석해 본뜬 것 (음원 자체는 담지 않음)
 const S_ = (t, name, lv, accent) => ({ t, name, lv: lv ?? (SEC_TYPES.find((x) => x[0] === name) || [0, 1])[1], ...(accent ? { accent: true } : {}) });
 const H_ = (arr) => arr.map((t) => ({ t, label: '' }));
+function fitDur(o, dur) {   // 구성 틀의 시간들을 곡 길이에 맞춤(마지막 동작은 끝 1.5초 전)
+  if (!o.dur || o.dur === dur) return { ...o, dur, endHit: dur - 1.5 };
+  const k = (dur - 1.5) / (o.endHit || o.dur - 4), r = (x) => Math.round(x * k * 2) / 2;
+  return { ...o, dur, sections: o.sections.map((x) => ({ ...x, t: r(x.t) })), hits: o.hits.map((h) => ({ ...h, t: r(h.t) })).filter((h) => h.t < dur - 2), endHit: dur - 1.5 };
+};
 const PRESETS = [
   { id: 'basic', name: '기본 구성', make: (c) => { const d = defaults(c.dur); return { sections: d.sections, hits: d.hits, endHit: d.endHit }; } },
-  { id: 'A', name: '대회형 A · 130 BPM 99초 · 후반 연속 타격', make: () => ({ dur: 99, bpm: 130,
+  { id: 'A', name: '대회형 A · 130 BPM · 후반 연속 타격', make: () => ({ dur: 99, bpm: 130,
     sections: [S_(0, '준비·인트로'), S_(9, '기본동작'), S_(17, '뛰어 옆차기'), S_(29, '다단계 발차기'), S_(34, '브레이크'), S_(38.5, '회전 발차기'), S_(51, '연속 발차기', 3, true), S_(70, '아크로바틱'), S_(90, '마무리')],
     hits: H_([17.5, 26.5, 29.5, 38.5, 51.5, 57, 60, 62.5, 66, 69.5, 76.5, 85.5]), endHit: 95 }) },
-  { id: 'B', name: '대회형 B · 140 BPM 98초 · 빠르고 고른 타격', make: () => ({ dur: 98, bpm: 140,
+  { id: 'B', name: '대회형 B · 140 BPM · 빠르고 고른 타격', make: () => ({ dur: 98, bpm: 140,
     sections: [S_(0, '준비·인트로'), S_(6, '기본동작'), S_(19, '뛰어 옆차기'), S_(22, '브레이크'), S_(25, '다단계 발차기'), S_(34, '회전 발차기'), S_(47, '연속 발차기', 2, true), S_(60, '쉬어가기', 1), S_(66, '아크로바틱'), S_(80, '연속 발차기', 3, true), S_(90, '마무리')],
     hits: H_([7, 13.5, 19.5, 25.5, 31, 37, 40.5, 51.5, 58, 67.5, 77, 83.5, 87.5]), endHit: 94 }) },
-  { id: 'C', name: '대회형 C · 120 BPM 93초 · 멈췄다 터지기 반복', make: () => ({ dur: 93, bpm: 120,
+  { id: 'C', name: '대회형 C · 120 BPM · 멈췄다 터지기 반복', make: () => ({ dur: 93, bpm: 120,
     sections: [S_(0, '준비·인트로', 2), S_(4, '브레이크'), S_(10, '기본동작', 2), S_(22, '브레이크'), S_(26, '뛰어 옆차기'), S_(34, '다단계 발차기'), S_(46, '연속 발차기', 3, true), S_(66, '브레이크'), S_(70, '아크로바틱'), S_(86, '브레이크')],
     hits: H_([2, 10, 14, 18, 26, 32, 36, 42, 50, 54, 58, 62, 70, 78, 82]), endHit: 90 }) },
 ];
@@ -369,7 +375,7 @@ $('preset').innerHTML += PRESETS.map((p) => `<option value="${p.id}">${esc(p.nam
 $('preset').addEventListener('change', () => {
   const p = PRESETS.find((x) => x.id === $('preset').value); $('preset').value = ''; if (!p) return;
   if (!confirm(`'${p.name}'으로 구간과 타격 포인트를 바꿀까요? 지금 구성은 사라져요.`)) return;
-  Object.assign(cfg, p.make(cfg)); fillInputs(); renderLists(); changed(); toast(`${p.name.split(' · ')[0]}로 바꿨어요.`);
+  Object.assign(cfg, fitDur(p.make(cfg), cfg.dur)); fillInputs(); renderLists(); changed(); toast(`${p.name.split(' · ')[0]}로 바꿨어요.`);
 });
 
 /* ------------ 말로 설명하기 → 설정 ------------ */
@@ -426,7 +432,7 @@ function parsePrompt(text) {
   cfg.lead = 'auto';
   if (cfg.opts.flute) { cfg.opts.flute = false; cfg.lead = /피리|태평소/.test(T) ? 'shanai' : /대금|단소|퉁소|소금/.test(T) || cfg.style === 'gugak' ? 'shakuhachi' : 'flute'; }
   else if (/호른/.test(T)) cfg.lead = 'french_horn';
-  const pm = T.match(/대회형\s*([ABCabc])/); if (pm) { const p = PRESETS.find((x) => x.id === pm[1].toUpperCase()); Object.assign(cfg, p.make(cfg)); done.push(p.name.split(' · ')[0] + ' 구성'); }
+  const pm = T.match(/대회형\s*([ABCabc])/); if (pm) { const p = PRESETS.find((x) => x.id === pm[1].toUpperCase()); Object.assign(cfg, fitDur(p.make(cfg), cfg.dur)); done.push(p.name.split(' · ')[0] + ' 구성'); }
   // 다채로움·무게
   if (/화려|다채|풍성|다양/.test(T)) { Object.assign(cfg.knobs, { perc: 85, mel: 85, counter: 70, fill: 70, swap: 65 }); done.push('🎛️ 화려하게'); }
   else if (/단순|심플|담백/.test(T)) { Object.assign(cfg.knobs, { perc: 25, mel: 30, counter: 15, fill: 30, swap: 10 }); done.push('🎛️ 단순하게'); }
@@ -645,7 +651,7 @@ async function renderTrack(c, onProg) {
   const degSemi = (d) => { const sc = SCALE, n = sc.length, o = Math.floor(d / n); return sc[((d % n) + n) % n] + 12 * o; };
 
   const nBars = Math.ceil(D / BAR);
-  const endT = Math.min(D - .8, Math.max(spb, Math.round(c.endHit / spb) * spb));
+  const endT = Math.min(Math.floor((D - .8) / spb) * spb, Math.max(spb, Math.round(c.endHit / spb) * spb));
   const secs = [...c.sections].sort((a, b) => a.t - b.t).map((s) => ({ ...s, bar: Math.round(s.t / BAR) }));
   if (!secs.length || secs[0].bar > 0) secs.unshift({ name: '준비·인트로', lv: 0, bar: 0 });
   const hits = [...new Set(c.hits.map((h) => Math.round(h.t / spb) * spb).filter((t) => t > spb && t < endT - spb / 2))].sort((a, b) => a - b);
@@ -1210,7 +1216,7 @@ async function renderTrack(c, onProg) {
   master.connect(hpf); hpf.connect(boom); boom.connect(deHarsh); deHarsh.connect(air); air.connect(comp); 
   const lim = main.createDynamicsCompressor(); lim.threshold.value = -3; lim.knee.value = 3; lim.ratio.value = 12; lim.attack.value = .002; lim.release.value = .12;   // 튀는 북소리 끝만 눌러 둠
   comp.connect(lim); lim.connect(shape); shape.connect(main.destination);   // 구간 음량 흐름은 압축이 끝난 뒤에 걸어야 살아남음
-  master.gain.setValueAtTime(1, 0); master.gain.setValueAtTime(1, Math.max(0, D - 1.0)); master.gain.linearRampToValueAtTime(0, D - .01);
+  master.gain.setValueAtTime(1, 0); master.gain.setValueAtTime(1, Math.max(0, Math.min(D - .3, Math.max(D - 1.0, toT(endT) + .4)))); master.gain.linearRampToValueAtTime(0, D - .01);
   // 구간 세기에 따른 음량 흐름: 잔잔 -6dB, 보통 -3.3dB, 강하게 -1.5dB, 최고조 0dB, 브레이크 -7.5dB.
   // 커질 때는 앞 마디부터 서서히 올리고(빌드업), 작아질 때는 구간이 바뀌는 순간 뚝 떨어뜨림
   { const LG = [.56, .7, .85, 1], gOf = (x) => x.name === '브레이크' ? .42 : LG[isFlip(x.bar) ? Math.max(2, x.lv) : Math.max(0, Math.min(3, x.lv))];
