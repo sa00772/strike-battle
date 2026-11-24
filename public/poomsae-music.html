@@ -855,6 +855,10 @@ async function renderTrack(c, onProg) {
   ];
   const frng = rngOf(c.seed * 59 + 3); let lastF = -1; const fills = new Map();
   const fillOf = (b) => { if (!fills.has(b)) { let f = Math.floor(frng() * FILLS.length), n = 0; while (f === lastF && n++ < 5) f = Math.floor(frng() * FILLS.length); lastF = f; fills.set(b, f); } return fills.get(b); };
+  // 대회 하이브리드 낮은 현악 무늬(16칸, 대문자 = 강세, 빈칸 = 쉼): 3+3+2 강세, 분산화음, 걷는 베이스 느낌 등
+  const OST = ['R..rR.R.r..R..F.', 'R.rFr.R.O.rFr.T.', 'R.F.O.F.T.F.O.F.', 'R..R..F.r.rR..O.', 'RrR.F.r.RrR.O.T.', 'R.r.rF..R.r.O.F.'].map((x) => [...x].map((ch) => (ch === '.' ? null : ch)));
+  const orng2 = rngOf(c.seed * 211 + styleIx * 17 + 9), osts = new Map();
+  const ostOf = (sec, bk) => { const k = sec.name + '|' + bk; if (!osts.has(k)) { let v = Math.floor(orng2() * OST.length); if (bk > 0 && osts.get(sec.name + '|' + (bk - 1)) === v) v = (v + 1) % OST.length; osts.set(k, v); } return osts.get(k); };
   const CLAVE = { son32: [[0, 6, 12], [4, 8]], son23: [[4, 8], [0, 6, 12]], rumba: [[0, 6, 14], [4, 8]] };
   const grng = rngOf(c.seed * 977 + styleIx * 31 + 3), grooves = new Map(); let lastG = -1;
   const grooveOf = (sec, bk) => {   // 같은 이름의 구간은 같은 그루브, 8마디마다·구간이 바뀌면 다른 그루브(바로 앞과 겹치지 않게)
@@ -881,7 +885,7 @@ async function renderTrack(c, onProg) {
       else if (style === 'latin' && L >= 2) { brass(t0 + s16 * 6, ch, .6); brass(t0 + s16 * 10, ch, .6); }
     }
     if (O.gong && (firstOfSec || b === 0) && !(b > 0 && L === 0)) gong(t0, L >= 2 ? .9 : .6);
-    if (O.choir && (L >= 2 || ((style === 'epic' || style === 'pro') && L >= 1))) choir(t0, ch, barEnd - t0, [0, .5, .7, .85][L]);
+    if (O.choir && (L >= 2 || ((style === 'epic' || style === 'pro') && L >= 1))) choir(t0, ch, barEnd - t0, [0, .36, .48, .58][L]);
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
     const ph = b - s.bar, blk = Math.floor(ph / 4), vari = blk % 2, pOff = (ph % 4) * 16;   // 4마디 묶음마다 멜로디가 달라짐: 주제 → 꾸밈 변주 → 새 주제 → 그 변주 …
@@ -899,7 +903,7 @@ async function renderTrack(c, onProg) {
       const h = nextHit(t), toHit = h == null ? 99 : h - t;
       if (!BRK && i === 0) {   // 멜로디 밑에 한 마디 길게 깔리는 화음 바닥(근음·5도·3도를 낮게 쌓아 묵직하게)
         const bd = Math.min(BAR * 1.02, endT - t + s16 * 2);
-        if (bd > .1) for (const x of [ch[0] - 12, ch[0] - 5, ch[1]]) P('LD', 'mdbl', t, [.2, .28, .34, .4][L], bd, hz(x, 4));
+        if (bd > .1) for (const x of [ch[0] - 12, ch[0] - 5, ch[1]]) P('LD', 'mdbl', t, [.13, .16, .18, .2][L], bd, hz(x, 4));   // 화음 바닥은 은은하게(멜로디를 덮지 않게)
       }
       if (line) for (const n of line) if (n.st === i + pOff) {
         let semi = degSemi(n.d); if (n.end) semi = nearestChordTone(semi, [ch[0]]); else if (n.strong) { const raw = semi; semi = nearestChordTone(raw, ch); if (semi === lastMel) semi = nearestChordTone(raw + (raw >= semi ? 3 : -3), ch); }
@@ -913,7 +917,7 @@ async function renderTrack(c, onProg) {
         if (semi === lastMel && semi === prevMel && !n.end && !n.strong) semi = degSemi(n.d + (mrnd() < .5 ? 1 : -1));
         play(tt, d, semi, v); if (!n.run) { prevMel = lastMel; lastMel = semi; }
         if (n.run) continue;
-        if (L >= 1) P('LD', 'mdbl', tt, v * .5, d, hzL(semi - 12));   // 한 옥타브 아래 현악(또는 호른)으로 겹쳐 두껍게
+        if (L >= 1) P('LD', 'mdbl', tt, v * .38, d, hzL(semi - 12));   // 한 옥타브 아래 현악(또는 호른)으로 겹쳐 두껍게
         if (L >= 2 && n.len >= 2) {   // 아래로 화음 성부 1~2개
           const below = (top) => { let hv = null; for (const cs of ch) for (const o of [-24, -12, 0, 12, 24]) { const x = cs + o; if (x <= top - 3 && x >= top - 9 && (hv == null || x > hv)) hv = x; } return hv; };
           const h1 = below(semi), h2 = L >= 3 && h1 != null ? below(h1) : null;
@@ -1033,9 +1037,11 @@ async function renderTrack(c, onProg) {
       if (O.strings && FL && L >= 1) {   // 반전: 낮은 현악이 '둥-다다' 말발굽 리듬(갤럽)으로 몰아침
         if (i % 4 !== 1) { const sm = ch[0] - 12 + (i === 8 ? 7 : i === 14 || i === 15 ? (b % 2 ? 3 : 5) : 0); strings(t, i % 4 === 0 ? [sm, sm + 12] : [sm], s16 * .85, i % 4 === 0 ? 1 : .7); }
       } else if (O.strings && style === 'pro' && L >= 1) {   // 낮은 현악 16분 리프: 근음 연타에 강세 자리(3+3+2)에서 5도·옥타브·4도로 뛰기
-        const acc = [0, 3, 6, 8, 11, 14], jump = [{ 3: 7, 6: 12, 11: 5, 14: 7 }, { 3: 5, 6: 7, 11: 12, 14: 3 }, { 6: 7, 8: 12, 11: 5, 14: 10 }][blk % 3], sm = ch[0] + (jump[i] || 0) - 12;
-        if (L >= 2 || eighth) strings(t, L >= 3 && acc.includes(i) ? [sm, sm + 12] : [sm], s16 * .9, (acc.includes(i) ? 1 : .6) * [0, .75, .85, 1][L]);
-      } else if (O.strings && L >= 1 && eighth) { const pat = [0, 0, 2, 0, 1, 0, 2, 1], sm = ch[pat[(i / 2) % 8]]; strings(t, L >= 3 ? [sm, sm + 12] : [sm], s16 * 1.6, [0, .7, .85, 1][L]); }
+        // 예전엔 16칸을 빈틈없이 근음으로 연타해서 '한 음만 일정하게' 들렸음 → 쉼이 있는 무늬에서 근음·3도·5도·옥타브로 움직이게, 4마디마다 무늬 바꿈
+        const o = OST[ostOf(s, blk)], tok = o[i], acc = tok && tok === tok.toUpperCase();
+        if (tok && (L >= 2 || q || (eighth && acc))) { const sm = { r: ch[0], t: ch[1], f: ch[2], o: ch[0] + 12 }[tok.toLowerCase()] - 12;
+          strings(t, L >= 3 && acc ? [sm, sm + 12] : [sm], s16 * (o[i + 1] ? .9 : 1.7), (acc ? 1 : .6) * [0, .62, .72, .85][L]); }
+      } else if (O.strings && L >= 1 && eighth) { const pat = [[0, 0, 2, 0, 1, 0, 2, 1], [0, 2, 1, 2, 0, 2, 1, 2], [0, 1, 2, 1, 0, 2, 0, 1], [2, 1, 0, 1, 2, 0, 1, 0]][(blk + (c.seed % 4)) % 4], sm = ch[pat[(i / 2) % 8]]; strings(t, L >= 3 ? [sm, sm + 12] : [sm], s16 * 1.6, [0, .7, .85, 1][L]); }
       if (O.piano && L >= 1 && (L === 1 ? (i === 0 || i === 8) : [0, 3, 6, 10].includes(i))) for (const sm of ch) piano(t, sm + 12, L === 1 ? .55 : .5);
       if (O.guitar && L >= 2 && !firstOfSec && eighth) guitar(t, ch[0], s16 * 1.4, q ? .85 : .65);
       if (O.bells && ((L === 0 && i === 0) || (L >= 1 && [0, 6, 12].includes(i)))) bells(t, hz(ch[(i / 6) % 3] + 12, 8), L === 0 ? .5 : .6);
@@ -1086,13 +1092,15 @@ async function renderTrack(c, onProg) {
   const BASS_I = style === 'edm' ? 'synth_bass_1' : 'acoustic_bass';
   const CTR_I = { pro: 'orchestral_harp', epic: 'flute', edm: 'marimba', gugak: 'koto', hiphop: 'acoustic_grand_piano', latin: 'marimba' }[style] || 'orchestral_harp';
   const MDBL = { edm: 'pad_2_warm', hiphop: 'electric_piano_1', gugak: 'koto', latin: 'acoustic_guitar_nylon' };
+  // 멜로디로 쓸 때만 키우는 악기(반주용으로 작게 맞춘 악기라 멜로디로 쓰면 묻힘)
+  const LEAD_BOOST = { string_ensemble_1: 1.7, choir_aahs: 1.25, acoustic_grand_piano: 1.35, electric_piano_1: 1.35, koto: 1.4, acoustic_guitar_nylon: 1.4, flute: 1.15 };
   const PLAYR = { flute: [60, 96], shakuhachi: [60, 90], shanai: [60, 91], trumpet: [54, 84], french_horn: [44, 77], lead_2_sawtooth: [48, 96], string_ensemble_1: [43, 93], choir_aahs: [45, 81], electric_piano_1: [36, 96], koto: [57, 91], orchestral_harp: [36, 100], acoustic_guitar_nylon: [53, 84], marimba: [67, 96], acoustic_bass: [28, 55], synth_bass_1: [24, 60], brass_section: [34, 81], string_ensemble_2: [36, 93], pad_2_warm: [30, 96], tubular_bells: [60, 84] };
   const fold = (inst, m) => { const r = PLAYR[inst]; if (!r) return m; while (m < r[0]) m += 12; while (m > r[1]) m -= 12; return m; };
   const SAMP = (ev) => { const sp = SAMP0(ev); if (sp && PLAYR[sp.inst]) sp.notes = sp.notes.map((m) => fold(sp.inst, m)); return sp; };
   const SAMP0 = ([name, ...a]) => {
     switch (name) {
       case 'flead': return { inst: FLEAD_I[0], notes: [toMidi(a[1]) + FLEAD_I[1]], d: a[0], at: .012, r: .12, sus: true };
-      case 'lead': { const li = a[3] || LEAD_I[0]; return { inst: li, notes: [toMidi(a[1]) + (LEADS[li] ? LEADS[li][1] : -12)], d: a[0], at: .015, r: .18, sus: !['acoustic_grand_piano', 'electric_piano_1', 'koto', 'acoustic_guitar_nylon'].includes(li) }; }
+      case 'lead': { const li = a[3] || LEAD_I[0]; return { inst: li, notes: [toMidi(a[1]) + (LEADS[li] ? LEADS[li][1] : -12)], d: a[0], at: .015, r: .18, sus: !['acoustic_grand_piano', 'electric_piano_1', 'koto', 'acoustic_guitar_nylon'].includes(li), g: LEAD_BOOST[li] || 1 }; }
       case 'counter': return { inst: CTR_I, notes: [toMidi(a[1])], d: a[0], at: .006, r: .2, sus: !['orchestral_harp', 'marimba', 'koto', 'acoustic_grand_piano'].includes(CTR_I) };
       case 'flute': return { inst: style === 'gugak' ? 'shakuhachi' : 'flute', notes: [toMidi(a[1])], d: a[0], at: .03, r: .15, sus: true };
       case 'piano': return { inst: 'acoustic_grand_piano', notes: [mOf(a[0], 4)], d: 2.4, r: .3 };
@@ -1141,7 +1149,7 @@ async function renderTrack(c, onProg) {
   if (c._events) return { events: events.map((e) => { const sp = SAMP(e.slice(3)); return [...e, sp ? sp.inst : null, sp ? sp.notes : null, sp ? sp.d : null]; }), secs, BAR, s16, spb, D, endT: FT != null ? endOut : endT, hits, FT: FU, chords: Array.from({ length: nBars }, (_, b) => chordAt(b)), scale: SCALE };   // 점검용
   await loadInst([...need], onProg ? (x) => onProg(.05 * x) : null);
   const playSamp = (oc, sp) => {
-    const bank = INST.get(sp.inst), gn = (INST_GAIN[sp.inst] || 1) / Math.sqrt(sp.notes.length);
+    const bank = INST.get(sp.inst), gn = (INST_GAIN[sp.inst] || 1) * (sp.g || 1) / Math.sqrt(sp.notes.length);
     for (const m of sp.notes) {
       let best = null, bd = 99; for (const k of bank.keys()) { const dd = Math.abs(k - m); if (dd < bd) { bd = dd; best = k; } }
       const buf = bank.get(best), rate = Math.pow(2, (m - best) / 12), src = oc.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
@@ -1201,11 +1209,13 @@ async function renderTrack(c, onProg) {
   const rev = main.createConvolver(); { const n = Math.floor(sr * 2.4), b = main.createBuffer(2, n, sr); for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2); } rev.buffer = b; }
   const revOut = main.createGain(); revOut.gain.value = .32; rev.connect(revOut); revOut.connect(master);
   // [음량, 잔향, 좌우 위치(-1 왼쪽 ~ 1 오른쪽), 좌우 퍼짐]: 예전엔 모든 소리가 가운데 한 점에 몰려 있었음
-  const BUS = { GT: [.5, .1, -.35, 0], DR: [.85, .12, 0, .12], FX: [.8, .35, 0, .5], MU: [.5, .45, 0, .55], PU: [.5, .45, 0, .55], BA: [.62, 0, 0, 0], LD: [.4, .45, .08, .3], CT: [.36, .45, -.45, .15] };
+  const brightLead = ['trumpet', 'shanai', 'lead_2_sawtooth', 'flute', 'shakuhachi'].includes(leadName);   // 원래 밝은 멜로디 악기는 덜 키움(쨍해지지 않게)
+  const BUS = { GT: [.5, .1, -.35, 0], DR: [.85, .12, 0, .12], FX: [.8, .35, 0, .5], MU: [.42, .45, 0, .55], PU: [.45, .45, 0, .55], BA: [.62, 0, 0, 0], LD: [brightLead ? .56 : .72, .38, .08, .3], CT: [.36, .45, -.45, .15] };
   const drLow = main.createBiquadFilter(); drLow.type = 'peaking'; drLow.frequency.value = 95; drLow.Q.value = .8; drLow.gain.value = kw * 4.5;   // 묵직함은 가슴을 치는 80~120Hz에서(그 아래 웅웅거림은 덜고)
   const drSub = main.createBiquadFilter(); drSub.type = 'highpass'; drSub.frequency.value = 38; drSub.Q.value = .7; drSub.connect(drLow);
   const drHigh = main.createBiquadFilter(); drHigh.type = 'highshelf'; drHigh.frequency.value = 5000; drHigh.gain.value = -kw * 4; drLow.connect(drHigh); drHigh.connect(master);
-  const toneLD = main.createBiquadFilter(); toneLD.type = 'lowpass'; toneLD.frequency.value = 8000; toneLD.Q.value = .5; toneLD.connect(master);
+  const toneLD = main.createBiquadFilter(); toneLD.type = 'lowpass'; toneLD.frequency.value = 8000; toneLD.Q.value = .5;
+  const presLD = main.createBiquadFilter(); presLD.type = 'peaking'; presLD.frequency.value = 2200; presLD.Q.value = .8; presLD.gain.value = brightLead ? 0 : 2.5; toneLD.connect(presLD); presLD.connect(master);   // 멜로디가 반주 위로 또렷하게
   for (const [name, buf] of Object.entries(stems)) {
     const [vol, wet, pan, wide] = BUS[name], out = name === 'LD' ? toneLD : name === 'DR' ? drSub : master;
     const src = main.createBufferSource(); src.buffer = buf; const g = main.createGain(); g.gain.value = vol; src.connect(g);
