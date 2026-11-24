@@ -91,7 +91,7 @@
 </style>
 </head>
 <body>
-<header class="bar"><h1>🎼 자유품새 음원 만들기</h1><a class="back" id="back" href="/#tkd">홈으로</a></header>
+<header class="bar"><h1>🎼 자유품새 음원 만들기 <small id="ver" style="font-size:.6em;opacity:.55;font-weight:400">11.24 저녁판</small></h1><a class="back" id="back" href="/#tkd">홈으로</a></header>
 
 <main class="wrap">
   <section class="card">
@@ -105,7 +105,7 @@
     <h2>1. 분위기</h2>
     <div class="styles" id="styles"></div>
     <div class="grid4">
-      <label class="f">길이(초)<input type="number" id="dur" min="30" max="180" step="1" title="WT 자유품새 경기 시간은 90~100초예요"></label>
+      <label class="f">길이(초)<input type="number" id="dur" min="60" max="180" step="1" title="WT 자유품새 경기 시간은 90~100초예요"></label>
       <label class="f">빠르기(BPM)<input type="number" id="bpm" min="70" max="180" step="1"></label>
       <label class="f">조성<select id="key"></select></label>
       <label class="f">변주 번호<span class="seed"><input type="number" id="seed" min="1" max="9999" title="번호를 바꾸면 화음 진행과 멜로디가 달라져요. 같은 번호면 똑같이 다시 만들어져요."><button id="dice" title="다른 변주" aria-label="다른 변주로 바꾸기">🎲</button></span></label>
@@ -248,7 +248,8 @@ cfg.knobs = { ...KNOB_DEF, ...(cfg.knobs || {}) }; delete cfg.myMel;
 if (cfg.sections && cfg.hits) fixShrunk();
 if (cfg.sections && !cfg.v95) { Object.assign(cfg, fitDur({ dur: cfg.dur, sections: cfg.sections, hits: cfg.hits, endHit: cfg.endHit }, 95)); cfg.v95 = true; }
 function fixShrunk() {
-  if (!(cfg.endHit < cfg.dur * .6)) return false;
+  if (cfg.dur < 60) { Object.assign(cfg, fitDur({ dur: cfg.dur, sections: cfg.sections, hits: cfg.hits, endHit: cfg.endHit }, 95)); setTimeout(() => toast('곡 길이가 너무 짧게 저장돼 있어서 95초로 맞췄어요'), 300); return true; }
+  if (!(cfg.endHit < cfg.dur * .8)) return false;
   const k = (cfg.dur - 1.5) / Math.max(5, cfg.endHit);
   cfg.sections.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.hits.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.endHit = cfg.dur - 1.5;
   setTimeout(() => toast('구간·타격 시간이 곡 앞쪽에 몰려 있어서 곡 길이에 맞게 다시 늘렸어요'), 300); return true;
@@ -340,8 +341,8 @@ function sortAll() { openSec.clear(); cfg.sections.sort((a, b) => a.t - b.t); cf
 let dirty = false;
 function changed() { persist(); renderTimeline(); if (rendered) { dirty = true; $('dirty').style.display = 'block'; } }
 
-$('dur').addEventListener('change', () => { const old = cfg.dur; cfg.dur = num($('dur').value, 30, 180, 100); $('dur').value = cfg.dur;
-  if (cfg.endHit > cfg.dur - 1 || old - cfg.endHit <= 6 || cfg.endHit < cfg.dur * .6) cfg.endHit = Math.max(5, cfg.dur - Math.min(6, Math.max(1.5, old - cfg.endHit))); $('endhit').value = cfg.endHit; fixShrunk(); changed(); });
+$('dur').addEventListener('change', () => { const old = cfg.dur; cfg.dur = num($('dur').value, 60, 180, 95); $('dur').value = cfg.dur;
+  if (cfg.endHit > cfg.dur - 1 || old - cfg.endHit <= 6 || cfg.endHit < cfg.dur * .8) cfg.endHit = Math.max(5, cfg.dur - Math.min(6, Math.max(1.5, old - cfg.endHit))); $('endhit').value = cfg.endHit; fixShrunk(); changed(); });
 $('bpm').addEventListener('change', () => { cfg.bpm = num($('bpm').value, 70, 180, 120); $('bpm').value = cfg.bpm; changed(); });
 $('key').addEventListener('change', () => { cfg.key = $('key').value; changed(); });
 $('dstyle').addEventListener('change', () => { cfg.drumStyle = $('dstyle').value; if (!cfg.opts.drumkit) { cfg.opts.drumkit = true; renderInst(); } changed(); });
@@ -404,7 +405,7 @@ function parsePrompt(text) {
   const AT = '(?:에|부터|이후|후|뒤|쯤|까지|전|부근|지점|동안|마다|간격|정도에|째)';
   const secAll = [...T.matchAll(new RegExp('(\\d{2,3}(?:\\.\\d)?)\\s*초(?!\\s*' + AT + ')', 'g'))].filter((m) => Number(m[1]) >= 45);
   const sec = secAll[0] || T.match(new RegExp('(\\d)\\s*분\\s*(\\d{1,2})?\\s*초?(?!\\s*' + AT + ')'));
-  if (sec) { const d = sec[0].includes('분') ? Number(sec[1]) * 60 + Number(sec[2] || 0) : Number(sec[1]); const old = cfg.dur; cfg.dur = num(d, 30, 180, cfg.dur);
+  if (sec) { const d = sec[0].includes('분') ? Number(sec[1]) * 60 + Number(sec[2] || 0) : Number(sec[1]); const old = cfg.dur; cfg.dur = num(d, 60, 180, cfg.dur);
     if (cfg.dur !== old) { const k = cfg.dur / old; cfg.sections.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.hits.forEach((x) => (x.t = Math.round(x.t * k * 2) / 2)); cfg.endHit = Math.round(cfg.endHit * k * 2) / 2; }
     done.push(`${cfg.dur}초`); }
   const key = T.match(/([A-Ga-g])\s*(?:단조|마이너|minor|m\b)/); if (key && KEYS.some((k) => k[0] === key[1].toUpperCase())) { cfg.key = key[1].toUpperCase(); done.push(`${cfg.key} 단조`); }
@@ -1272,11 +1273,18 @@ $('make').addEventListener('click', async () => {
   stopPlay(true);
   $('make').disabled = true; $('make').textContent = '만드는 중…'; const pr = $('prog'); pr.style.display = 'block';
   const t1 = performance.now();
+  if (fixShrunk()) { fillInputs(); renderLists(); renderTimeline(); persist(); }
   try {
     rendered = await renderTrack(JSON.parse(JSON.stringify(cfg)), (x) => { pr.firstElementChild.style.width = Math.round(x * 100) + '%'; });
     wavBlob = null; dirty = false; $('dirty').style.display = 'none';
     $('make-info').textContent = `${STYLES[cfg.style].name} · ${cfg.bpm} BPM · ${cfg.key} 단조 · 변주 ${cfg.seed} (${((performance.now() - t1) / 1000).toFixed(1)}초 걸림)`;
     if (cfg.endHit < cfg.dur - 8) $('make-info').textContent += ` · 마지막 동작이 ${cfg.endHit}초라 곡이 거기서 끝나요`;
+    { // 스스로 점검: 처음부터 마지막 동작까지 4초 넘게 소리가 거의 없는 곳이 있으면 알림(만들다 마는 문제를 바로 알아채게)
+      const d = rendered.buf.getChannelData(0), sr = rendered.buf.sampleRate, end = Math.min(rendered.buf.duration, cfg.endHit) - 1, win = Math.floor(sr * .5); let quiet = 0, bad = null, ref = 0;
+      for (let i = 0; i < d.length; i += win * 4) { let q = 0; for (let j = i; j < Math.min(d.length, i + win); j++) q += d[j] * d[j]; ref = Math.max(ref, q / win); }
+      for (let t = 2; t < end; t += .5) { const i = Math.floor(t * sr); let q = 0; for (let j = i; j < Math.min(d.length, i + win); j++) q += d[j] * d[j]; if (q / win < ref * 1e-4) { quiet += .5; if (quiet > 4 && bad == null) bad = t - quiet; } else quiet = 0; }
+      if (bad != null) { $('make-info').textContent += ` · ⚠ ${bad.toFixed(0)}초 뒤에 소리가 거의 없는 곳이 있어요`; console.warn('quiet stretch', bad); }
+    }
     ['play', 'stop', 'tap', 'save-ath', 'dl'].forEach((id) => ($(id).disabled = false));
     playOff = 0; updTime(); toast('음원이 만들어졌어요. ▶ 재생으로 들어 보세요.');
   } catch (e) { console.error(e); toast('이 브라우저에서는 음원을 만들 수 없어요. 크롬이나 엣지 최신 버전에서 열어 주세요.'); }
