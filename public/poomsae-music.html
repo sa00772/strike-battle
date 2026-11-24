@@ -637,7 +637,7 @@ async function renderTrack(c, onProg) {
   const CELLS = [[0, 1, 2, 3], [0, 2, 3], [0, 3], [0, 1, 2], [0, 2], [0, 1, 3], [0, 2, 3], [0], [0, 1], [1, 2, 3], [0, 1, 2, 3], [1, 3], [0, 2]];
   const riffBar = (cells, d0, off, drift) => { const out = []; let d = d0;
     cells.forEach((cl, bt) => cl.forEach((st, k) => {
-      if (bt + k > 0) { const r = mrnd(); d = clampD(d + (r < .32 ? 0 : r < .47 ? (mrnd() < .5 ? 3 : -3) : r < .62 ? drift : mpick([1, -1, 2, -2]))); }
+      if (bt + k > 0) { const r = mrnd(); d = clampD(d + (r < .2 ? 0 : r < .37 ? (mrnd() < .5 ? 3 : -3) : r < .55 ? drift : mpick([1, -1, 2, -2]))); }
       out.push({ st: off + bt * 4 + st, d });
     })); return out; };
   const proTheme = () => {
@@ -681,13 +681,15 @@ async function renderTrack(c, onProg) {
   const learnTheme = () => {
     const start = mpick([NS, NS + 2, NS + 4]), seq = mpick([1, 2, -1, -2, 0]);
     const q1 = learnBar(start, 0, true), q2 = learnBar(q1[q1.length - 1].d, 16, false);
-    const a1 = q1.map((n) => ({ st: n.st + 32, d: clampD(n.d + seq) }));   // 첫 마디를 옮겨 되풀이(배운 곡들도 동기 되풀이가 많음)
+    const a1 = q1.map((n) => ({ st: n.st + 32, d: clampD(n.d + seq) })).filter((n, i, a) => !(i === a.length - 1 && a.length > 3 && mrnd() < .45));   // 첫 마디를 옮겨 되풀이(끝 음은 가끔 빼서 똑같지 않게)
     const a2 = barLine(mpick(ENDR), a1[a1.length - 1].d, NS, 1, 48); a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true;
     return [...q1, ...q2, ...a1, ...a2];
   };
   const themeFor = (name) => {
     if (themes.has(name)) return themes.get(name);
-    const t0 = themeFor0(name), t = style === 'pro' ? t0.map((n) => ({ ...n, f16: n.st % 2 === 1 })) : add16(t0);
+    const t0 = themeFor0(name).map((n) => ({ ...n }));
+    for (let i = 3; i < t0.length; i++) if (!t0[i].end && t0[i].d === t0[i - 1].d && t0[i - 1].d === t0[i - 2].d && t0[i - 2].d === t0[i - 3].d) t0[i].d = clampD(t0[i].d + (mrnd() < .5 ? 1 : -1));   // 같은 음 4연타 이상은 이웃음으로
+    const t = style === 'pro' ? t0.map((n) => ({ ...n, f16: n.st % 2 === 1 })) : add16(t0);
     themes.set(name, t); return t;
   };
   const themeFor0 = (name) => {
@@ -700,7 +702,8 @@ async function renderTrack(c, onProg) {
       let m;
       if (kind === 'hook') { const rh = mpick(HOOKR), st0 = mpick([NS, NS + 2, NS + 4]); let d = st0; m = rh.map((x, k) => { if (k) d = clampD(d + mpick([1, -1, 2, -2, 0, 3])); return { st: x, d }; }); if (rh[rh.length - 1] < 8) m = [...m, ...m.map((n) => ({ st: n.st + 8, d: clampD(n.d + mpick([0, 0, 1, -1])) }))]; }
       else { const shp = mpick([[0, 2, 4, 7], [0, 2, 4, 2], [7, 4, 2, 0], [0, 4, 2, 4], [0, 2, 4, 6]]), st0 = mpick([NS - 1, NS, NS + 2]), step = mpick([2, 4]); m = []; for (let x = 0; x < 16; x += step) m.push({ st: x, d: clampD(st0 + shp[(x / step) % shp.length]) }); }
-      const notes = [...m, ...m.map((n) => ({ st: n.st + 16, d: n.d })), ...m.map((n) => ({ st: n.st + 32, d: clampD(n.d + seqv) })), ...close(clampD(m[m.length - 1].d + seqv))];
+      const m2 = m.map((n, i) => ({ st: n.st + 16, d: i >= m.length - 2 ? clampD(n.d + mpick([1, -1, 2, -2])) : n.d })).filter((n, i) => !(i === m.length - 2 && m.length > 3 && mrnd() < .4));   // 둘째 마디는 끝을 바꿔 그대로 되풀이하지 않게
+      const notes = [...m, ...m2, ...m.map((n) => ({ st: n.st + 32, d: clampD(n.d + seqv) })), ...close(clampD(m[m.length - 1].d + seqv))];
       themes.set(name, notes); return notes;
     }
     if (kind === 'desc' || kind === 'call') {
@@ -715,15 +718,26 @@ async function renderTrack(c, onProg) {
     const start = mpick([NS, NS + 2, NS + 4, NS - 1]), top = NS + 4 + Math.floor(mrnd() * 4), seq = mpick([1, 2, -1, -2, 0]);
     const q1 = barLine(rA, start, top, arch, 0);                                    // 물음: 올라가서
     const q2 = barLine(rB, top, mpick([NS + 1, NS + 4, NS + 6]), arch * .5, 16);   // 2도·5도·7도에서 열린 채 멈춤
-    const a1 = q1.map((n) => ({ st: n.st + 32, d: clampD(n.d + seq) }));          // 대답: 첫 마디를 옮겨 되풀이(반복 진행)
+    const a1 = q1.map((n) => ({ st: n.st + 32, d: clampD(n.d + seq) })).filter((n, i, a) => !(i === a.length - 1 && a.length > 3 && mrnd() < .45));   // 대답: 첫 마디를 옮겨 되풀이(끝 음은 가끔 빼서 똑같지 않게)
     const a2 = barLine(mpick(ENDR), a1[a1.length - 1].d, NS, 1, 48);               // 마지막은 으뜸음
     a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true;
     const notes = [...q1, ...q2, ...a1, ...a2];
     themes.set(name, notes); return notes;
   };
   const lines = new Map();
-  const lineFor = (name, L, vari) => {
-    const key = name + '|' + L + '|' + vari; if (lines.has(key)) return lines.get(key);
+  const uses = new Map();
+  const occOf = (name, id) => { if (!uses.has(name)) uses.set(name, []); const a = uses.get(name); if (!a.includes(id)) a.push(id); return Math.min(3, a.indexOf(id)); };
+  const develop = (ns, occ) => {   // 다시 나올 때마다: 2~4마디 음을 몇 개 이웃음으로, 짧은 장식음은 빼거나 더하고, 세 번째부터는 끝맺음도 새로
+    let out = ns.map((n) => ({ ...n }));
+    for (let i = 0; i < out.length; i++) { const n = out[i]; if (n.end || n.run || n.st < 16) continue;
+      const r = mrnd(); if (r < .3) n.d = clampD(n.d + mpick([1, -1, 2, -2])); else if (r < .4 && n.f16) n.drop = true; }
+    out = out.filter((n) => !n.drop);
+    for (let i = 0; i + 1 < out.length; i++) { const n = out[i]; if (n.st >= 16 && !n.end && out[i + 1].st - n.st >= 4 && mrnd() < .2) out.push({ st: n.st + 2, d: clampD(n.d + mpick([1, -1])), f16: false }); }
+    if (occ >= 2) { out = out.filter((n) => n.st < 48); const a2 = barLine(mpick(ENDR), (out[out.length - 1] || { d: NS }).d, NS, mpick([1, -1, 0]), 48); a2[a2.length - 1].d = NS; a2[a2.length - 1].end = true; out.push(...a2); }
+    return out.sort((x, y) => x.st - y.st);
+  };
+  const lineFor = (name, L, vari, occ = 0) => {
+    const key = name + '|' + L + '|' + vari + '|' + occ; if (lines.has(key)) return lines.get(key);
     const grid = L < 0 ? 16 : L === 0 ? 8 : L === 1 ? (r16 >= .6 ? 2 : 4) : L === 2 ? 2 : 1;
     let ns = themeFor(name).filter((n) => n.st % grid === 0 || n.end || (n.f16 && L >= 2 && (style !== 'pro' || r16 >= .3)) || (n.f16 && L === 1 && r16 >= .8)).map((n) => ({ ...n }));
     if (L <= 1) for (let bar = 0; bar < 4; bar++) if (!ns.some((n) => n.st >= bar * 16 && n.st < bar * 16 + 16)) {   // 걸러내다 한 마디가 통째로 비면 그 마디 첫 음을 마디 첫 박으로 당겨 둠(긴 공백 방지)
@@ -743,11 +757,12 @@ async function renderTrack(c, onProg) {
       const last = ns[ns.length - 1];
       if (last.st <= 57) { const to = themeFor(name)[0].d; for (let k = 0; k < 3; k++) ns.push({ st: 61 + k, d: clampD(to - 3 + k), run: true }); }
     }
+    if (occ >= 1) ns = develop(ns, occ);
     ns.sort((x, y) => x.st - y.st);
     const res = ns.map((n, i) => { const len = (i + 1 < ns.length ? ns[i + 1].st : 64) - n.st; return { ...n, len, strong: !n.run && (n.st % 8 === 0 || (n.st % 4 === 0 && len >= 3) || len >= 5) && !(n.st % 8 && mrnd() < .12) }; });
     lines.set(key, res); return res;
   };
-  let lastMel = null;
+  let lastMel = null, prevMel = null;
   const prog = pick(PROGS);
   // 구간마다, 그리고 4마디마다 다른 화음 진행. 바로 앞 진행과 겹치지 않게 고름
   const secProgs = new Map(); let lastProg = prog;
@@ -849,7 +864,8 @@ async function renderTrack(c, onProg) {
     if (O.guitar && L >= 2 && firstOfSec) guitar(t0, ch[0], Math.min(BAR, barEnd - t0), .9);
     if (O.piano && L === 0 && !BRK) for (const sm of ch) piano(t0, sm, .5);
     const ph = b - s.bar, blk = Math.floor(ph / 4), vari = blk % 2, pOff = (ph % 4) * 16;   // 4마디 묶음마다 멜로디가 달라짐: 주제 → 꾸밈 변주 → 새 주제 → 그 변주 …
-    const line = lineFor((km >= .75 ? s.name : roleOf(s)) + (FL ? '|반전' : '') + (km >= .75 ? (blk >= 1 ? '#' + blk : '') : km >= .35 && (blk >> 1) % 2 ? '#b' : ''), BRK ? -1 : L, vari);   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
+    const lname = (km >= .75 ? s.name : roleOf(s)) + (FL ? '|반전' : '') + (km >= .75 ? (blk >= 1 ? '#' + blk : '') : km >= .35 && (blk >> 1) % 2 ? '#b' : '');
+    const line = lineFor(lname, BRK ? -1 : L, vari, occOf(lname, s.bar + ':' + (blk >> 1)));   // 멜로디는 잔잔한 구간·브레이크에서도 음 수만 줄여 계속 이어짐
     for (let i = 0; i < 16; i++) {
       const t = t0 + i * s16 + (i % 2 ? KN.swing / 100 * s16 * .38 : 0); if (t >= endT - 1e-4) break;
       if (i === 0 && line && !BRK && L >= 1 && KN.counter > 0) {   // 대선율: 멜로디가 길게 끌거나 쉬는 틈에 다른 악기가 짧게 받아침
@@ -873,7 +889,8 @@ async function renderTrack(c, onProg) {
         const v = (n.run ? .7 : 1) * (BRK ? .4 : [.5, .65, .75, .85][L]) * (.88 + .24 * Math.sin(Math.PI * pos)) * (n.strong ? 1.06 : n.st % 2 ? .86 : .95) * (.93 + mrnd() * .14);
         const play = (t1, dd, sm, vv) => (FL ? P('LD', 'flead', t1, vv, dd, hz(sm, 8), leadKind) : P('LD', 'lead', t1, vv, dd, hz(sm, 8), leadKind, leadFor(s))), hzL = (sm) => hz(sm, 8) * Math.pow(2, (FL ? FLEAD_I : LEAD_I)[1] / 12);
         if ((leadKind === 'piri' || mrnd() < (km - .45) * .7) && n.len >= 4 && t > s16 && !n.end) play(tt - s16 * .5, s16 * .45, degSemi(n.d + 1), v * .55);   // 국악: 위에서 떨어지는 꾸밈음
-        play(tt, d, semi, v); if (!n.run) lastMel = semi;
+        if (semi === lastMel && semi === prevMel && !n.end && !n.strong) semi = degSemi(n.d + (mrnd() < .5 ? 1 : -1));
+        play(tt, d, semi, v); if (!n.run) { prevMel = lastMel; lastMel = semi; }
         if (n.run) continue;
         if (L >= 1) P('LD', 'mdbl', tt, v * .5, d, hzL(semi - 12));   // 한 옥타브 아래 현악(또는 호른)으로 겹쳐 두껍게
         if (L >= 2 && n.len >= 2) {   // 아래로 화음 성부 1~2개
