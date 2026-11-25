@@ -419,14 +419,14 @@ function parsePrompt(text) {
     if (n) done.push(`${at}초 뒤 구간 ${n}개 ${strong ? (m[2] ? '한 단계 더 강하게' : '최고조로') : '잔잔하게'}`); else miss.push(`${at}초 뒤에 구간이 없어요`); }
   // 악기
   const noRe = /빼|없이|말고|제외/;
-  const ds = [['funk', /펑크|펑키|funk/i], ['disco', /디스코|four|포비트/i], ['break', /브레이크\s*비트|브레이크비트|브레익/], ['half', /하프\s*타임|묵직한\s*드럼/], ['rock', /록|락|rock/i]].find(([, re]) => re.test(T));
+  const ds = [['funk', /펑크|펑키|funk/i], ['disco', /디스코|four|포비트/i], ['break', /브레이크\s*비트|브레이크비트|브레익/], ['half', /하프\s*타임|묵직한\s*드럼/], ['rock', /(?<![가-힣])(?:록|락)(?:\s*(?:비트|드럼|스타일|느낌)|(?![가-힣]))|rock/i]].find(([, re]) => re.test(T));
   if (ds) { cfg.drumStyle = ds[0]; cfg.opts.drumkit = true; done.push('🥁 드럼 ' + $('dstyle').querySelector(`[value=${ds[0]}]`).textContent.split(' ')[0]); }
   if (/타악기|퍼커션|리듬\s*(?:악기|많이|강하게)|북\s*많이/.test(T) && !/타악기\s*(?:는|은)?\s*(?:빼|없이)/.test(T)) { for (const k of PERC_SET) cfg.opts[k] = true; done.push('🥁 타악기 더하기'); }
   const TG = T.split(/[,.，。!\n]|그리고|하고\s|하며|이고|다음에?/).filter((x) => !TECH.some(([, r]) => r.test(x))).join(', ');   // 기술 이름이 든 문장은 그 구간에만 적용(아래)
   for (const [k, l, re] of INSTR) {
     const m = TG.match(re); if (!m) continue;
     let end = TG.length; const pm = TG.slice(m.index).search(/[,.\n]/); if (pm > 0) end = m.index + pm;
-    for (const [, , r2] of INSTR) { const g = new RegExp(r2.source, 'g' + r2.flags.replace('g', '')); let mm; while ((mm = g.exec(TG))) if (mm.index > m.index && mm.index < end) end = mm.index; }
+    for (const [k2, , r2] of INSTR) { if (k2 === k) continue; const g = new RegExp(r2.source, 'g' + r2.flags.replace('g', '')); let mm; while ((mm = g.exec(TG))) if (mm.index > m.index && mm.index < end) end = mm.index; }
     const c = TG.slice(m.index, end);
     if (noRe.test(c)) { cfg.opts[k] = false; done.push(`${l} 빼기`); } else { cfg.opts[k] = true; done.push(l); }
   }
